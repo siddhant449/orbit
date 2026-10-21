@@ -8,5 +8,3 @@ allowBuilds:
   prisma: true
   esbuild: true
   workerd: set this to true or false
-minimumReleaseAgeExclude:
-  - '@anthropic-ai/sdk@0.137.0'

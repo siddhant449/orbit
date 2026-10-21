@@ -23,6 +23,8 @@ export function resolveModel(alias: ModelAlias): string {
     : (process.env.AI_MODEL_EXTRACT ?? "claude-haiku-5-5");
 }
 
+export type SdkLike = { messages: { create(params: Anthropic.MessageCreateParamsNonStreaming): Promise<Anthropic.Message> } };
+
 type ImageMedia = "image/jpeg" | "image/png" | "image/gif" | "image/webp";
 
 function buildContent(prompt: string, images?: AiImage[]): Anthropic.ContentBlockParam[] {
@@ -38,6 +40,9 @@ function textOf(message: Anthropic.Message): string {
   if (message.stop_reason === "refusal") {
     throw new Error("The model declined this request.");
   }
+  if (message.stop_reason === "max_tokens") {
+    throw new Error("The model response was cut off (max_tokens reached) before it finished.");
+  }
   return message.content
     .flatMap((b) => (b.type === "text" ? [b.text] : []))
     .join("")
@@ -48,11 +53,15 @@ function textOf(message: Anthropic.Message): string {
  * Claude-backed AiClient. Throws AiUnavailableError lazily (on first call)
  * when no key is configured, so constructing it never crashes a keyless server.
  */
-export function createClaudeClient(apiKey: string | undefined = process.env.ANTHROPIC_API_KEY): AiClient {
-  let sdk: Anthropic | null = null;
+export function createClaudeClient(
+  apiKey: string | undefined = process.env.ANTHROPIC_API_KEY,
+  /** Test seam: supply a fake SDK instead of constructing the real one. */
+  sdkFactory: (apiKey: string) => SdkLike = (key) => new Anthropic({ apiKey: key }),
+): AiClient {
+  let sdk: SdkLike | null = null;
   const getSdk = () => {
     if (!apiKey) throw new AiUnavailableError();
-    return (sdk ??= new Anthropic({ apiKey }));
+    return (sdk ??= sdkFactory(apiKey));
   };
 
   return {
@@ -78,7 +87,14 @@ export function createClaudeClient(apiKey: string | undefined = process.env.ANTH
           },
         },
       });
-      return schema.parse(JSON.parse(textOf(res)));
+      const raw = textOf(res);
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        throw new Error("The model returned invalid JSON.");
+      }
+      return schema.parse(parsed);
     },
   };
 }
