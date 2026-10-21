@@ -4,12 +4,20 @@ import type { Chat, ChatRole } from "../generated/prisma/client";
 
 export type ActiveTurn = { runId: string; requestMessageId: string | null };
 
+export type ChatErrorCode = "chat_not_found" | "chat_turn_active" | "message_id_conflict";
+
 export class ChatError extends Error {
-  readonly code: "chat_not_found" | "chat_turn_active";
+  readonly code: ChatErrorCode;
   readonly activeTurn?: ActiveTurn;
 
-  constructor(code: "chat_not_found" | "chat_turn_active", activeTurn?: ActiveTurn) {
-    super(code === "chat_turn_active" ? "This chat already has a reply in progress." : "Chat not found.");
+  constructor(code: ChatErrorCode, activeTurn?: ActiveTurn) {
+    super(
+      code === "chat_turn_active"
+        ? "This chat already has a reply in progress."
+        : code === "message_id_conflict"
+          ? "That message id belongs to another message."
+          : "Chat not found.",
+    );
     this.name = "ChatError";
     this.code = code;
     this.activeTurn = activeTurn;
@@ -91,7 +99,12 @@ export async function claimRun(chatId: string, runId: string, requestMessageId: 
       throw new ChatError("chat_turn_active", { runId: chat.activeRunId, requestMessageId: chat.activeRequestMessageId });
     }
   }
-  throw new ChatError("chat_turn_active");
+  // Still contended after retries: report whoever holds the lock now, if anyone.
+  const holder = await prisma.chat.findFirst({ where: { id: chatId, deletedAt: null } });
+  throw new ChatError(
+    "chat_turn_active",
+    holder?.activeRunId ? { runId: holder.activeRunId, requestMessageId: holder.activeRequestMessageId } : undefined,
+  );
 }
 
 /** Frees the lock, but only for the run that holds it. Also clears any stop flag. */
@@ -116,6 +129,12 @@ export async function isStopRequested(chatId: string, runId: string): Promise<bo
   return chat?.stopRequestedRunId === runId;
 }
 
+/** An id that already exists must be this chat's own message of this role, or the caller is colliding with another message. */
+async function assertOwnsMessage(chatId: string, id: string, role: ChatRole): Promise<void> {
+  const existing = await prisma.message.findUnique({ where: { id }, select: { chatId: true, role: true } });
+  if (!existing || existing.chatId !== chatId || existing.role !== role) throw new ChatError("message_id_conflict");
+}
+
 /** Stores the user's message once per id. A retry returns `created: false` and changes nothing. */
 export async function saveUserMessage(chatId: string, msg: MessageInput): Promise<{ created: boolean }> {
   const { count } = await prisma.message.createMany({
@@ -131,8 +150,12 @@ export async function saveUserMessage(chatId: string, msg: MessageInput): Promis
     ],
     skipDuplicates: true,
   });
-  if (count === 1) await prisma.chat.updateMany({ where: { id: chatId }, data: { lastActivityAt: new Date() } });
-  return { created: count === 1 };
+  if (count === 1) {
+    await prisma.chat.updateMany({ where: { id: chatId }, data: { lastActivityAt: new Date() } });
+    return { created: true };
+  }
+  await assertOwnsMessage(chatId, msg.id, "USER");
+  return { created: false };
 }
 
 /** Writes the assistant message, replacing the stored copy with the same id (partial saves, then the final). */
@@ -143,9 +166,9 @@ export async function saveAssistantMessage(chatId: string, msg: MessageInput & {
     context: optionalJson(msg.context) ?? Prisma.DbNull,
     runId: msg.runId,
   };
-  const { count } = await prisma.message.updateMany({ where: { id: msg.id, chatId }, data });
+  const { count } = await prisma.message.updateMany({ where: { id: msg.id, chatId, role: "ASSISTANT" }, data });
   if (count === 0) {
-    await prisma.message.createMany({
+    const { count: inserted } = await prisma.message.createMany({
       data: [
         {
           id: msg.id,
@@ -159,8 +182,11 @@ export async function saveAssistantMessage(chatId: string, msg: MessageInput & {
       ],
       skipDuplicates: true,
     });
-    // A parallel writer may have created it between our update and insert; make the last writer win.
-    await prisma.message.updateMany({ where: { id: msg.id, chatId }, data });
+    if (inserted === 0) {
+      // Someone else holds the id. If it is our own assistant message (a parallel writer), the last writer wins.
+      await assertOwnsMessage(chatId, msg.id, "ASSISTANT");
+      await prisma.message.updateMany({ where: { id: msg.id, chatId, role: "ASSISTANT" }, data });
+    }
   }
   await prisma.chat.updateMany({ where: { id: chatId }, data: { lastActivityAt: new Date() } });
 }

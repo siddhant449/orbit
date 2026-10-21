@@ -139,6 +139,29 @@ describe("run lock", () => {
     expect(r.filter((x) => x.status === "fulfilled")).toHaveLength(1);
   });
 
+  it("treats exactly 6 minutes as still active, and 6 minutes plus 1 ms as stale", async () => {
+    const { c } = await setup();
+    const t = new Date("2026-01-01T00:00:00Z");
+    await claimRun(c, "run-1", "m1", t);
+    await expect(claimRun(c, "run-2", "m2", new Date(t.getTime() + 6 * 60_000))).rejects.toMatchObject({ code: "chat_turn_active" });
+    await expect(claimRun(c, "run-2", "m2", new Date(t.getTime() + 6 * 60_000 + 1))).resolves.toBeUndefined();
+  });
+
+  it("a new claim clears a leftover stop flag", async () => {
+    const { c } = await setup();
+    await prisma.chat.update({ where: { id: c }, data: { stopRequestedRunId: "old-run" } });
+    await claimRun(c, "run-1", "m1");
+    expect((await prisma.chat.findUnique({ where: { id: c } }))!.stopRequestedRunId).toBeNull();
+    expect(await isStopRequested(c, "old-run")).toBe(false);
+  });
+
+  it("takes over a lock whose start time is missing", async () => {
+    const { c } = await setup();
+    await prisma.chat.update({ where: { id: c }, data: { activeRunId: "ghost", activeRunStartedAt: null } });
+    await expect(claimRun(c, "run-2", "m2")).resolves.toBeUndefined();
+    expect((await prisma.chat.findUnique({ where: { id: c } }))!.activeRunId).toBe("run-2");
+  });
+
   it("claim on a missing or deleted chat is chat_not_found", async () => {
     const { p, c } = await setup();
     await expect(claimRun(randomUUID(), "r", "m")).rejects.toMatchObject({ code: "chat_not_found" });
@@ -184,6 +207,39 @@ describe("messages", () => {
     expect(r.filter((x) => x.created)).toHaveLength(1);
     expect(await listMessages(p, c)).toHaveLength(1);
     expect((await prisma.chat.findUnique({ where: { id: c } }))!.lastActivityAt.getTime()).toBeGreaterThan(before.getTime());
+  });
+
+  it("rejects a user message id that belongs to another profile's chat", async () => {
+    const { c } = await setup();
+    const other = await ensureAccount(clerk(2));
+    const oc = randomUUID();
+    await getOrCreateChat(other.currentProfile!.id, other.user.id, oc);
+    const m = msg();
+    await saveUserMessage(oc, m);
+    await expect(saveUserMessage(c, m)).rejects.toMatchObject({ code: "message_id_conflict" });
+    expect(await prisma.message.count({ where: { id: m.id } })).toBe(1);
+  });
+
+  it("rejects a user message id that is already an assistant message", async () => {
+    const { c } = await setup();
+    const id = randomUUID();
+    await saveAssistantMessage(c, { ...msg(id), runId: "r" });
+    await expect(saveUserMessage(c, msg(id))).rejects.toMatchObject({ code: "message_id_conflict" });
+  });
+
+  it("rejects an assistant message id owned by another chat or a user message", async () => {
+    const { p, u, c } = await setup();
+    const c2 = randomUUID();
+    await getOrCreateChat(p, u, c2);
+    const a = randomUUID();
+    await saveAssistantMessage(c2, { ...msg(a), runId: "r", parts: [{ type: "text", text: "orig" }] });
+    await expect(saveAssistantMessage(c, { ...msg(a), runId: "r2" })).rejects.toMatchObject({ code: "message_id_conflict" });
+    const row = await prisma.message.findUnique({ where: { id: a } });
+    expect(row).toMatchObject({ chatId: c2, parts: [{ type: "text", text: "orig" }], runId: "r" });
+    const um = msg();
+    await saveUserMessage(c, um);
+    await expect(saveAssistantMessage(c, { ...msg(um.id), runId: "r" })).rejects.toMatchObject({ code: "message_id_conflict" });
+    expect(await prisma.message.findUnique({ where: { id: um.id } })).toMatchObject({ role: "USER", runId: null });
   });
 
   it("upserts an assistant message by id", async () => {
