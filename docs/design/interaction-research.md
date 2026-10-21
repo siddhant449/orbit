@@ -27,14 +27,14 @@ General rules for every pattern below:
 | Auth | `Authorization: Bearer <ORIGINKIT_API_KEY>` (key lives in `.env`; it was read at runtime by a script, never printed or written to any file). |
 | Tools (actual, from `tools/list`) | `list_components({category?})`, `get_component({name, stack: framer|react|nextjs|vite, styling: css|tailwind|cssmodules, typescript, preset?, tweaks?})`, `search({query})`, `fetch({id})`. The README names `originkit_browse / originkit_get / originkit_setup` (that is the plugin wrapper); the raw server tools differ. |
 | Plugin | `vellum-ai/originkit` (MIT repo): `assistant plugins install originkit`. Key goes in the plugin `config.json` (`{ "apiKey": "cmp_live_..." }`) or per session. |
-| Limits | README: 10 source fetches per key per day, shared with website copies, reset at 00:00 UTC; browsing is unlimited. This session used 10 fetch calls (8 delivered, 2 rejected as paid), so **assume 0 left until 00:00 UTC**. |
-| Plan gating | Free plan returned: "`dither-effect-2` is a paid component and your plan does not include it", same for `scroll-text-highlight`. Check `originkit.dev/pricing` before planning around a component. |
+| Limits | README: 10 source fetches per key per day, shared with website copies, reset at 00:00 UTC; browsing is unlimited. First key: 10 fetch calls (8 delivered, 2 rejected as paid); no refusal was recorded, the key was simply treated as spent. **Second key, same UTC day: 11 `get_component` calls (10 distinct names: 6 delivered, 4 rejected as paid, plus 1 repeat of an already-fetched name), every one answered HTTP 200 with no quota error.** Had the cap been per account, the 14 delivered fetches across both keys would have been refused, so the allowance is per key (or not enforced at 10). The second key itself never exceeded 10 delivered, so the per-key cap was not tested. Plan for 10 per key per day; a fresh key restores access to the free components. |
+| Plan gating | Free plan returned: "`dither-effect-2` is a paid component and your plan does not include it", same for `scroll-text-highlight`. The second key hit the same wall on `scrambletext`, `brush-reveal`, `magnetic-hover-button` and `text-dither`; the rejection is a normal HTTP 200 response carrying the message and no source. Check `originkit.dev/pricing` before planning around a component. |
 | Output shape | JSON with `dependencies`, an `installHint`, an `agentInstructions` brief (needs **Tailwind v4**; write into `src/components/originkit`; add to Tailwind `@source`), then a fenced TSX file. |
 | Category counts | background-animation 253, interactive-elements 118, text 83, animation 78, image-gallery 46, image 43, loader 28, cursor 23, button 21, games 7, border 4. |
 | Licence | The repo is MIT, but the README states no separate terms for the component source and the plan gates some components. **Treat the code as plan-licensed: adapt and rewrite to our tokens; do not redistribute verbatim**, and read `originkit.dev` terms before shipping anything unmodified. Credit is requested by the README. |
 | Gotchas | Fetched code frequently has no `prefers-reduced-motion` handling (canvas / WebGL ones had none: see table). Some use `framer-motion` (old import) vs `motion/react`; normalise to `motion/react`. |
 
-### Fetched into `.recon/originkit/` (8 components)
+### Fetched into `.recon/originkit/` (14 components)
 
 | File | What it does | Stack / deps | Reduced motion in source | Adaptation |
 |------|--------------|--------------|--------------------------|------------|
@@ -46,15 +46,22 @@ General rules for every pattern below:
 | `bayer-vortex.tsx` | Canvas 2D spiral field quantised through an 8x8 Bayer matrix | raw canvas, 363 lines | no | lightest dither background; good loader / empty-state animation at small size |
 | `halftone-pulse.tsx` | WebGL point-sprite grid, dot size and opacity carry a radial sine wave | raw WebGL, 338 lines | no | halftone ripple behind a hero or "generating" state; pink dots on paper |
 | `ascii-reveal.tsx` | turns any photo into live ASCII with a cursor-tracked porthole revealing the real image | Canvas 2D, 400 lines | no | marketing-only; static ASCII render on reduced motion |
+| `label-slide-button.tsx` | pill button whose label rolls up out of an `overflow:hidden` clip while a duplicate rolls in from below; an arrow badge swaps in a second arrow and both change colour on pointer hover and `:focus-visible`; press scales to 0.97 | `motion/react` (`useAnimate`, `useReducedMotion`); inline styles, Tailwind not needed; 553 lines; meta lists `framer-motion` + `motion` | yes (`useReducedMotion` turns every transition into `duration: 0`; the colour and label swap still happen, instantly) | **P05 label roll** for the nav CTA: keep the clipped roll, square 2px corners, ink fill with paper text; mark the duplicate label `aria-hidden` (source exposes both copies to screen readers); drop or replace the arrow badge |
+| `wax-seal.tsx` | procedurally baked 3D wax seal (height map from a logo mask, lobed irregular rim, optional rings) lit by a light that follows the cursor; presses in when scrolled into view and replays on re-entry | `three` (own `WebGLRenderer` per instance), 1131 lines; falls back to a remote logo URL when none is passed | no (reveal plays on viewport entry, cursor light always runs; only `role="img"` `aria-label="Wax seal"`) | idea only, do not ship `three`: build the **P24 stamp press** in CSS / SVG (face scales 1.15 to 1, slight rotate, expanding ink ring) for publish confirm and toasts; static ring under reduced motion |
+| `tiles-loader.tsx` | full-viewport page preloader: grid of ink squares, each paper cover fades out in random order as progress (fake easing curve capped by real `document` / image / font load) rises under a huge `mix-blend-mode: difference` percentage; at 100% tiles scale to 0 diagonally; fades itself out and calls `onComplete` | no deps, React + rAF + inline styles; 360 lines; min size 1200x800; shares the `useEditorialLoader` hook with `hairline-loader`; default palette `#EEEAE3` / `#151412` is already paper and ink | partial (`matchMedia` shortens the load to 0.6 s and the reveal to 0.4 s but it still animates; no role or aria on the progress) | **P28 route curtain / generation progress**: keep tile logic, feed `progress` from real task state instead of the fake curve, add `role="progressbar"` with `aria-valuenow`, replace the serif counter with our display face; RM: crossfade |
+| `hairline-loader.tsx` | full-viewport preloader: 1px rule draws left to right with tick marks every 10% and a large serif counter riding its head; at 100% the top and bottom halves split apart to reveal the page | no deps, same hook and 334 lines as `tiles-loader`; min size 1200x800 | partial (same as `tiles-loader`) | **P27 hairline loader**: ink rule, ticks as registration marks, counter in display face; compact version (rule + counter only) as a top-of-page progress for long generations; add `role="progressbar"`; split reveal optional |
+| `dither-reveal.tsx` | image drawn by a WebGL shader as a 3-tone dither (Bayer 8x8, diagonal lines or noise) with an ambient moving wave; a soft circle around the pointer reveals the real photo | raw WebGL1, no deps, 424 lines; texture from the `image` prop (default is a remote Unsplash URL with `crossOrigin`); pointer events only | no (continuous wave unless `wave=false`; pauses off-screen via `IntersectionObserver`; no keyboard or touch path) | **P18**: never one WebGL context per card; pre-bake the dither with `sharp` and crossfade on hover, or use this shader for one hero image only; RM: wave off, static dither |
+| `stipple-flow.tsx` | one huge word rendered to a canvas field, stippled by a WebGL threshold shader; a soft focus blob drifts on a Lissajous path lighting the letters, follows the pointer on hover and tightens on press | raw WebGL1 + 2D canvas, no deps, 778 lines; min size 1200x800; text exists only in the canvas | yes (`matchMedia` freezes the animation clock so the blob stops drifting; pointer-driven focus still works) | marketing hero word only (Feature 12): ink stipple on paper, focus follows the pointer; add a visually hidden `<h1>` with the same text; share one GL context with the hero background |
 
-Other Originkit components worth a later fetch (not fetched, index metadata only): **text**: `scrambletext`,
-`brush-reveal`, `text-dither`, `stipple-flow`, `text-gather`, `focus-reveal`, `skew-in-text-effect`; **button**:
-`encrypt-button` (cipher scramble to label), `magnetic-hover-button`, `label-slide-button`, `arrow-reveal-button`;
-**image**: `dither-reveal` (dithered image tears open to colour at the cursor), `dot-image-reveal`, `pixelreveal`,
-`wax-seal` (stamp press, good for toast / publish confirm), `sticker-peel`; **loader**: `tiles-loader` (square tiles
-ink in one by one), `hairline-loader` (rule drawn across the page with a percentage); **cursor**: `inkbleed-cursor`,
-`dot-cursor`, `axis-cursor` (crosshair with X/Y readout, echoes the Heron drafting cursor); **background**:
-`pulsing-ripple`, `tidal-stipple`, `triangle-halftone-dark`, `ascii-rain`, `ascii-flame`, `ascii-radar`.
+Other Originkit components worth a later fetch (not fetched, index metadata only): **text**: `text-gather`,
+`focus-reveal`, `skew-in-text-effect`; **button**: `encrypt-button` (cipher scramble to label), `arrow-reveal-button`;
+**image**: `dot-image-reveal`, `pixelreveal`, `sticker-peel`; **cursor**: `inkbleed-cursor`, `dot-cursor`,
+`axis-cursor` (crosshair with X/Y readout, echoes the Heron drafting cursor); **background**: `pulsing-ripple`,
+`tidal-stipple`, `triangle-halftone-dark`, `ascii-rain`, `ascii-flame`, `ascii-radar`.
+
+Paid on the free plan, so not fetchable with these keys (rejected by the server, no source returned): `scrambletext`,
+`brush-reveal`, `magnetic-hover-button`, `text-dither`, plus `dither-effect-2` and `scroll-text-highlight` from the first
+batch. Use the Motion Primitives `magnetic` / `text-effect` references for the same patterns.
 
 ---
 
@@ -204,7 +211,7 @@ Perf column assumes transform/opacity only. "RM" = reduced-motion fallback. Sour
 | P15 | Halftone avatar hover | halftone dots in the avatar grow on hover to reveal the full-tone photo | dot radius via mask | Originkit `dot-image-reveal` (idea); Paper Shaders halftone | CSS mask on a pre-rendered halftone, no WebGL; RM: crossfade |
 | P16 | Halftone spotlight | dots near the cursor grow | riso analogue of a glow spotlight | Motion Primitives `spotlight` (idea) | CSS variables updated in rAF; RM: static |
 | P17 | Terminal row hover | mono rows with a block caret | library lists | Codrops terminal typography | CSS only |
-| P18 | Image dither reveal | dithered image tears open to full colour at the pointer | knowledge-base thumbnails | Originkit `dither-reveal` (not fetched) | canvas / WebGL; RM: static dithered |
+| P18 | Image dither reveal | dithered image tears open to full colour at the pointer | knowledge-base thumbnails | Originkit `dither-reveal` (fetched; per-card WebGL is not used) | canvas / WebGL; RM: static dithered |
 | P19 | Press feedback on touch | `:active` shifts the shadow plate | replaces hover | plan | CSS `:active` |
 
 ### 6.3 Custom SVG animation
@@ -238,7 +245,7 @@ Perf column assumes transform/opacity only. "RM" = reduced-motion fallback. Sour
 | P39 | Ghost corner type | giant 8% ink type pinned to corners, slight parallax | scale without colour | bleibtgleich | transform; static on RM |
 | P40 | Marquee | a ticker of words that syncs to scroll | footer / logos | Originkit `sync-scroll` | pause on hover and RM |
 
-**40 patterns catalogued (P01 to P40)**, backed by the 8 fetched Originkit sources and the 21st.dev, Motion Primitives and Codrops tables above.
+**40 patterns catalogued (P01 to P40)**, backed by the 14 fetched Originkit sources and the 21st.dev, Motion Primitives and Codrops tables above.
 
 ---
 
@@ -310,8 +317,8 @@ quickly. No ASCII for body copy. No error-diffusion on anything that animates.
 - 21st.dev: https://21st.dev/@andrehzh/components/dither-effect.md and the dithered shader background.
 - Framer marketplace (reference only, paid and Framer-specific): ASCII Flow Trail, ASCII Motion, ASCII Cursor
   (interactive lens), Dither Media, Dither Grain Overlay (four modes: Bayer, fine noise, blue-noise grain, halftone).
-- Originkit: `dither-burn`, `bayer-vortex`, `halftone-pulse`, `ascii-reveal` fetched; `dither-reveal`, `text-dither`,
-  `stipple-flow`, `tidal-stipple`, `ascii-*` backgrounds indexed.
+- Originkit: `dither-burn`, `bayer-vortex`, `halftone-pulse`, `ascii-reveal`, `dither-reveal`, `stipple-flow` fetched;
+  `text-dither` paid-gated; `tidal-stipple`, `ascii-*` backgrounds indexed.
 - Awwwards Inspiration: "Dithered Images" by nahare (listing only; the creator's site did not load).
 - Riso practice: a student riso blog (arts.ac.uk) calls dithering the riso machine's native algorithm; halftone
   frequency and screen angle guidance from Mint's riso guide; the Riso design skill (bergside) for palette:

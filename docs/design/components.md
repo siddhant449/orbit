@@ -23,7 +23,7 @@ Licence rules for the whole table:
 | Button (secondary, ink soak) | Originkit `radial-reveal-button` (fetched) | as above; source imports `framer-motion`, switch to `motion/react` | entry-side radial `clip-path` in ink; exit reverses from the leave side; reduced motion instant | hand-built from reference, D2 |
 | Button (ghost) | hand-built | — | sunk fill on hover, no plate | D2 |
 | IconButton | hand-built (Button `size="icon"`) | — | stamp press (B4), 44 px touch target via padding | D2 |
-| Magnetic CTA (marketing only) | Motion Primitives `magnetic` | MIT | pointer-only, disabled on touch and reduced motion; not in `packages/ui`, lives in `apps/marketing` later | deferred to Feature 12 |
+| Magnetic CTA (marketing only) | Motion Primitives `magnetic` (Originkit `magnetic-hover-button` is paid-gated, not fetchable) | MIT | pointer-only, disabled on touch and reduced motion; not in `packages/ui`, lives in `apps/marketing` later | deferred to Feature 12 |
 | Input, Textarea, NativeSelect, Label, Hint, FieldError | hand-built (existing `field.tsx`) | — | `--line-strong` rest border, keyline on hover, `--focus` ring; `data-lenis-prevent` on textareas; add `FieldError` caption | D2 |
 | Dialog, AlertDialog | radix Dialog / AlertDialog + Motion `AnimatePresence`; Motion Primitives `morphing-dialog` as the reference for the later card-to-sheet open | MIT | stamp in / opacity out; scrim `--ink` 40 % no blur; Lenis stop/start; body `data-lenis-prevent` | hand-built, D2 |
 | Popover, DropdownMenu, Tooltip | radix + Motion | MIT | 2 px plate, stamp 120 ms from the popper origin, ink-bar item highlight (H1) | hand-built, D2 |
@@ -52,9 +52,14 @@ Licence rules for the whole table:
 | Logo mark | hand-built SVG (existing `logo.tsx`) | ours | draw-on (S1) on auth; static in app | D3 |
 | Marketing hero dither | `@paper-design/shaders-react` `Dithering` on one canvas, or hand-written raw WebGL Bayer (Codrops guide) if the bundle check fails | Apache-2.0 / ours | `next/dynamic` `ssr:false`, poster PNG fallback, dpr ≤ 1.5 | deferred to Feature 12 |
 | `/design` ASCII loader demo | hand-built Canvas 2D; Originkit `ascii-reveal` (fetched) as reference | plan-licensed, reference only | 15 fps, 96 px cells, one frame under reduced motion; dev page only | D1.3 |
-| Knowledge thumbnails (dither) | hand-built server-side Bayer with `sharp`; Originkit `dither-reveal` (not fetched) idea only | sharp Apache-2.0 | 1-bit halftone PNG on upload, `mask-image` in `--pink`, crossfade to original | Feature 1 Task 7+ on the new system |
+| Knowledge thumbnails (dither) | hand-built server-side Bayer with `sharp`; Originkit `dither-reveal` (fetched, per-card WebGL not used) idea only | sharp Apache-2.0 | 1-bit halftone PNG on upload, `mask-image` in `--pink`, crossfade to original | Feature 1 Task 7+ on the new system |
+| Label roll (nav CTA, marketing links) | Originkit `label-slide-button` (fetched) | plan-licensed; source imports `motion/react`, rewrite to our tokens | clipped label roll (P05), 2 px corners, ink fill with paper text; mark the duplicate label `aria-hidden`; drop the arrow badge; reduced motion = instant colour swap | candidate, not scheduled |
+| Stamp-in confirm (publish, toast icon) | Originkit `wax-seal` (fetched) as the idea only; `three` not used | plan-licensed, idea only | CSS / SVG stamp press (P24): scale 1.15 to 1, slight rotate, expanding ink ring; static ring under reduced motion | candidate, not scheduled |
+| Generation / route progress (hairline) | Originkit `hairline-loader` (fetched) | plan-licensed; rewrite | ink rule, registration-mark ticks, counter in the display face (P27); drive from real task state, `role="progressbar"`; compact top-of-page variant, full-viewport split reveal optional | candidate, not scheduled |
+| Route curtain (tiles) | Originkit `tiles-loader` (fetched) | plan-licensed; rewrite | ink squares over paper in random order (P28); real progress instead of the fake curve; `role="progressbar"`; crossfade under reduced motion | candidate, not scheduled |
+| Hero stipple word | Originkit `stipple-flow` (fetched) | plan-licensed; rewrite | ink stipple on paper, focus blob follows the pointer; visually hidden `<h1>` with the same text; one shared GL context | deferred to Feature 12 |
 
-Not used (decided): Originkit `dither-burn`, `bayer-vortex` (canvas / WebGL backgrounds, no reduced-motion handling, not
+Not used (decided): Originkit `scrambletext`, `brush-reveal`, `text-dither` (paid-gated, not fetchable), `dither-burn`, `bayer-vortex` (canvas / WebGL backgrounds, no reduced-motion handling, not
 needed once the hero uses one shared canvas), `encrypt-button` / 21st `scramble-hover` / `hyper-text` (scramble text
 rejected for a writing product), Motion Primitives `spotlight`, `glow-effect`, `tilt`, `border-trail` (glow and lift are
 slop), 21st `dithered-shader-background` (Three.js), Framer-marketplace ASCII/dither components (Framer-only, paid).
