@@ -35,7 +35,7 @@ and later writes back into them.
   - Each has a fictional name, a tagline, a style guide in markdown and a generated avatar (initials or an illustration).
   - We use no real names or photos, and we don't copy any creator's posts. The user's own style is added from pasted posts. Learning a style from a LinkedIn URL waits
   for the LinkedIn connection in Feature 3.
-- **The strategy page works without the chat.** It has a "Generate my strategy" button: one Claude call that returns structured
+- **The strategy page works without the chat.** It has a "Generate my strategy" button: one model call that returns structured
   JSON, based on identity, voice and knowledge. Every field can then be edited by hand. Refining through chat comes with Feature 2.
 - **Extraction is validated:** a memory is saved only if the model returns a structured fact. Refusals, questions and
   "I need more information" replies are rejected. This avoids the defect seen in Kleo's data.
@@ -97,7 +97,7 @@ and later writes back into them.
   - XLSX: `xlsx`
   - TXT and MD: read as-is
   - URL: fetch the page, then extract the article text
-  - Image: Claude vision describes it
+  - Image: the vision model describes it
   - YouTube URL: use the video's captions
 - **Video** (user's decision): a `Transcriber` chain.
   1. **Deepgram** is tried first, for both uploads and links (YouTube, TikTok, Reels, Facebook), using `DEEPGRAM_API_KEY`.
@@ -105,9 +105,9 @@ and later writes back into them.
   3. If neither works, the item is marked `failed` with a reason.
   - The UI shows a notice in the Video tab and on affected items: "Video transcription is unavailable right now (Deepgram). YouTube links still work using captions."
   - Provider health is exposed at `/api/status/transcription`.
-- **Claude calls** go through `packages/ai`. Model IDs are chosen at plan time using the claude-api reference. Uses: strategy
+- **AI calls** go through `packages/ai`, which runs on the Vercel AI SDK (`ai`) with OpenAI models (`@ai-sdk/openai`). The default model IDs are `gpt-6.1-sol` for generation and `gpt-6-luna` for extraction. Both can be overridden with `AI_MODEL_GENERATE` and `AI_MODEL_EXTRACT`. Uses: strategy
   generation, memory extraction, voice extraction and summaries.
-- Needs `ANTHROPIC_API_KEY`.
+- Needs `OPENAI_API_KEY`.
 
 ## Not in scope
 

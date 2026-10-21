@@ -1,14 +1,17 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { generateText, NoObjectGeneratedError, Output } from "ai";
+import type { FinishReason, LanguageModel, ModelMessage } from "ai";
 import { z } from "zod";
+import { getModel, type ModelAlias } from "./provider";
+
+export { resolveModel, type ModelAlias } from "./provider";
 
 export class AiUnavailableError extends Error {
-  constructor(message = "AI is unavailable: ANTHROPIC_API_KEY is not set.") {
+  constructor(message = "AI is unavailable: OPENAI_API_KEY is not set.") {
     super(message);
     this.name = "AiUnavailableError";
   }
 }
 
-export type ModelAlias = "generate" | "extract";
 export type AiImage = { mediaType: string; base64: string };
 type BaseOpts = { model: ModelAlias; system: string; prompt: string; images?: AiImage[] };
 
@@ -17,84 +20,83 @@ export type AiClient = {
   text(opts: BaseOpts): Promise<string>;
 };
 
-export function resolveModel(alias: ModelAlias): string {
-  return alias === "generate"
-    ? (process.env.AI_MODEL_GENERATE ?? "claude-sonnet-5-5")
-    : (process.env.AI_MODEL_EXTRACT ?? "claude-haiku-5-5");
+/** Test seam: supply fake language models instead of the real OpenAI ones. */
+export type AiClientDeps = { model?: (alias: ModelAlias) => LanguageModel };
+
+const MAX_OUTPUT_TOKENS = 16000;
+
+function buildMessages(prompt: string, images?: AiImage[]): ModelMessage[] {
+  return [
+    {
+      role: "user",
+      content: [
+        ...(images ?? []).map((img) => ({
+          type: "file" as const,
+          mediaType: img.mediaType,
+          data: { type: "data" as const, data: img.base64 },
+        })),
+        { type: "text" as const, text: prompt },
+      ],
+    },
+  ];
 }
 
-export type SdkLike = { messages: { create(params: Anthropic.MessageCreateParamsNonStreaming): Promise<Anthropic.Message> } };
-
-type ImageMedia = "image/jpeg" | "image/png" | "image/gif" | "image/webp";
-
-function buildContent(prompt: string, images?: AiImage[]): Anthropic.ContentBlockParam[] {
-  const blocks: Anthropic.ContentBlockParam[] = (images ?? []).map((img) => ({
-    type: "image",
-    source: { type: "base64", media_type: img.mediaType as ImageMedia, data: img.base64 },
-  }));
-  blocks.push({ type: "text", text: prompt });
-  return blocks;
-}
-
-function textOf(message: Anthropic.Message): string {
-  if (message.stop_reason === "refusal") {
+/** Turns refusals and token-limit truncation into clear errors, before any parsing. */
+function assertCompleted(reason: FinishReason | undefined): void {
+  if (reason === "content-filter") {
     throw new Error("The model declined this request.");
   }
-  if (message.stop_reason === "max_tokens") {
-    throw new Error("The model response was cut off (max_tokens reached) before it finished.");
+  if (reason === "length") {
+    throw new Error("The model response was cut off (output limit reached) before it finished.");
   }
-  return message.content
-    .flatMap((b) => (b.type === "text" ? [b.text] : []))
-    .join("")
-    .trim();
 }
 
 /**
- * Claude-backed AiClient. Throws AiUnavailableError lazily (on first call)
- * when no key is configured, so constructing it never crashes a keyless server.
+ * OpenAI-backed AiClient on the Vercel AI SDK. Throws AiUnavailableError lazily
+ * (on first call) when no key is configured, so constructing it never crashes
+ * a keyless server.
  */
-export function createClaudeClient(
-  apiKey: string | undefined = process.env.ANTHROPIC_API_KEY,
-  /** Test seam: supply a fake SDK instead of constructing the real one. */
-  sdkFactory: (apiKey: string) => SdkLike = (key) => new Anthropic({ apiKey: key }),
+export function createAiClient(
+  apiKey: string | undefined = process.env.OPENAI_API_KEY,
+  deps: AiClientDeps = {},
 ): AiClient {
-  let sdk: SdkLike | null = null;
-  const getSdk = () => {
+  const modelFor = (alias: ModelAlias): LanguageModel => {
     if (!apiKey) throw new AiUnavailableError();
-    return (sdk ??= sdkFactory(apiKey));
+    return deps.model ? deps.model(alias) : getModel(alias, apiKey);
   };
 
   return {
     async text({ model, system, prompt, images }) {
-      const res = await getSdk().messages.create({
-        model: resolveModel(model),
-        max_tokens: 16000,
-        system,
-        messages: [{ role: "user", content: buildContent(prompt, images) }],
+      const result = await generateText({
+        model: modelFor(model),
+        instructions: system,
+        messages: buildMessages(prompt, images),
+        maxOutputTokens: MAX_OUTPUT_TOKENS,
       });
-      return textOf(res);
+      assertCompleted(result.finishReason);
+      return result.text.trim();
     },
     async json<T>({ model, system, prompt, images, schema }: BaseOpts & { schema: z.ZodType<T> }) {
-      const res = await getSdk().messages.create({
-        model: resolveModel(model),
-        max_tokens: 16000,
-        system,
-        messages: [{ role: "user", content: buildContent(prompt, images) }],
-        output_config: {
-          format: {
-            type: "json_schema",
-            schema: z.toJSONSchema(schema) as Record<string, unknown>,
-          },
-        },
-      });
-      const raw = textOf(res);
-      let parsed: unknown;
+      let result;
       try {
-        parsed = JSON.parse(raw);
-      } catch {
-        throw new Error("The model returned invalid JSON.");
+        result = await generateText({
+          model: modelFor(model),
+          instructions: system,
+          messages: buildMessages(prompt, images),
+          output: Output.object({ schema }),
+          maxOutputTokens: MAX_OUTPUT_TOKENS,
+        });
+      } catch (err) {
+        // A cut-off or filtered reply can still reach the parser and fail there;
+        // report the real cause instead of a parse error.
+        if (NoObjectGeneratedError.isInstance(err)) assertCompleted(err.finishReason);
+        throw err;
       }
-      return schema.parse(parsed);
+      assertCompleted(result.finishReason);
+      return result.output;
     },
   };
 }
+
+/** @deprecated Use createAiClient. Kept so existing imports keep working. */
+export const createClaudeClient = createAiClient;

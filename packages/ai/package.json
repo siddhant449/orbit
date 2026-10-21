@@ -9,15 +9,18 @@
   },
   "scripts": {
     "test": "vitest run",
+    "smoke": "tsx --env-file=../../.env scripts/smoke.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "0.132.1",
+    "@ai-sdk/openai": "4.0.98",
+    "ai": "7.0.146",
     "zod": "^4.6.7"
   },
   "devDependencies": {
     "@brandloop/config": "workspace:*",
     "@types/node": "^20.19.43",
+    "tsx": "^4.23.15",
     "typescript": "5.9.3",
     "vitest": "^5.0.5"
   }

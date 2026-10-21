@@ -1,0 +1,27 @@
+import { createOpenAI, openai } from "@ai-sdk/openai";
+import type { LanguageModel } from "ai";
+
+export type ModelAlias = "generate" | "extract";
+
+/**
+ * Maps a model alias to an OpenAI model ID. Override per environment with
+ * AI_MODEL_GENERATE / AI_MODEL_EXTRACT.
+ */
+export function resolveModel(alias: ModelAlias): string {
+  return alias === "generate"
+    ? (process.env.AI_MODEL_GENERATE ?? "gpt-6.1-sol")
+    : (process.env.AI_MODEL_EXTRACT ?? "gpt-6-luna");
+}
+
+/**
+ * The AI SDK language model for an alias. Shared by the background-job client
+ * and the chat agent (`streamText`). Lazy: building a model never reads or
+ * requires OPENAI_API_KEY, so importing this never throws on a keyless server.
+ *
+ * Pass `apiKey` to bind a specific key; otherwise the default provider reads
+ * OPENAI_API_KEY from the environment when a request is made.
+ */
+export function getModel(alias: ModelAlias, apiKey?: string): LanguageModel {
+  const id = resolveModel(alias);
+  return apiKey ? createOpenAI({ apiKey })(id) : openai(id);
+}

@@ -6,14 +6,14 @@
 
 **Architecture:**
 - **Data:** a profile-scoped service layer in `packages/db/src/services/*`.
-- **AI:** calls go through `packages/ai`, which has an injectable Claude client, zod schemas and a guard that rejects refusals.
+- **AI:** calls go through `packages/ai`, which has an injectable AI client (Vercel AI SDK with OpenAI models), zod schemas and a guard that rejects refusals.
 - **Background work:** slow work (imports, ingestion, generation) is a `BackgroundJob` row executed through Next's `after()`.
 - **Transcription:** a `Transcriber` chain, Deepgram first, then YouTube captions.
 - **Screens:** built in `apps/web` inside the existing shell, with frontend-design.
 
 **Tech stack:**
 - Next.js 16.4, Prisma 7.10.1 (Postgres), Vitest 5, Playwright
-- `@anthropic-ai/sdk`, zod
+- `ai` (Vercel AI SDK), `@ai-sdk/openai`, zod
 - Extraction libraries: `unpdf`, `mammoth`, `xlsx`, `@mozilla/readability` with `linkedom`
 - `youtube-transcript`
 - Deepgram REST API
@@ -36,7 +36,7 @@
   2. YouTube captions
   3. Otherwise the item fails with a reason
 - **Exact copy for the unavailable state:** "Video transcription is unavailable right now (Deepgram). YouTube links still work using captions."
-- **Model IDs:** load the `claude-api` skill before writing `packages/ai`, and use the current Claude 5 IDs. Defaults: `claude-sonnet-5-5` for generation, `claude-haiku-5-5` for extraction and summaries. Both can be overridden with `AI_MODEL_GENERATE` and `AI_MODEL_EXTRACT`.
+- **Model IDs:** `packages/ai` uses the Vercel AI SDK with OpenAI models. Defaults: `gpt-6.1-sol` for generation, `gpt-6-luna` for extraction and summaries (both from the key's live `/v1/models` list on 2026-10-21). Both can be overridden with `AI_MODEL_GENERATE` and `AI_MODEL_EXTRACT`. The key is `OPENAI_API_KEY`.
 - **AI keys:** no AI call ever runs in unit tests. Every AI function takes the client as a parameter, and tests pass a fake.
 - **Interface copy:** sentence case, no all-caps labels, buttons named for what they do.
 
@@ -95,6 +95,8 @@
 - [ ] **Step 6: Commit** with the message `feat(db): feature 1 models and memory service`
 
 ### Task 2: `packages/ai`: the Claude client, schemas and refusal guard
+
+> **Superseded (2026-10-21):** the client was switched from the Anthropic SDK to the Vercel AI SDK with OpenAI models. It is now `createAiClient(apiKey = process.env.OPENAI_API_KEY, deps?)` (`createClaudeClient` stays as a deprecated alias) and the key is `OPENAI_API_KEY`. The task text below is the original brief.
 
 **Files:**
 - Create: `packages/ai/package.json` (name `@brandloop/ai`; dependencies `@anthropic-ai/sdk`, `zod`), `tsconfig.json`
@@ -420,7 +422,7 @@
   - Setup → "Set up later" lands on the home page.
   - Memories: add the line "Runs a design studio"; it is visible after a reload.
   - Knowledge: add a 120-word text item; it appears with type Text.
-  - Strategy: when `ANTHROPIC_API_KEY` is set, Generate fills Content mix with a legend whose values sum to 100%.
+  - Strategy: when `OPENAI_API_KEY` is set, Generate fills Content mix with a legend whose values sum to 100%.
 - [ ] **Step 2: Run `pnpm turbo lint typecheck test`, then `pnpm --filter @brandloop/web e2e`**
   - Expected: all pass, or the e2e tests are skipped with the reason printed.
 - [ ] **Step 3: Compare screenshots at 1440 and 390 px against the Kleo recon screens**
