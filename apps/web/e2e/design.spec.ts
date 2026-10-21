@@ -1,7 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
 import { axeCheck, captureSet, expectNoHorizontalScroll } from "./helpers/shots";
 
-// /design is public outside production, so these specs run without signing in.
+// /design is public outside production, so these specs run without signing in. A production build serves a 404
+// there (see page.test.tsx), so the whole file is skipped against one.
+test.beforeEach(async ({ request }) => {
+  const res = await request.get("/design");
+  test.skip(res.status() === 404, "/design is not found in production builds");
+});
 
 async function open(page: Page, colorScheme: "light" | "dark", width = 1440, height = 900) {
   await page.setViewportSize({ width, height });

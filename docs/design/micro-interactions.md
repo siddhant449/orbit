@@ -164,7 +164,7 @@ Playwright assertions for `apps/web/e2e/scroll.spec.ts` (new in D2):
 | Text (T1, T2) | final text, final number |
 | Layout (R2, R3, R7, R8) | instant |
 | Lenis | smoothing off, native scroll |
-| Cinematic (C2–C8) | final frame: letters at width 125 with copies at 3 px, composer and tickets in place, static Bayer tile instead of the canvas, no custom cursor, reveals visible |
+| Cinematic (C2–C8) | final frame: letters at width 125 with copies at 3 px, composer and tickets in place, static Bayer tile instead of the canvas, reveals visible |
 
 Verified by the Playwright run with `reducedMotion: 'reduce'`: no element reports a non-identity transform during
 load and no `transform` transition is pending on hover.
@@ -174,11 +174,10 @@ load and no `transform` transition is pending on hover.
 Budget (ruling U10, supersedes the earlier 400 ms / 40 KB figures):
 
 - Home initial JS adds **≤ 90 KB gzip eagerly** over the pre-D2 baseline (264,361 B); every lazily loaded chunk (motion
-  features, drafting cursor, dither field) is recorded beside the first-load figure in
-  `docs/features/ui-redesign/bundle-baseline.md`.
-- Canvas, dither and the cursor load **after first paint** (`next/dynamic` with `ssr: false`, mounted from an idle
-  callback) and pause when off-screen (`IntersectionObserver`) or when the tab is hidden; canvases cap
-  `devicePixelRatio` at 1 (dither) / 1.5 (anything else).
+  features, dither field) is recorded beside the first-load figure in `docs/features/ui-redesign/bundle-baseline.md`.
+- Canvas and dither load **after first paint** (`next/dynamic` with `ssr: false`, mounted from an idle callback) and
+  pause when off-screen (`IntersectionObserver`) or when the tab is hidden; canvases cap `devicePixelRatio` at 1
+  (dither) / 1.5 (anything else).
 - INP < 200 ms: interaction feedback ≤ 200 ms, never blocking input; no `layout` animation on lists > 20 rows.
 - Hero sequences hold 60 fps on a mid laptop (4× CPU throttle in the check below): only `transform`, `opacity`,
   `filter` and `clip-path` animate, except the kinetic greeting's `font-stretch` (one heading, one shot, ≤ 1.1 s).
@@ -207,7 +206,7 @@ prototype and removed: no page transitions, routes switch instantly (user decisi
 | ID | Interaction | Trigger | Animates | Timing | Reduced motion | Perf / a11y | Source |
 |----|-------------|---------|----------|--------|----------------|-------------|--------|
 | C2 | Kinetic greeting | home mount | per letter: `opacity 0 → 1`, `translateY .18em → 0`, `font-stretch 75% → 125%`; the pink copy 70 ms behind, the blue copy 140 ms behind, ending at ±3 px | 420 ms `ease-ink` per letter, 22 ms stagger (≈ 950 ms for 26 letters) | letters at 125 %, copies at 3 px | `h1[aria-label="What are we writing today?"]`, letter spans and copies `aria-hidden`; one heading only (font-stretch re-lays out one line per frame) | Motion Primitives `text-effect`, Originkit `text-colour-sweep` (ideas) |
-| C3 | Drafting cursor | pointer moves (fine pointer, hover-capable, no reduced motion) | a fixed `aria-hidden` crosshair follows the pointer via `transform: translate3d` written per frame; a caption readout shows x / y in sheet pixels; the label reads `OPEN` over links and buttons (ink plate), `WRITE` over the composer sheet (pink plate), `DRAG` over `[draggable]`; hidden over text inputs, which keep the native caret, and when the pointer leaves the window | follow 0 ms (rAF), label swap 120 ms | not mounted | `pointer-events: none`, z-index above dialogs, never hides focus rings; native cursor hidden via `html[data-drafting-cursor] { cursor: none }` except on text fields; `next/dynamic`, mounted after first paint | Heron lesson; Originkit `axis-cursor` idea (not fetched) |
+| C3 | Drafting cursor | — | Removed: the native cursor is used everywhere (user decision 2026-10-21) | — | — | — | — |
 | C4 | Dither field | home mount, after first paint | Canvas 2D, 3 px cells, dpr 1: two low-frequency fields thresholded through an 8 × 8 Bayer matrix, pink and blue dots, overprint where both pass; drifts at 24 fps; the pointer pulls the two inks apart by up to 4 px within 160 px; density masked toward the headline | continuous, 24 fps; fade in 600 ms | static CSS Bayer tile (`--ghost` dots), no canvas | `aria-hidden`, `pointer-events: none`; paused off-screen and on `document.hidden`; `requestIdleCallback` mount; re-reads tokens on theme change | Originkit `dither-burn`, `bayer-vortex` (ideas, Canvas 2D rewrite) |
 | C5 | Object landing | home mount (composer); later: dialogs that "drop" | face `opacity 0 → 1`, `translateY -28px → 0`, `rotate -1.2deg → 0`, `scale 1.02 → 1`; the ink plate behind it `translate 0 → 6px 6px` 120 ms later | spring 320 / 26 (≈ 480 ms); plate 200 ms `ease-ink` | in place | transform only; the textarea is focusable throughout | Ascension lesson; Originkit `tactile-button` plate idea |
 | C6 | Stamped stagger | home mount (tickets); list entries later | `scale 1.12 → 1`, `rotate -2deg → 0`, `opacity 0 → 1` per item | 180 ms `ease-ink`, 60 ms stagger | in place | transform / opacity | Originkit `wax-seal` stamp idea (CSS, no `three`) |

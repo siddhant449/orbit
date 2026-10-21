@@ -14,10 +14,10 @@ the motion budget, the slop checklist.
 2. Everything is printed: hard edges, hard offset shadows, 1 px keylines, grain visible at rest. No blur, no gradient,
    no glow, anywhere.
 3. Scale does the talking: one wide Archivo line against small Hanken text, with nothing in between.
-4. The app is a drafting table in a print room, and motion is the press at work: display type sets in letter by letter,
-   printed objects land on the table, and the pointer is a drafting instrument. Every screen has a composition and a
-   motion score (§10). Interaction feedback stays instant (≤ 200 ms); the cinema is in the one-shots. Routes switch
-   instantly, with no transition.
+4. The app is a drafting table in a print room, and motion is the press at work: display type sets in letter by letter
+   and printed objects land on the table. Every screen has a composition and a motion score (§10). Interaction feedback
+   stays instant (≤ 200 ms); the cinema is in the one-shots. Routes switch instantly, with no transition, and the
+   pointer is the native cursor.
 5. Night print is the same press run on black stock with light inks: overlaps bloom (screen) instead of bruise (multiply).
 
 ## 2. Palette
@@ -504,7 +504,6 @@ No sparkle, wand or star icons for AI actions; generation uses the `PenLine` fam
 | Link | anchor + SVG underline | inline, standalone | — | blue | underline draw | hand-built (P13) |
 | SmoothScroll | Lenis provider | root, wrapper | — | — | Lenis + Motion frame | `lenis/react` |
 | KineticHeading | `h1` with `aria-label`, letter spans (`aria-hidden`), pink and blue plate copies | hero, title | display-1 / hero | ink, pink, blue | letters set in, widths 75 → 125, plates chase into register | hand-built (Motion Primitives `text-effect`, Originkit `text-colour-sweep` as ideas) |
-| DraftingCursor | crosshair, coordinate readout, context label | — | 14 px cross | ink, pink (WRITE), ink (OPEN) | follows the pointer, label swaps | hand-built (Heron lesson; Originkit `axis-cursor` idea, not fetched) |
 | DitherField | Canvas 2D two-ink Bayer field | hero | — | pink, blue, overprint | drift, pointer reaction, lazy, paused off-screen | hand-built (Originkit `dither-burn`, `bayer-vortex` as ideas) |
 | Ticket | rectangular stamped chip with a perforated edge and two offset plates | default, selected | h 32 | keyline, pink, blue | stamp in (C6), plate swap on hover | hand-built (Originkit `wax-seal` as the stamp idea) |
 | Reveal | `whileInView` wrapper | fade-print, stagger | — | — | scroll-driven reveal (C8) | hand-built on Motion `whileInView` |
@@ -519,13 +518,13 @@ No sparkle, wand or star icons for AI actions; generation uses the `PenLine` fam
 | Sidebar, the printed index (248 px) | brand row (logo mark 24 + wordmark in Archivo 600 / 100 at 19 px), search icon button, collapse button; `nav[aria-label="Main"]` rows h 36 with kinetic hover (C7: ink bar sweeps in from the left, the label rolls up and its duplicate rolls in); "Chats" section; profile menu on a top hairline. At the foot, the **index label**: the current (or hovered) page name set in Archivo 800 / 125 at 88 px in `--ghost`, clipped by the sidebar edge like a running head, swapping by a vertical roll. No keyline between sidebar and desk; the sheet's keyline is the edge |
 | Rail (56 px) | mark, search, five icon rows (sr-only labels), expand, profile; current row = ink bar 32 × 32 |
 | Section panel (228 px) | title-2 header (section title), groups with caption labels, rows as sidebar; vertical `--line` hairline on its right edge |
-| Sheet, the drafting table | `--surface`, keyline, `--shadow-raised`, radius 2, inset 12 px; a **ruled margin** 28 px from its left edge (1 px `--line`) with coordinate ticks every 32 px (`--line-strong`, 4 px, every fourth 8 px) that the cursor readout measures against; the Lenis wrapper scrolls inside it (`micro-interactions.md` §6); `scrollbar-gutter: stable`; ruler hidden < 768 px |
+| Sheet, the drafting table | `--surface`, keyline, `--shadow-raised`, radius 2, inset 12 px; a **ruled margin** 24 px from its left edge (1 px `--line`) with ticks every 32 px (`--line-strong`, 4 px, every fourth 8 px); the Lenis wrapper scrolls inside it (`micro-interactions.md` §6); `scrollbar-gutter: stable`; ruler hidden < 768 px |
 | Page header | h 56, sticky, `--surface` opaque (no backdrop blur), bottom hairline; title-2 title preceded by a 1 px × 20 px `--keyline` vertical rule (bleibtgleich meta pattern); actions right; 390: title truncates, actions collapse |
 | Command palette | overlay plate 560 max, input h 48 with search icon, groups with caption headings, items h 36 with ink-bar highlight, kbd hints on the right, `data-lenis-prevent` on the list; placeholder "Search pages and profiles…" unchanged |
 | Profile menu | plate 256 with team name caption, profile rows with avatars, "Add profile", separator, "Settings", theme radiogroup as three chips (aria-labels Light / Dark / System), separator, "Sign out" in danger |
 | Mobile drawer | `min(300px, 86vw)`, paper, keyline right edge, slides in by transform; same sidebar/section content; close button top-right |
 | Route transition | **No page transitions: routes switch instantly (user decision 2026-10-21).** After a route change focus moves to the page's `h1` (or `main`), with no animation |
-| Drafting cursor | app-wide on fine pointers: crosshair, coordinate readout in sheet pixels, context label `WRITE` / `OPEN` / `DRAG`; hidden over text inputs (native caret); off under reduced motion and `pointer: coarse` (C3) |
+| Cursor | the native cursor everywhere (a custom drafting cursor was built and removed on the user's decision, 2026-10-21) |
 | Smooth scroll | Lenis in wrapper mode inside the sheet, driven from Motion's frame loop; native under reduced motion (§6 of `micro-interactions.md`) |
 | Auth | paper desk, centred wordmark display-1 with 3 px misregistration, Clerk card as an overlay plate; Clerk `appearance.variables`: `colorPrimary` ink, `colorForeground` ink (the installed `Variables` type has no `colorText`), `colorBackground` surface, `borderRadius: "2px"`, `fontFamily: var(--font-ui)`, `fontFamilyMono: var(--font-ui)` |
 
@@ -541,8 +540,9 @@ first interaction is an object that lands, with grain carrying the mood. All fou
 wheel tick in about a second; their one-shots run 600–1500 ms; their feedback is instant.
 
 Rules for every score: one-shots 600–1200 ms, feedback ≤ 200 ms and never blocking input; `prefers-reduced-motion`
-renders the final frame of every sequence (no Lenis smoothing, no cursor, no animated canvas); heavy effects load after
-first paint and pause off-screen; budgets in `micro-interactions.md` §8.
+renders the final frame of every sequence (no Lenis smoothing, no animated canvas); heavy effects load after first
+paint and pause off-screen; budgets in `micro-interactions.md` §8. No custom cursor and no page transitions (user
+decisions, 2026-10-21).
 
 ### 10.1 Shell: the print room
 

@@ -152,12 +152,13 @@ const groups: Group[] = [
   {
     title: "Aliases",
     cols: "lg:grid-cols-3",
-    note: "Names that replaced the old jade tokens, so existing screens re-skin without a rewrite.",
+    note: "Role names that alias the inks, so screens re-skin without a rewrite when an ink changes.",
     swatches: [
-      { token: "--accent", role: "Equals --blue. Replaces --jade. Used as bg-accent and text-on-accent.", block: <OnPlate bg="bg-accent" text="text-on-accent" label="On accent" /> },
+      { token: "--accent", role: "Equals --blue. Used as bg-accent for generate actions.", block: <OnPlate bg="bg-accent" text="text-on-accent" label="On accent" /> },
+      { token: "--on-accent", role: "Equals --on-blue. Text on an accent plate: paper by day, dark at night.", block: <OnPlate bg="bg-accent" text="text-on-accent" label="On accent" /> },
       {
         token: "--accent-soft",
-        role: "Equals --stock-blue. Replaces --jade-soft.",
+        role: "Equals --stock-blue. Tinted stock for AI callouts.",
         block: (
           <div className={`${blockBase} bg-accent-soft`}>
             <p className="type-caption text-ink">Ink text</p>

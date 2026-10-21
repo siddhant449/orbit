@@ -1,6 +1,7 @@
 # Bundle baseline (pre-D2)
 
-Task 13 compares the home route against this number. The budget is: home route First Load JS grows by at most 40 KB gzip.
+Task 13 compares the home route against this number. The budget is: home route First Load JS grows by at most 40 KB gzip
+(raised to **90 KB gzip eagerly** for the cinematic direction, ruling U10; lazy chunks are listed beside the first-load figure).
 
 ## How it is measured
 
@@ -9,7 +10,7 @@ Next 16.4 with Turbopack does not print a "First Load JS" column in `next build`
 uncompressed size. The gzip figure below is the sum of `gzip -9` sizes of those chunk files, computed with:
 
 ```js
-// node bundle-size.mjs apps/web /
+// node scripts/bundle-size.mjs apps/web /   (checked in; also lists the lazy chunks)
 import { readFileSync } from "node:fs";
 import { gzipSync } from "node:zlib";
 import { join } from "node:path";
@@ -57,3 +58,35 @@ component uses motion. Experiment (not committed): loading the features lazily,
 animations wait for the features chunk, so a Task 13 decision is needed if the budget gets tight.
 
 `/design` is prerendered as a 404 in production (`.next/server/app/design.meta` has `"status": 404`).
+
+## After Task R2★ (shell + home: kinetic type, landing, tickets, dither field, Lenis, lazy motion features)
+
+Measured with `node scripts/bundle-size.mjs apps/web / /strategy /settings "/sign-in/[[...sign-in]]"` after
+`pnpm --filter @brandloop/web build` (Next.js 16.4.2, Turbopack), with the custom cursor already removed; the final
+avatar and label fixes that followed change markup only.
+
+| Route | First Load JS gzip | Change from baseline | Change from Task 1 |
+|-------|-------------------:|---------------------:|-------------------:|
+| `/` (home) | 320,390 B (312.9 KiB) | **+56,029 B (+54.7 KiB)**, within the 90 KB budget | +28,695 B |
+| `/strategy` | 349,078 B | +54,378 B | +27,046 B |
+| `/settings` | 312,943 B | +54,378 B | +27,045 B |
+| `/sign-in/[[...sign-in]]` | 259,102 B | +61,521 B | +34,266 B |
+
+Lazy chunks (not in any route's first load), gzip -9:
+
+| Chunk | What | raw | gzip | Loaded |
+|-------|------|----:|-----:|--------|
+| `3pktomc-a023p.js` | `DitherField` (Canvas 2D two-ink field, `@brandloop/ui/effects`) | 3,145 B | 1,766 B | home, after first paint (`next/dynamic`, `ssr: false`, idle callback) |
+| `349d1vbvyhych.js` | `packages/ui/src/motion/features.ts` (the `domAnimation` bundle entry, ruling U7) | 239 B | 209 B | app root, after hydration through `LazyMotion features={() => import(...)}` |
+
+Honest note on U7: the features module is split (the 209 B stub above), but Turbopack co-locates framer-motion's
+feature implementations (animation, exit, gestures, in-view, the DOM renderer) in the eager framer-motion chunk
+`1uuop-i60pxde.js` (85,441 B raw / 31,014 B gzip), because other eager modules import from the same package graph
+(`m`, `AnimatePresence`, `frame`, `useReducedMotion`). The lazy import therefore costs nothing but also saves nothing
+with Turbopack 16.4.2; Task 1's 16 KB experiment did not hold once `m` components were in the eager graph. The custom
+cursor chunk that existed during the task was removed with the cursor (user decision 2026-10-21).
+
+The sign-in route grew more than the app routes (+34 KB vs Task 1) although it renders no shell: the root layout
+imports `MotionProvider` from the `@brandloop/ui` barrel, which now also exports `SmoothScroll` (`lenis/react` and
+`lenis`) and `Reveal`; `lenis` carries no `sideEffects: false`, so it is retained. Suggested follow-up: import the
+provider through a `@brandloop/ui/motion` subpath export so auth pages do not pay for Lenis.

@@ -5,7 +5,7 @@ import { CONTENT_TYPES, normalizePercents } from "@brandloop/ai";
 import { cn } from "@brandloop/ui";
 import { NumberField, Section, useStrategy } from "./edit";
 
-/** Jade family derived from tokens, ordered dark to light. Each step also reads in dark mode. */
+/** Accent family derived from tokens, ordered dark to light. Each step also reads in dark mode. */
 const SHADES = [
   "color-mix(in oklab, var(--accent) 62%, var(--ink))",
   "var(--accent)",
