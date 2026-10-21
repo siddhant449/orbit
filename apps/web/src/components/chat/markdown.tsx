@@ -3,17 +3,13 @@
 import Markdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { cn } from "@brandloop/ui";
+import { safeUrl } from "./chat-logic";
 
 /**
  * Assistant text as markdown, loaded lazily. Raw HTML is never rendered (no rehype-raw, `skipHtml`), images
  * are dropped, and links keep only http, https and mailto targets, opening in a new tab without an opener.
  */
 
-const SAFE_URL = /^(https?:|mailto:)/i;
-
-export function safeUrl(url: string): string {
-  return SAFE_URL.test(url.trim()) ? url.trim() : "";
-}
 
 const components: Components = {
   p: ({ children }) => <p>{children}</p>,

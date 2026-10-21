@@ -28,6 +28,18 @@ export function HomeChat(props: Omit<ComponentProps<typeof Composer>, "onSend">)
     return () => (window.cancelIdleCallback ?? window.clearTimeout)(handle);
   }, []);
 
+  // "New chat" (or the home link) while the first turn still runs on "/": the address doesn't change, so a
+  // click on any link to "/" starts fresh. The turn keeps running on the server and shows up in the list.
+  useEffect(() => {
+    if (!started) return;
+    const onClick = (e: MouseEvent) => {
+      const link = (e.target as Element | null)?.closest?.('a[href="/"]');
+      if (link && window.location.pathname === "/") setStarted(null);
+    };
+    document.addEventListener("click", onClick);
+    return () => document.removeEventListener("click", onClick);
+  }, [started]);
+
   // Back on "/" after the address moved to the chat (the home link, the back button): start fresh.
   useEffect(() => {
     if (pathname === "/" && moved.current) {

@@ -12,22 +12,25 @@ import { ChatComposer, type ComposerRect } from "./chat-composer";
 import type { KnowledgeChoice } from "./knowledge-picker";
 import { MessageList } from "./message-list";
 import { toolNameOf, toolStateOf, type ToolPartLike } from "./tool-row";
-import { HISTORY_KEY, useChatSession } from "./use-chat-session";
+import { HISTORY_KEY } from "./history-key";
+import { useChatSession } from "./use-chat-session";
 
 type History = { chats: { id: string; title: string }[] };
 const fetchJson = (url: string) => fetch(url).then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))));
 
-/** What a screen reader hears: state changes only, never every token. */
-function useLiveStatus(messages: ChatUIMessage[], status: string, errorText: string | null) {
+/**
+ * What a screen reader hears: state changes only, never every token. Errors are left to their own alert, and a
+ * reply loaded with the page isn't announced as new.
+ */
+function liveStatus(messages: ChatUIMessage[], status: string, initialIds: ReadonlySet<string>) {
   const last = messages.at(-1);
-  let text = "";
-  if (status === "submitted") text = "Sent. Waiting for the reply.";
-  else if (status === "streaming" && last?.role === "assistant") {
+  if (status === "submitted") return "Sent. Waiting for the reply.";
+  if (status === "streaming" && last?.role === "assistant") {
     const active = (last.parts as ToolPartLike[]).filter((p) => p.type.startsWith("tool-") && toolStateOf(p) === "active").at(-1);
-    text = active ? `${toolLabel(toolNameOf(active), "active")}.` : "Writing the reply.";
-  } else if (status === "error" && errorText) text = errorText;
-  else if (status === "ready" && last?.role === "assistant") text = "Reply ready.";
-  return text;
+    return active ? `${toolLabel(toolNameOf(active), "active")}.` : "Writing the reply.";
+  }
+  if (status === "ready" && last?.role === "assistant" && !initialIds.has(last.id)) return "Reply ready.";
+  return "";
 }
 
 export function ChatView({
@@ -56,7 +59,7 @@ export function ChatView({
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const initialIds = useMemo(() => new Set(initialMessages.map((m) => m.id)), [initialMessages]);
 
-  const { messages, status, errorText, send, stop, retry } = useChatSession({
+  const { messages, status, errorText, canRetry, send, stop, retry } = useChatSession({
     chatId,
     initialMessages,
     selections: {
@@ -112,7 +115,7 @@ export function ChatView({
     void send(text);
   }
 
-  const live = useLiveStatus(messages, status, errorText);
+  const live = liveStatus(messages, status, initialIds);
 
   return (
     <div className="flex min-h-full flex-col">
@@ -139,7 +142,7 @@ export function ChatView({
       </header>
 
       <div className="mx-auto w-full max-w-[768px] flex-1 px-4 pb-10 pt-10 sm:px-6">
-        <MessageList messages={messages} status={status} initialIds={initialIds} errorText={errorText} onRetry={() => void retry()} />
+        <MessageList messages={messages} status={status} initialIds={initialIds} errorText={errorText} onRetry={canRetry ? () => void retry() : undefined} />
         <div ref={endRef} aria-hidden="true" className="h-px" />
       </div>
 

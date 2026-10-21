@@ -65,21 +65,23 @@ export function MessageList({
   status: Status;
   initialIds: ReadonlySet<string>;
   errorText: string | null;
-  onRetry: () => void;
+  /** Absent when the refused text went back to the composer. */
+  onRetry?: () => void;
 }) {
   const shown = messages.filter((m) => !m.metadata?.hideInUI);
-  const last = shown.at(-1);
+  // Live and waiting read the full list: a hidden quick-link message still starts a turn.
+  const last = messages.at(-1);
   const busy = status === "submitted" || status === "streaming";
   // Waiting on the first chunk: a reply placeholder in the margin.
   const waiting = busy && last?.role === "user";
   return (
     <ol className="flex flex-col gap-8" aria-label="Messages">
-      {shown.map((m, i) => (
+      {shown.map((m) => (
         <li key={m.id}>
           {m.role === "user" ? (
             <UserNote message={m} land={!initialIds.has(m.id)} />
           ) : (
-            <Reply message={m} live={busy && i === shown.length - 1} />
+            <Reply message={m} live={busy && m.id === last?.id} />
           )}
         </li>
       ))}
@@ -92,10 +94,12 @@ export function MessageList({
         <li>
           <div role="alert" className="flex flex-wrap items-center gap-3 border-l border-signal pl-4">
             <p className="type-ui text-signal-ink">{errorText}</p>
-            <Button variant="secondary" size="sm" onClick={onRetry}>
-              <RotateCcw aria-hidden="true" />
-              Try again
-            </Button>
+            {onRetry && (
+              <Button variant="secondary" size="sm" onClick={onRetry}>
+                <RotateCcw aria-hidden="true" />
+                Try again
+              </Button>
+            )}
           </div>
         </li>
       )}

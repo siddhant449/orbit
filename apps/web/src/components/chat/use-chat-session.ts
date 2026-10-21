@@ -6,7 +6,9 @@ import { DefaultChatTransport } from "ai";
 import { toast } from "sonner";
 import { mutate } from "swr";
 import type { ChatUIMessage } from "@brandloop/agent/client";
-import { chatFetch, ChatRequestError, ChatTurnActiveError, ChatTurnCompleteError } from "./chat-fetch";
+import { chatFetch, ChatRequestError, ChatTurnActiveError, ChatTurnCompleteError, type ActiveTurn } from "./chat-fetch";
+import { draftToRestore, friendlyError, hasReplyTo, pollUntilIdle, restoresDraft, type StoredChat } from "./chat-logic";
+import { HISTORY_KEY } from "./history-key";
 
 export type ChatSelections = {
   selectedKnowledgeBaseIds: string[];
@@ -14,27 +16,24 @@ export type ChatSelections = {
   webSearchEnabled: boolean;
 };
 
-type StoredMessages = { messages: ChatUIMessage[]; activeTurn: { runId: string; requestMessageId: string | null } | null };
-
-export const HISTORY_KEY = "/api/history";
 const POLL_FIRST_MS = 15_000;
 const POLL_EVERY_MS = 10_000;
 export const TURN_ACTIVE_TOAST = "This chat is still finishing its last reply.";
 
-async function loadMessages(chatId: string): Promise<StoredMessages | null> {
+async function loadMessages(chatId: string): Promise<StoredChat<ChatUIMessage> | null> {
   try {
     const res = await fetch(`/api/chat/${encodeURIComponent(chatId)}/messages`, { cache: "no-store" });
-    return res.ok ? ((await res.json()) as StoredMessages) : null;
+    return res.ok ? ((await res.json()) as StoredChat<ChatUIMessage>) : null;
   } catch {
     return null;
   }
 }
 
-/** The stored history holds an assistant reply to the user message `requestId`. */
-function hasReplyTo(messages: ChatUIMessage[], requestId: string | null): boolean {
-  if (!requestId) return false;
-  const at = messages.findIndex((m) => m.id === requestId && m.role === "user");
-  return at !== -1 && messages.slice(at + 1).some((m) => m.role === "assistant");
+function sleep(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, ms);
+    signal.addEventListener("abort", () => (clearTimeout(timer), resolve()), { once: true });
+  });
 }
 
 const textOf = (m: ChatUIMessage | undefined) =>
@@ -66,6 +65,17 @@ class TurnState {
 
   clearPending() {
     this.pendingId = null;
+  }
+
+  /** The run that is really live on the server (from a 409 or the messages route): Stop must target it. */
+  adopt(turn: ActiveTurn) {
+    this.runId = turn?.runId ?? null;
+    if (turn?.requestMessageId) this.pendingId = turn.requestMessageId;
+  }
+
+  /** Our request ended: its run id is no longer the live one. */
+  finished() {
+    this.runId = null;
   }
 
   /** Sends only the newest message plus the composer's selections, with a fresh run id per request. */
@@ -114,14 +124,15 @@ export function useChatSession({
     callbacks.current = { onRestoreDraft, onFirstFinish };
   });
 
+  const dangling = initialMessages.at(-1)?.role === "user";
   const chat = useChat<ChatUIMessage>({
     id: chatId,
     messages: initialMessages,
     transport,
     generateId: () => crypto.randomUUID(),
-    resume: initialMessages.at(-1)?.role === "user",
     throttle: 50,
     onFinish: () => {
+      turn.finished();
       void mutate(HISTORY_KEY);
       // The title is written just after the reply; pick it up a moment later.
       setTimeout(() => void mutate(HISTORY_KEY), 1500);
@@ -134,13 +145,13 @@ export function useChatSession({
       lastErrorRef.current = err;
       if (err instanceof ChatTurnActiveError) {
         toast(TURN_ACTIVE_TOAST);
-        dropRefused();
-        void (async () => {
-          await chatRef.current.resumeStream().catch(() => {});
-          await syncFromServer();
-        })();
+        turn.adopt(err.activeTurn);
+        dropRefused(err.activeTurn);
+        void resumeThenRecover();
       } else if (err instanceof ChatTurnCompleteError) {
-        void syncFromServer();
+        void recover();
+      } else if (restoresDraft(err)) {
+        dropRefused(null);
       }
     },
   });
@@ -149,22 +160,62 @@ export function useChatSession({
     chatRef.current = chat;
   });
 
-  /** Removes the optimistic user message of a refused send and hands its text back. */
-  function dropRefused() {
+  /**
+   * Removes the optimistic user message of a refused send and hands its text back. When the running turn is
+   * answering that very message it is already stored, so it stays on screen and nothing is restored.
+   */
+  function dropRefused(activeTurn: ActiveTurn) {
     const id = turn.pending();
     const current = chatRef.current;
     const refused = current.messages.find((m) => m.id === id && m.role === "user");
-    if (!refused) return;
-    current.setMessages((ms) => ms.filter((m) => m.id !== id));
-    callbacks.current.onRestoreDraft?.(textOf(refused));
+    if (!refused || activeTurn?.requestMessageId === refused.id) return;
+    const draft = draftToRestore({ id: refused.id, text: textOf(refused) }, activeTurn);
+    current.setMessages((ms) => ms.filter((m) => m.id !== refused.id));
+    if (draft) callbacks.current.onRestoreDraft?.(draft);
     turn.clearPending();
   }
 
-  async function syncFromServer() {
-    const stored = await loadMessages(chatId);
+  // Recovery: poll the stored chat (with backoff, up to six minutes) until no turn runs, then adopt it.
+  const [recovering, setRecovering] = useState(false);
+  const recoveryRef = useRef<AbortController | null>(null);
+  useEffect(() => () => recoveryRef.current?.abort(), []);
+
+  async function recover() {
+    recoveryRef.current?.abort();
+    const ctrl = new AbortController();
+    recoveryRef.current = ctrl;
+    setRecovering(true);
+    const stored = await pollUntilIdle({
+      load: () => loadMessages(chatId),
+      onActive: (t) => turn.adopt(t),
+      sleep: (ms) => sleep(ms, ctrl.signal),
+      signal: ctrl.signal,
+    });
+    if (ctrl.signal.aborted) return;
+    setRecovering(false);
+    turn.finished();
     if (stored) chatRef.current.setMessages(stored.messages);
     void mutate(HISTORY_KEY);
   }
+
+  /** Replays the live run if this instance has it; a 204 (run elsewhere, or already over) falls to polling. */
+  async function resumeThenRecover() {
+    await chatRef.current.resumeStream().catch(() => {});
+    await recover();
+  }
+
+  // Opened on a dangling user message: resume, then recover. Deferred, so a StrictMode remount can't abort it.
+  const resumed = useRef(false);
+  useEffect(() => {
+    if (!dangling || resumed.current) return;
+    const timer = setTimeout(() => {
+      resumed.current = true;
+      void resumeThenRecover();
+    }, 0);
+    return () => clearTimeout(timer);
+    // Mount only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const { status } = chat;
 
@@ -177,7 +228,7 @@ export function useChatSession({
     }
   }, [status]);
 
-  // Poll recovery: while a turn runs, check the stored history; adopt the reply if it landed without us.
+  // Poll recovery: while a turn streams, check the stored history; adopt the reply if it landed without us.
   useEffect(() => {
     if (status !== "submitted" && status !== "streaming") return;
     let timer: ReturnType<typeof setTimeout>;
@@ -200,23 +251,6 @@ export function useChatSession({
     };
   }, [status, chatId, turn]);
 
-  // Opened on a dangling user message and nothing to resume here (204): the reply may still be saving.
-  const settled = useRef(false);
-  useEffect(() => {
-    if (status !== "ready" || settled.current) return;
-    if (chat.messages.at(-1)?.role !== "user" || initialMessages.at(-1)?.role !== "user") return;
-    settled.current = true;
-    let tries = 0;
-    let timer: ReturnType<typeof setTimeout>;
-    const check = async () => {
-      const stored = await loadMessages(chatId);
-      if (stored && hasReplyTo(stored.messages, turn.pending())) chatRef.current.setMessages(stored.messages);
-      else if (++tries < 5) timer = setTimeout(check, 1000);
-    };
-    timer = setTimeout(check, 300);
-    return () => clearTimeout(timer);
-  }, [status, chat.messages, chatId, initialMessages, turn]);
-
   const send = useCallback(async (text: string) => {
     const t = text.trim();
     if (!t) return;
@@ -224,8 +258,10 @@ export function useChatSession({
     await chatRef.current.sendMessage({ text: t, metadata: { createdAt: new Date().toISOString() } });
   }, []);
 
+  /** Stops the live run on the server (its real run id, asked for if unknown) and the local stream. */
   const stop = useCallback(async () => {
-    const runId = turn.run();
+    const local = chatRef.current.stop();
+    const runId = turn.run() ?? (await loadMessages(chatId))?.activeTurn?.runId ?? null;
     if (runId) {
       void fetch("/api/chat/stop", {
         method: "POST",
@@ -234,7 +270,7 @@ export function useChatSession({
         body: JSON.stringify({ chatId, runId }),
       }).catch(() => {});
     }
-    await chatRef.current.stop();
+    await local;
   }, [chatId, turn]);
 
   /** A user-initiated retry: always a new message id (the old one may already have its reply). */
@@ -243,7 +279,7 @@ export function useChatSession({
     const lastUser = [...current.messages].reverse().find((m) => m.role === "user");
     const text = textOf(lastUser);
     if (!text) return;
-    // Refused before the turn started: that message was never stored, so it shouldn't stay on screen.
+    // Refused by the server before the turn started: that message was never stored.
     if (lastErrorRef.current instanceof ChatRequestError && lastUser) {
       current.setMessages((ms) => ms.filter((m) => m.id !== lastUser.id));
     }
@@ -251,12 +287,13 @@ export function useChatSession({
     await send(text);
   }, [send]);
 
-  const errorText =
-    chat.error && !(chat.error instanceof ChatTurnActiveError) && !(chat.error instanceof ChatTurnCompleteError)
-      ? chat.error instanceof ChatRequestError
-        ? chat.error.message
-        : chat.error.message || "Something went wrong while answering. Try again."
-      : null;
+  const err = chat.error;
+  const conflict = err instanceof ChatTurnActiveError || err instanceof ChatTurnCompleteError;
+  const errorText = err && !conflict ? friendlyError(err) : null;
+  // A refused message is back in the composer: edit and send it again rather than retrying as is.
+  const canRetry = errorText !== null && !restoresDraft(err);
+  // While recovering, the view reads as waiting on the reply.
+  const viewStatus = recovering && status !== "streaming" && status !== "submitted" ? "submitted" : status;
 
-  return { messages: chat.messages, status, errorText, send, stop, retry };
+  return { messages: chat.messages, status: viewStatus, errorText, canRetry, send, stop, retry };
 }

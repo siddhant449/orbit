@@ -19,6 +19,15 @@ test.setTimeout(120_000);
 const CHAT_URL = /\/chat\/([0-9a-f-]{36})$/;
 const created = new Set<string>();
 
+// Every chat id the page POSTs is recorded, so cleanup holds even when a test fails before the address changes.
+test.beforeEach(async ({ page }) => {
+  page.on("request", (req) => {
+    if (req.method() !== "POST" || new URL(req.url()).pathname !== "/api/chat") return;
+    const id = (req.postDataJSON() as { id?: string } | null)?.id;
+    if (id) created.add(id);
+  });
+});
+
 test.afterEach(async ({ page }) => {
   for (const id of created) await page.request.delete(`/api/chat/${id}`).catch(() => {});
   created.clear();
@@ -35,9 +44,7 @@ async function startChat(page: Page, text: string): Promise<string> {
   await page.getByLabel("Message", { exact: true }).fill(text);
   await page.getByLabel("Message", { exact: true }).press("Enter");
   await expect(page).toHaveURL(CHAT_URL, { timeout: 30_000 });
-  const id = CHAT_URL.exec(page.url())![1]!;
-  created.add(id);
-  return id;
+  return CHAT_URL.exec(page.url())![1]!;
 }
 
 const userNotes = (page: Page) => page.locator('[data-message="user"]');
@@ -59,7 +66,7 @@ test("starts on home, shows tool activity, keeps the history, manages the chat f
 
   await expect(page).toHaveURL(CHAT_URL);
   const id = CHAT_URL.exec(page.url())![1]!;
-  created.add(id);
+  expect(created.has(id)).toBe(true);
   const row = page.getByRole("complementary", { name: "Sidebar" }).locator(`a[href="/chat/${id}"]`);
   await expect(row).toBeVisible();
   await expect(row).toHaveAttribute("aria-current", "page");
@@ -180,6 +187,39 @@ test("shows 409 recovery: a refused send comes back to the composer, rapid sends
   await expect(userNotes(page).filter({ hasText: "Second message" })).toHaveCount(1);
   await page.reload();
   await expect(userNotes(page)).toHaveText(["You: Hello there", "You: Second message"]);
+
+  // A refused message (413) goes back to the composer with the server's reason, and no "Try again".
+  await page.route(
+    (url) => url.pathname === "/api/chat",
+    (route) =>
+      route.request().method() !== "POST"
+        ? route.fallback()
+        : route.fulfill({
+            status: 413,
+            contentType: "application/json",
+            body: JSON.stringify({ code: "message_too_long", cause: "That message is too long. Keep it under 200,000 characters." }),
+          }),
+  );
+  await page.getByLabel("Message", { exact: true }).fill("Too long, pretend");
+  await page.getByLabel("Message", { exact: true }).press("Enter");
+  await expect(page.getByRole("alert").filter({ hasText: "That message is too long." })).toBeVisible();
+  await expect(page.getByLabel("Message", { exact: true })).toHaveValue("Too long, pretend");
+  await expect(userNotes(page)).toHaveCount(2);
+  await expect(page.getByRole("button", { name: "Try again" })).toHaveCount(0);
+  await page.unrouteAll({ behavior: "wait" });
+});
+
+test("New chat while the first reply streams on home starts fresh", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/");
+  await page.getByLabel("Message", { exact: true }).fill("Give me markdown");
+  await page.getByLabel("Message", { exact: true }).press("Enter");
+  await expect(page.locator(".md--streaming")).toBeVisible({ timeout: 30_000 });
+  await expect(page).toHaveURL(/\/$/);
+  await page.getByRole("main").getByRole("link", { name: "New chat" }).click();
+  await expect(page.getByRole("heading", { name: "What are we writing today?" })).toBeVisible();
+  await expect(page.getByLabel("Message", { exact: true })).toHaveValue("");
+  expect(created.size).toBe(1);
 });
 
 test("stop ends a live reply and keeps what was written", async ({ page }) => {

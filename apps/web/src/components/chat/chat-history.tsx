@@ -9,7 +9,7 @@ import { MoreHorizontal, Pencil, Pin, PinOff, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { groupChatsByDate } from "@brandloop/agent/client";
 import { Button, cn } from "@brandloop/ui";
-import { HISTORY_KEY } from "./use-chat-session";
+import { HISTORY_KEY } from "./history-key";
 
 type ChatSummary = { id: string; title: string; pinned: boolean; lastActivityAt: string };
 type History = { chats: ChatSummary[]; hasMore: boolean };
