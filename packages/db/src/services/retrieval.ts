@@ -11,6 +11,13 @@ export type ChunkInput = { ordinal: number; title: string; text: string; embeddi
 const vec = (v: number[] | null) => (v ? `[${v.join(",")}]` : null);
 
 /** Replaces all chunks of a source in one transaction. Returns the number stored. */
+let warnedEmbedder = false;
+function warnOnce(err: unknown) {
+  if (warnedEmbedder) return;
+  warnedEmbedder = true;
+  console.warn("hybridSearch: embedder unavailable, using full-text only:", err instanceof Error ? err.message : String(err));
+}
+
 export async function replaceChunks(
   profileId: string,
   sourceType: ChunkSource,
@@ -18,7 +25,7 @@ export async function replaceChunks(
   chunks: ChunkInput[],
 ): Promise<number> {
   await prisma.$transaction(async (tx) => {
-    await tx.$executeRaw`DELETE FROM "KnowledgeChunk" WHERE "sourceType" = ${sourceType}::"ChunkSource" AND "sourceId" = ${sourceId}`;
+    await tx.$executeRaw`DELETE FROM "KnowledgeChunk" WHERE "profileId" = ${profileId} AND "sourceType" = ${sourceType}::"ChunkSource" AND "sourceId" = ${sourceId}`;
     for (const c of chunks) {
       await tx.$executeRaw`
         INSERT INTO "KnowledgeChunk" (id, "profileId", "sourceType", "sourceId", ordinal, title, text, embedding, tsv)
@@ -30,8 +37,8 @@ export async function replaceChunks(
   return chunks.length;
 }
 
-export async function deleteChunks(sourceType: ChunkSource, sourceId: string): Promise<void> {
-  await prisma.$executeRaw`DELETE FROM "KnowledgeChunk" WHERE "sourceType" = ${sourceType}::"ChunkSource" AND "sourceId" = ${sourceId}`;
+export async function deleteChunks(profileId: string, sourceType: ChunkSource, sourceId: string): Promise<void> {
+  await prisma.$executeRaw`DELETE FROM "KnowledgeChunk" WHERE "profileId" = ${profileId} AND "sourceType" = ${sourceType}::"ChunkSource" AND "sourceId" = ${sourceId}`;
 }
 
 export type SearchHit = {
@@ -57,24 +64,33 @@ export async function hybridSearch(
       const [v] = await opts.embedder.embed([query]);
       qv = v ? vec(v) : null;
     } catch (err) {
-      console.error("hybridSearch: embedder failed, using full-text only:", err instanceof Error ? err.message : err);
+      warnOnce(err);
     }
   }
   const rows = await prisma.$transaction(async (tx) => {
-    await tx.$executeRawUnsafe("SET LOCAL hnsw.iterative_scan = relaxed_order");
+    if (qv) {
+      // Older pgvector lacks iterative scans; a savepoint keeps the transaction usable if SET fails.
+      try {
+        await tx.$executeRawUnsafe("SAVEPOINT iter_scan");
+        await tx.$executeRawUnsafe("SET LOCAL hnsw.iterative_scan = relaxed_order");
+        await tx.$executeRawUnsafe("RELEASE SAVEPOINT iter_scan");
+      } catch {
+        await tx.$executeRawUnsafe("ROLLBACK TO SAVEPOINT iter_scan");
+      }
+    }
     return tx.$queryRaw<Row[]>`
       WITH vec AS (
-        SELECT id, row_number() OVER (ORDER BY embedding <=> ${qv}::vector) r FROM "KnowledgeChunk"
+        SELECT id, row_number() OVER (ORDER BY embedding <=> ${qv}::vector, id) r FROM "KnowledgeChunk"
         WHERE ${qv}::text IS NOT NULL AND "profileId" = ${profileId} AND "sourceType"::text = ANY(${sources}) AND embedding IS NOT NULL
-        ORDER BY embedding <=> ${qv}::vector LIMIT ${CANDIDATES}),
+        ORDER BY embedding <=> ${qv}::vector, id LIMIT ${CANDIDATES}),
       fts AS (
-        SELECT id, row_number() OVER (ORDER BY ts_rank_cd(tsv, q) DESC) r
+        SELECT id, row_number() OVER (ORDER BY ts_rank_cd(tsv, q) DESC, id) r
         FROM "KnowledgeChunk", websearch_to_tsquery('english', ${query}) q
-        WHERE "profileId" = ${profileId} AND "sourceType"::text = ANY(${sources}) AND tsv @@ q LIMIT ${CANDIDATES})
+        WHERE "profileId" = ${profileId} AND "sourceType"::text = ANY(${sources}) AND tsv @@ q ORDER BY r LIMIT ${CANDIDATES})
       SELECT c.id, c."sourceType", c."sourceId", c.ordinal, c.text,
              (COALESCE(1.0/(${RRF_K}+vec.r),0) + COALESCE(1.0/(${RRF_K}+fts.r),0))::float8 AS score
       FROM "KnowledgeChunk" c LEFT JOIN vec ON vec.id = c.id LEFT JOIN fts ON fts.id = c.id
-      WHERE vec.id IS NOT NULL OR fts.id IS NOT NULL ORDER BY score DESC LIMIT 80`;
+      WHERE vec.id IS NOT NULL OR fts.id IS NOT NULL ORDER BY score DESC, c.id LIMIT 80`;
   });
 
   const bySource = new Map<string, SearchHit>();
@@ -89,5 +105,5 @@ export async function hybridSearch(
       hit.chunks.push({ id: r.id, ordinal: r.ordinal, text: r.text, score: r.score });
     }
   }
-  return [...bySource.values()].sort((a, b) => b.score - a.score).slice(0, limit);
+  return [...bySource.values()].sort((a, b) => b.score - a.score || (a.sourceId < b.sourceId ? -1 : 1)).slice(0, limit);
 }

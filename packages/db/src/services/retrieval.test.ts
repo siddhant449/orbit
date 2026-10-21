@@ -33,7 +33,7 @@ describe("schema", () => {
     expect(idx.map((i) => i.indexname)).toEqual(
       expect.arrayContaining(["KnowledgeChunk_embedding_hnsw", "KnowledgeChunk_tsv_gin"]),
     );
-    expect(idx.find((i) => i.indexname === "KnowledgeChunk_embedding_hnsw")?.indexdef).toMatch(/hnsw/);
+    expect(idx.find((i) => i.indexname === "KnowledgeChunk_embedding_hnsw")?.indexdef).toMatch(/hnsw.*vector_cosine_ops/);
     expect(idx.find((i) => i.indexname === "KnowledgeChunk_tsv_gin")?.indexdef).toMatch(/gin/);
   });
 });
@@ -56,15 +56,42 @@ describe("hybridSearch", () => {
     expect((await hybridSearch(p, "zebra migration", { embedder: e }))[0]?.sourceId).toBe("k2");
   });
 
-  it("ranks a chunk found by both lists above one found by one list", async () => {
+  it("fuses both rankers with RRF (exact scores; neither ranker alone would pass)", async () => {
     const p = await profile(3);
     const e = fakeEmbedder();
-    const [both, vOnly] = await e.embed(["zebra migration", "zebra migration herd"]);
-    await replaceChunks(p, "KNOWLEDGE", "vec-only", [{ ordinal: 0, title: "A", text: "unrelated words here", embedding: vOnly! }]);
-    await replaceChunks(p, "KNOWLEDGE", "both", [{ ordinal: 0, title: "B", text: "zebra migration", embedding: both! }]);
+    const [qv, mv] = await e.embed(["zebra migration", "zebra migration herd"]);
+    // Q: vector rank 1, no lexical match. R: FTS-only, strongest lexical match.
+    // M: vector rank 2 and FTS rank 2, so 2/62 beats either single rank-1 (1/61).
+    await replaceChunks(p, "KNOWLEDGE", "q", [{ ordinal: 0, title: "A", text: "unrelated words here", embedding: qv! }]);
+    await replaceChunks(p, "KNOWLEDGE", "r", [{ ordinal: 0, title: "B", text: "zebra migration zebra migration zebra migration", embedding: null }]);
+    await replaceChunks(p, "KNOWLEDGE", "m", [{ ordinal: 0, title: "C", text: "zebra migration", embedding: mv! }]);
     const hits = await hybridSearch(p, "zebra migration", { embedder: e });
-    expect(hits.map((h) => h.sourceId)).toEqual(["both", "vec-only"]);
-    expect(hits[0]!.score).toBeGreaterThan(hits[1]!.score);
+    expect(hits.map((h) => h.sourceId)[0]).toBe("m");
+    expect(hits[0]!.score).toBeCloseTo(2 / 62, 10);
+    const byId = Object.fromEntries(hits.map((h) => [h.sourceId, h.score]));
+    expect(byId.q).toBeCloseTo(1 / 61, 10);
+    expect(byId.r).toBeCloseTo(1 / 61, 10);
+  });
+
+  it("scores a chunk ranked first by both lists at 2/61", async () => {
+    const p = await profile(9);
+    const e = fakeEmbedder();
+    const [qv] = await e.embed(["zebra migration"]);
+    await replaceChunks(p, "KNOWLEDGE", "both", [{ ordinal: 0, title: "B", text: "zebra migration", embedding: qv! }]);
+    const hits = await hybridSearch(p, "zebra migration", { embedder: e });
+    expect(hits[0]!.score).toBeCloseTo(2 / 61, 10);
+  });
+
+  it("never returns another profile's chunks on the vector path", async () => {
+    const a = await profile(10);
+    const b = await profile(11);
+    const e = fakeEmbedder();
+    const [v] = await e.embed(["zebra migration"]);
+    const chunk = { ordinal: 0, title: "Notes", text: "lorem ipsum", embedding: v! };
+    await replaceChunks(a, "KNOWLEDGE", "a-src", [chunk]);
+    await replaceChunks(b, "KNOWLEDGE", "b-src", [chunk]);
+    const hits = await hybridSearch(a, "zebra migration", { embedder: e });
+    expect(hits.map((h) => h.sourceId)).toEqual(["a-src"]);
   });
 
   it("falls back to full-text search when the embedder throws", async () => {
@@ -108,7 +135,7 @@ describe("replaceChunks / deleteChunks", () => {
     expect(await count("s")).toBe(3);
     await replaceChunks(p, "KNOWLEDGE", "s", mk(1));
     expect(await count("s")).toBe(1);
-    await deleteChunks("KNOWLEDGE", "s");
+    await deleteChunks(p, "KNOWLEDGE", "s");
     expect(await count("s")).toBe(0);
   });
 });
