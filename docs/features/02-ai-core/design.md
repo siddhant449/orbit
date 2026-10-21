@@ -116,7 +116,7 @@ Chat errors use Kleo's shape, `{code, cause}`. Other routes keep `{error}`, plus
 | `PATCH /api/chat/:id` / `DELETE /api/chat/:id` | Rename or pin / soft delete |
 | `GET /api/history?limit=20&before=<chatId>` | `{chats: [{id, title, pinned, lastActivityAt, documentId}], hasMore}`, pinned first, then newest |
 | `GET /api/user-memory` | `{version, sections: [{key, path, title, description, content, source, pinned, updatedAt}]}` |
-| `PATCH /api/user-memory` | `{target: key, content (≤20,000 chars; "" deletes the section), expectedVersion}`. Returns 200 `{success: true, version}`, 409 `{code: "memory_version_conflict", version}`, or 400 for a bad key |
+| `PATCH /api/user-memory` | `{target: key, content (≤20,000 chars; exactly `null` deletes the section, a blank string is 400), expectedVersion}`. Returns 200 `{success: true, version}`, 409 `{code: "memory_version_conflict", version}`, or 400 for a bad key |
 | `GET /api/documents/:id` · `GET …/versions` | Document with current text · version list `{version, source, changeSummary, createdAt, chars}` |
 | `PATCH /api/documents/:id` | `{text, title?, expectedVersion}` saves a user edit. Returns 200 `{version}` or 409 `{code: "document_version_conflict", version}` |
 | `POST /api/documents/:id/restore` | `{version, expectedVersion}`. Writes a new version with source RESTORE |
