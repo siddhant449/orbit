@@ -158,11 +158,11 @@ export async function appendMemoryLines(
   });
 }
 
-function bulletLines(doc: MemoryDoc, lineIndex: number, expectedText?: string) {
+function bulletLines(doc: MemoryDoc, lineIndex: number, expectedText: string) {
   const lines = doc.content.split("\n");
   const bullet = Number.isInteger(lineIndex) && lines[lineIndex] ? BULLET.exec(lines[lineIndex]!) : null;
   if (!bullet) throw new AccountError("Not an editable line");
-  if (expectedText !== undefined && bullet[3]!.trim() !== expectedText.trim()) {
+  if (bullet[3]!.trim() !== expectedText.trim()) {
     throw new AccountError("This memory changed. Refresh and try again.");
   }
   return { lines, indent: bullet[1]!, marker: bullet[2]! };
@@ -173,7 +173,7 @@ function changeBulletLine(
   profileId: string,
   key: string,
   lineIndex: number,
-  expectedText: string | undefined,
+  expectedText: string,
   change: (lines: string[], bullet: { indent: string; marker: string }) => void,
 ): Promise<MemoryDoc> {
   return withMemoryRetry(profileId, async (version) => {
@@ -191,7 +191,8 @@ export function editMemoryLine(
   key: string,
   lineIndex: number,
   text: string,
-  expectedText?: string,
+  /** Required: the retry loop re-reads the section, and this stops a retry landing on a different line. */
+  expectedText: string,
 ): Promise<MemoryDoc> {
   const clean = text.trim();
   if (!clean) return Promise.reject(new AccountError("Line text is required"));
@@ -204,7 +205,8 @@ export function deleteMemoryLine(
   profileId: string,
   key: string,
   lineIndex: number,
-  expectedText?: string,
+  /** Required: the retry loop re-reads the section, and this stops a retry landing on a different line. */
+  expectedText: string,
 ): Promise<MemoryDoc> {
   return changeBulletLine(profileId, key, lineIndex, expectedText, (lines) => {
     lines.splice(lineIndex, 1);

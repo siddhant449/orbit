@@ -79,17 +79,17 @@ describe("line editing", () => {
       { index: 1, text: "a1", depth: 1 },
       { index: 2, text: "b", depth: 0 },
     ]);
-    const edited = await editMemoryLine(profileId, key, 1, "A1!");
+    const edited = await editMemoryLine(profileId, key, 1, "A1!", "a1");
     expect(edited.content).toBe("- a\n  - A1!\n- b");
-    const deleted = await deleteMemoryLine(profileId, key, 2);
+    const deleted = await deleteMemoryLine(profileId, key, 2, "b");
     expect(deleted.content).toBe("- a\n  - A1!");
   });
 
   it("rejects non-bullet or out-of-range lines", async () => {
     const { profileId } = await setup();
     await upsertMemory(profileId, "identity/story", "intro\n- a", "USER");
-    await expect(editMemoryLine(profileId, "identity/story", 0, "x")).rejects.toThrow(/line/i);
-    await expect(deleteMemoryLine(profileId, "identity/story", 9)).rejects.toThrow(/line/i);
+    await expect(editMemoryLine(profileId, "identity/story", 0, "x", "intro")).rejects.toThrow(/line/i);
+    await expect(deleteMemoryLine(profileId, "identity/story", 9, "a")).rejects.toThrow(/line/i);
   });
 });
 
@@ -123,8 +123,8 @@ describe("memory version", () => {
     expect(await getMemoryVersion(p)).toBe(0);
     await upsertMemory(p, "identity/about", "- A", "USER"); // 1
     await appendMemoryLines(p, "identity/about", ["B"], "USER"); // 2
-    await editMemoryLine(p, "identity/about", 0, "A2"); // 3
-    await deleteMemoryLine(p, "identity/about", 1); // 4
+    await editMemoryLine(p, "identity/about", 0, "A2", "A"); // 3
+    await deleteMemoryLine(p, "identity/about", 1, "B"); // 4
     expect(await getMemoryVersion(p)).toBe(4);
   });
 

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import {
   AccountError,
+  MemoryVersionConflict,
   appendMemoryLines,
   assertProfileAccess,
   deleteMemoryLine,
@@ -26,6 +27,10 @@ async function run(fn: (userId: string) => Promise<unknown>): Promise<ActionResu
     await fn(account.user.id);
   } catch (err) {
     if (err instanceof AccountError) return { ok: false, error: err.message };
+    // Concurrent memory writes outlasted the retries; ask the user to retry rather than 500.
+    if (err instanceof MemoryVersionConflict) {
+      return { ok: false, error: "Your memory changed while saving. Try again." };
+    }
     throw err;
   }
   revalidatePath("/", "layout");
