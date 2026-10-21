@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { Button } from "./button";
 
-describe("Button (riso press, section 5.1)", () => {
+describe("Button (drafting press, system.md section 5)", () => {
   it("plated variants are a static plate with a moving face child", () => {
     render(<Button>Save changes</Button>);
     const button = screen.getByRole("button", { name: "Save changes" });
@@ -12,6 +12,11 @@ describe("Button (riso press, section 5.1)", () => {
     expect(face).toHaveTextContent("Save changes");
   });
 
+  it("generate is the same graphite plate as primary", () => {
+    render(<Button variant="generate">Send</Button>);
+    expect(screen.getByRole("button", { name: "Send" })).toHaveClass("btn--plated", "btn--primary");
+  });
+
   it("flat variants carry their content directly", () => {
     render(<Button variant="ghost">Cancel</Button>);
     const button = screen.getByRole("button", { name: "Cancel" });
@@ -19,30 +24,21 @@ describe("Button (riso press, section 5.1)", () => {
     expect(button.querySelector(".btn__face")).toBeNull();
   });
 
-  it("danger uses the on-danger token, never hard-coded white", () => {
+  it("danger is a signal frame, never hard-coded white or a plate", () => {
     render(<Button variant="danger">Delete profile</Button>);
     const button = screen.getByRole("button", { name: "Delete profile" });
-    expect(button).toHaveClass("btn--danger");
-    expect(button.className).not.toMatch(/text-white/);
+    expect(button).toHaveClass("btn--flat", "btn--danger");
+    expect(button.className).not.toMatch(/text-white|btn--plated/);
   });
 
   it("mirrors a keyboard press for 120 ms", () => {
     vi.useFakeTimers();
-    render(<Button variant="generate">Send</Button>);
+    render(<Button>Send</Button>);
     const button = screen.getByRole("button", { name: "Send" });
     fireEvent.keyDown(button, { key: "Enter" });
     expect(button).toHaveAttribute("data-pressed", "");
     vi.advanceTimersByTime(130);
     expect(button).not.toHaveAttribute("data-pressed");
     vi.useRealTimers();
-  });
-
-  it("secondary records the pointer's entry point for the ink soak", () => {
-    render(<Button variant="secondary">Import memories</Button>);
-    const button = screen.getByRole("button", { name: "Import memories" });
-    button.getBoundingClientRect = () => ({ left: 0, top: 0, width: 200, height: 40, right: 200, bottom: 40, x: 0, y: 0, toJSON() {} });
-    fireEvent.pointerEnter(button, { clientX: 50, clientY: 10 });
-    expect(button.style.getPropertyValue("--soak-x")).toBe("25.0%");
-    expect(button.style.getPropertyValue("--soak-y")).toBe("25.0%");
   });
 });

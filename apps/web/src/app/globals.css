@@ -1,6 +1,6 @@
 @import "tailwindcss";
 @import "@brandloop/ui/tokens.css";
-@import "@brandloop/ui/cinematic.css";
+@import "@brandloop/ui/drafting.css";
 @import "lenis/dist/lenis.css";
 
 @custom-variant dark (&:where(.dark, .dark *));

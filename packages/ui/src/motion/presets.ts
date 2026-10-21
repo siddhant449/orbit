@@ -18,7 +18,7 @@ export const durations = { hover: 0.2, entry: 0.18, exit: 0.12, draw: 0.4, settl
 
 /**
  * Cinematic one-shots (micro-interactions.md section 9), in seconds. The first-paint sequences (kinetic greeting,
- * composer landing, ticket stamps) are CSS animations with the same numbers in `cinematic.css`, so they start before
+ * composer landing, tab rise) are CSS animations with the same numbers in `drafting.css`, so they start before
  * any JS chunk and are static under reduced motion; these values drive the Motion-powered pieces.
  */
 export const cinematic = {
@@ -35,6 +35,9 @@ export const cinematic = {
   /** Scroll reveal. */
   reveal: 0.42,
   revealStagger: 0.04,
+  /** Values count up; meters and rules draw in. */
+  count: 0.42,
+  draw: 0.7,
 } as const;
 
 /** `stamp`: entries of plates, dialogs, toasts and routes (180 ms `ease-ink`; exit is opacity only). */

@@ -16,8 +16,6 @@ type Props = {
   id?: string;
 };
 
-type Layer = "ink" | "pink" | "blue";
-
 function breaksAfter(lines: string[]): Set<number> {
   const set = new Set<number>();
   let count = -1;
@@ -29,10 +27,10 @@ function breaksAfter(lines: string[]): Set<number> {
 }
 
 /**
- * Kinetic display type (C2): every letter sets in with `font-stretch` 75 → 125 on a CSS stagger, and the pink and
- * blue plate copies run the same score behind it, 70 and 140 ms later, ending 3 px out of register. The layers are
- * `aria-hidden`; the heading's accessible name is `text` through `aria-label`. Under reduced motion the CSS renders
- * the final frame. No JS runs here, so the sequence starts with first paint.
+ * Kinetic display type (D2): every letter sets in on a CSS stagger, from light and tracked-out to the heading's weight
+ * and tight tracking. The letter layer is `aria-hidden`; the heading's accessible name is `text` through
+ * `aria-label`. Under reduced motion the CSS renders the final frame. No JS runs here, so the sequence starts with
+ * first paint.
  */
 export function KineticHeading({ text, lines, narrowLines, as: Tag = "h1", delay = 160, className, id }: Props) {
   const words = text.split(" ").filter(Boolean);
@@ -43,27 +41,24 @@ export function KineticHeading({ text, lines, narrowLines, as: Tag = "h1", delay
   }
 
   let letterIndex = 0;
-  const renderLayer = (layer: Layer) => {
-    letterIndex = 0;
-    return words.map((word, wi) => {
-      const letters = [...word].map((ch) => {
-        const i = letterIndex++;
-        return (
-          <span key={i} className="kinetic__letter" style={{ "--i": i } as CSSProperties}>
-            {ch}
-          </span>
-        );
-      });
+  const content = words.map((word, wi) => {
+    const letters = [...word].map((ch) => {
+      const i = letterIndex++;
       return (
-        <span key={`${layer}-${wi}`}>
-          <span className="kinetic__word">{letters}</span>
-          {wi < words.length - 1 && " "}
-          {wide.has(wi) && <br className="kinetic__br kinetic__br--wide" />}
-          {narrow.has(wi) && <br className="kinetic__br kinetic__br--narrow" />}
+        <span key={i} className="kinetic__letter" style={{ "--i": i } as CSSProperties}>
+          {ch}
         </span>
       );
     });
-  };
+    return (
+      <span key={wi}>
+        <span className="kinetic__word">{letters}</span>
+        {wi < words.length - 1 && " "}
+        {wide.has(wi) && <br className="kinetic__br kinetic__br--wide" />}
+        {narrow.has(wi) && <br className="kinetic__br kinetic__br--narrow" />}
+      </span>
+    );
+  });
 
   return (
     <Tag
@@ -73,13 +68,7 @@ export function KineticHeading({ text, lines, narrowLines, as: Tag = "h1", delay
       style={{ "--kinetic-delay": `${delay}ms` } as CSSProperties}
     >
       <span aria-hidden="true" className="kinetic__layer">
-        {renderLayer("ink")}
-      </span>
-      <span aria-hidden="true" className="kinetic__layer kinetic__layer--pink">
-        {renderLayer("pink")}
-      </span>
-      <span aria-hidden="true" className="kinetic__layer kinetic__layer--blue">
-        {renderLayer("blue")}
+        {content}
       </span>
     </Tag>
   );

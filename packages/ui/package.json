@@ -4,9 +4,10 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./effects": "./src/effects/index.ts",
+    "./motion": "./src/motion/provider.tsx",
+    "./scroll": "./src/scroll/index.ts",
     "./tokens.css": "./src/tokens.css",
-    "./cinematic.css": "./src/cinematic.css"
+    "./drafting.css": "./src/drafting.css"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

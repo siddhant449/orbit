@@ -2,22 +2,22 @@
 
 import { cva, type VariantProps } from "class-variance-authority";
 import { Slot } from "radix-ui";
-import { useRef, type ComponentProps, type KeyboardEvent, type PointerEvent } from "react";
+import { useRef, type ComponentProps, type KeyboardEvent } from "react";
 import { cn } from "./cn";
 
 /**
- * Riso button (riso-system.md section 5.1 and 6). Plated variants (primary ink, generate blue, danger) are a static
- * plate (the button box) with a moving face child: the face lands on the plate on press (B1) and its pink and blue
- * plates misregister on hover (B2). Secondary soaks in ink from the pointer's entry side (B3); ghost icon buttons
- * stamp (B4). All motion is CSS in `cinematic.css`; keyboard presses mirror the pointer press for 120 ms.
+ * Drafting-table button (system.md section 5). Plated variants (`primary`, and `generate` as its alias) are a static
+ * 2 px graphite-grey plate (the button box) with a graphite face child that lands on the plate when pressed; keyboard
+ * presses mirror the pointer for 120 ms. `secondary` is a hairline frame, `danger` a signal frame (status only),
+ * `ghost` text. All motion is CSS in `drafting.css`.
  */
 export const buttonVariants = cva("btn", {
   variants: {
     variant: {
       primary: "btn--plated btn--primary",
-      generate: "btn--plated btn--generate",
-      danger: "btn--plated btn--danger",
+      generate: "btn--plated btn--primary",
       secondary: "btn--flat btn--secondary",
+      danger: "btn--flat btn--danger",
       ghost: "btn--flat btn--ghost",
     },
     size: {
@@ -30,7 +30,7 @@ export const buttonVariants = cva("btn", {
   defaultVariants: { variant: "primary", size: "md" },
 });
 
-const PLATED = new Set(["primary", "generate", "danger"]);
+const PLATED = new Set(["primary", "generate"]);
 
 export function Button({
   className,
@@ -39,42 +39,23 @@ export function Button({
   asChild = false,
   children,
   onKeyDown,
-  onKeyUp,
-  onPointerEnter,
   ...props
 }: ComponentProps<"button"> & VariantProps<typeof buttonVariants> & { asChild?: boolean }) {
   const Comp = asChild ? Slot.Root : "button";
-  const resolved = variant ?? "primary";
-  const plated = PLATED.has(resolved) && !asChild;
+  const plated = PLATED.has(variant ?? "primary") && !asChild;
   const timer = useRef<number | null>(null);
 
   function keyDown(e: KeyboardEvent<HTMLButtonElement>) {
     onKeyDown?.(e);
     if (e.defaultPrevented || (e.key !== " " && e.key !== "Enter")) return;
-    e.currentTarget.setAttribute("data-pressed", "");
-    if (timer.current) window.clearTimeout(timer.current);
     const el = e.currentTarget;
+    el.setAttribute("data-pressed", "");
+    if (timer.current) window.clearTimeout(timer.current);
     timer.current = window.setTimeout(() => el.removeAttribute("data-pressed"), 120);
-  }
-  function keyUp(e: KeyboardEvent<HTMLButtonElement>) {
-    onKeyUp?.(e);
-  }
-  function pointerEnter(e: PointerEvent<HTMLButtonElement>) {
-    onPointerEnter?.(e);
-    if (resolved !== "secondary") return;
-    const r = e.currentTarget.getBoundingClientRect();
-    e.currentTarget.style.setProperty("--soak-x", `${(((e.clientX - r.left) / r.width) * 100).toFixed(1)}%`);
-    e.currentTarget.style.setProperty("--soak-y", `${(((e.clientY - r.top) / r.height) * 100).toFixed(1)}%`);
   }
 
   return (
-    <Comp
-      className={cn(buttonVariants({ variant, size }), className)}
-      onKeyDown={keyDown}
-      onKeyUp={keyUp}
-      onPointerEnter={pointerEnter}
-      {...props}
-    >
+    <Comp className={cn(buttonVariants({ variant, size }), className)} onKeyDown={keyDown} {...props}>
       {plated ? <span className="btn__face">{children}</span> : children}
     </Comp>
   );
