@@ -51,7 +51,7 @@ function RenameField({ chat, onDone }: { chat: ChatSummary; onDone: (title: stri
         else if (e.key === "Escape") finish(null);
       }}
       onBlur={() => finish(value.trim() || null)}
-      className="h-8 w-full rounded-control border border-line-strong bg-surface px-2 type-ui text-ink outline-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus"
+      className="h-8 w-full rounded-control border border-line-control bg-surface px-2 type-ui text-ink outline-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus"
     />
   );
 }

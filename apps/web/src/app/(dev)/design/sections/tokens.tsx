@@ -33,7 +33,7 @@ function TokenCard({ theme }: { theme: "dark" | "light" }) {
   return (
     <section
       aria-labelledby={`tokens-${theme}`}
-      className={cn(theme, "flex min-w-0 flex-col gap-5 rounded-card-lg bg-ground p-5 text-text shadow-card sm:p-7", dark && "ring-1 ring-line-2")}
+      className={cn(theme, "flex min-w-0 flex-col gap-5 rounded-card-lg bg-ground p-5 text-text shadow-elevation-card sm:p-7", dark && "ring-1 ring-line-2")}
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 id={`tokens-${theme}`} className="text-lg font-medium tracking-[-0.01em]">

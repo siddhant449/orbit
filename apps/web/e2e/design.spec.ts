@@ -138,3 +138,30 @@ test("screenshots: 1440 and 390, dark and light", async ({ page }) => {
   await page.waitForTimeout(2000);
   await captureSet(page, "design");
 });
+
+test.describe("with Light stored", () => {
+  test.use({
+    // The OS asks for dark; the stored choice must still win on first paint.
+    colorScheme: "dark",
+    storageState: {
+      cookies: [],
+      origins: [{ origin: new URL(process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000").origin, localStorage: [{ name: "orbit-theme", value: "light" }] }],
+    },
+  });
+
+  test("first paint is light: the class and ground are set by DOMContentLoaded, before hydration", async ({ page }) => {
+    await page.addInitScript(() => {
+      document.addEventListener("DOMContentLoaded", () => {
+        (window as unknown as { __firstPaint: unknown }).__firstPaint = {
+          cls: document.documentElement.className,
+          bg: getComputedStyle(document.body).backgroundColor,
+        };
+      });
+    });
+    await page.goto("/design", { waitUntil: "domcontentloaded" });
+    const first = await page.waitForFunction(() => (window as unknown as { __firstPaint?: { cls: string; bg: string } }).__firstPaint);
+    const { cls, bg } = (await first.jsonValue()) as { cls: string; bg: string };
+    expect(cls).toMatch(/(^|\s)light(\s|$)/);
+    expect(bg).toBe("rgb(245, 244, 240)");
+  });
+});

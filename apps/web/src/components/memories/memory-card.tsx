@@ -77,7 +77,7 @@ function LineRow({ line }: { line: MemoryLineView }) {
               cancel();
             }
           }}
-          className="min-w-0 flex-1 resize-none rounded-row border border-keyline bg-paper px-2.5 py-1.5 text-[15px] leading-relaxed text-ink"
+          className="min-w-0 flex-1 resize-none rounded-row border border-line-control bg-paper px-2.5 py-1.5 text-[15px] leading-relaxed text-ink"
         />
       ) : (
         <button

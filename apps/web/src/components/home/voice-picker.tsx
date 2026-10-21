@@ -125,7 +125,7 @@ export function VoicePicker({ voices, selectedId }: { voices: VoiceOption[]; sel
               aria-label={`Change writing style, ${current ? current.name : "Writing style"}`}
               aria-busy={pending}
               title={current?.tagline || "Choose how your posts sound"}
-              className="flex h-8 max-w-[210px] items-center gap-2 rounded-full border border-line-strong py-0 pl-1 pr-2.5 text-[13px] text-ink-muted transition-colors hover:border-keyline hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus data-[state=open]:border-keyline data-[state=open]:text-ink"
+              className="flex h-8 max-w-[210px] items-center gap-2 rounded-full border border-line-control py-0 pl-1 pr-2.5 text-[13px] text-ink-muted transition-colors hover:border-keyline hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus data-[state=open]:border-keyline data-[state=open]:text-ink"
             >
               {current ? (
                 <VoiceAvatar name={current.name} />
@@ -306,7 +306,7 @@ function AddStyleDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
               aria-invalid={error ? true : undefined}
               aria-describedby="voice-posts-hint"
               placeholder={"First post…\n---\nSecond post…\n---\nThird post…"}
-              className="w-full resize-y rounded-row border border-line bg-paper px-3 py-2 text-sm leading-relaxed placeholder:text-ink-faint"
+              className="w-full resize-y rounded-row border border-line-control bg-paper px-3 py-2 text-sm leading-relaxed placeholder:text-ink-faint"
             />
             <p id="voice-posts-hint" className="text-xs text-ink-muted">
               Separate posts with a line containing --- ({count} {count === 1 ? "post" : "posts"} found)

@@ -20,7 +20,7 @@ export function ComponentsCard({ theme }: { theme: "dark" | "light" }) {
   return (
     <section
       aria-labelledby={`components-${theme}`}
-      className={cn(theme, "flex min-w-0 flex-col gap-6 rounded-card-lg bg-ground p-5 text-text shadow-card sm:p-7", dark && "ring-1 ring-line-2")}
+      className={cn(theme, "flex min-w-0 flex-col gap-6 rounded-card-lg bg-ground p-5 text-text shadow-elevation-card sm:p-7", dark && "ring-1 ring-line-2")}
     >
       <h3 id={`components-${theme}`} className="text-lg font-medium tracking-[-0.01em]">
         {title}

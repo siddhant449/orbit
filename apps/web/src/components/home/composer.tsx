@@ -87,7 +87,7 @@ export function Composer({
           <span aria-hidden="true" className="land__plate" />
           <form
             onSubmit={send}
-            className="land__sheet rounded-card border border-keyline bg-surface p-2 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus"
+            className="land__sheet rounded-card border border-line-control bg-surface p-2 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus"
           >
             <label htmlFor="composer" className="sr-only">
               Message

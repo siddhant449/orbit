@@ -66,7 +66,8 @@ Dark lines are paper `rgba(245,244,240,a)`, light lines are ink `rgba(10,10,11,a
 | `line-2` | 0.10 | Composer border, pill buttons (32 px), top-bar pills [p01] |
 | `line-3` | 0.12 | Chips in chat, icon-button borders [p03 chips, p30 `Add`] |
 | `line-4` | 0.14 | Status pills ("4 left", "3 to review"), memory tag [p01, p03] |
-| `line-strong` | 0.18 | Ghost CTA border (52 px) [p30 `Schedule`] |
+| `line-strong` | → `line-control` (Orbit 0.18) | Ghost CTA border (52 px) [p30 `Schedule`]; raised to the control line (A17, 2.4) |
+| `line-control` | 0.36 dark / 0.44 light | Control boundaries at 3:1 (A17, 2.4) |
 | `line-hover` | 0.20-0.22 | Dark panel hover border (`0.22` on p30 `.paneld`, `0.2` on p03 `.panel:hover`); use 0.20 |
 | `line-input` (light) | `#E3E2DC` solid | Light input/icon-circle border [p30 light swatch "Panel", icon circles] |
 | `line-paper` (light) | `#ECEBE6` solid | Draft-card header divider (both themes; the card is always paper) [p03/p18] |
@@ -106,6 +107,7 @@ Computed WCAG contrast (sRGB):
 | `#FFFFFF` on `#6B7BFF` hover | | 3.56 | Fails for 13-17 px labels. Use **`#5566F7`** (4.54) plus Orbit's glow `0 10px 28px rgba(79,95,245,0.28)`. |
 | `#5B5B5E` "Text 3" (dark) | `#0E0E10` | 2.85 | Not for text. Token `faint`, non-text only. |
 | `#9A9A9E` icon (light) | `#F5F4F0` | 2.55 | Allowed only for icons that sit beside a visible label (decorative). Standalone icons use `text-2`. |
+| Line alphas 0.10-0.18 on control boundaries (inputs, composer, picker chips) | panel / ground | 1.2-1.6 | Fails WCAG 1.4.11 (3:1 non-text). Ruling A17: token **`line-control`** = paper `rgba(245,244,240,0.36)` dark (3.14 on `#151517`, 3.11 on `#0E0E10`) / ink `rgba(10,10,11,0.44)` light (3.07 on `#FFFFFF`, 3.01 on `#F5F4F0`), the lightest alpha reaching 3:1 on both grounds. Used for Input / NativeSelect, the composer border, the voice-picker button, knowledge chips and inline rename/edit fields. `line-strong` (ghost CTA border) points at it. Decorative hairlines keep Orbit's alphas. Checked in `packages/ui/src/tokens.test.ts`. |
 
 Every other text pair passes: `#F5F4F0`/`#0E0E10` 17.5, `#C9C8C4` 11.5, `#9A9A9E` 6.9 (6.5 on panel), `#7C8AFF` 6.0-6.4,
 white on `#4F5FF5` 4.90, `#0A0A0B`/`#F5F4F0` 18.0, `#3A3A3E` 10.3, `#5B5B5E` 6.2, `#2E3FE6` 6.4-7.1.
@@ -131,7 +133,9 @@ white on `#4F5FF5` 4.90, `#0A0A0B`/`#F5F4F0` 18.0, `#3A3A3E` 10.3, `#5B5B5E` 6.2
   / Auto"; p14 settings sub-nav footer].
 - Control: three pill buttons at the bottom of the Settings sub-nav, `height:32px; flex:1; font-size:12px`; selected = `inverse`
   fill, weight 500; others transparent with `line-2` border and `text-2` text [p14]. Accessible names "Light theme", "Dark
-  theme", "System theme" (Orbit's own `aria-label`s) with `aria-pressed`.
+  theme" (Orbit's own `aria-label`s) and **"Auto, system theme"** with `aria-pressed`. Ruling A18: Orbit's "System
+  theme" would not contain the visible word "Auto" (WCAG 2.5.3, axe `label-content-name-mismatch`, serious), so the name
+  keeps the visible label first; it still matches a non-exact "System theme" query.
 - Implementation: `next-themes` (already a dependency) with `attribute="class"`, `defaultTheme="dark"`, `enableSystem`,
   `themes={["light","dark"]}`, storage key `orbit-theme`, `disableTransitionOnChange`. Token blocks:
   `:root` = dark values, `:root.light` = light values (dark is default so the no-JS paint is dark). `color-scheme` set per theme.

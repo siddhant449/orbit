@@ -163,7 +163,7 @@ export function KnowledgePicker({
 /** A selected knowledge item under the composer, removable. */
 export function KnowledgeChip({ item, onRemove }: { item: KnowledgeChoice; onRemove: () => void }) {
   return (
-    <li className="flex h-7 max-w-[220px] items-center gap-1.5 rounded-pill border border-line-strong bg-surface pl-3 pr-1 type-caption text-ink">
+    <li className="flex h-7 max-w-[220px] items-center gap-1.5 rounded-pill border border-line-control bg-surface pl-3 pr-1 type-caption text-ink">
       <span className="min-w-0 truncate">{item.title}</span>
       <button
         type="button"

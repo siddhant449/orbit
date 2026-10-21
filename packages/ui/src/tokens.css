@@ -35,7 +35,10 @@
   --line-2: rgba(245, 244, 240, 0.1);
   --line-3: rgba(245, 244, 240, 0.12);
   --line-4: rgba(245, 244, 240, 0.14);
-  --line-strong: rgba(245, 244, 240, 0.18);
+  /* Control boundaries (inputs, composer, picker chips): lightest paper alpha with 3:1 on panel and ground (A17, §2.4). */
+  --line-control: rgba(245, 244, 240, 0.36);
+  /* Orbit's ghost-CTA line is 0.18; it frames controls, so it takes the AA control boundary (A17). */
+  --line-strong: var(--line-control);
   --line-hover: rgba(245, 244, 240, 0.2);
   --line-input: rgba(245, 244, 240, 0.1);
   --line-paper: #ECEBE6;
@@ -114,7 +117,8 @@
   --line-2: rgba(10, 10, 11, 0.1);
   --line-3: rgba(10, 10, 11, 0.12);
   --line-4: rgba(10, 10, 11, 0.14);
-  --line-strong: rgba(10, 10, 11, 0.18);
+  --line-control: rgba(10, 10, 11, 0.44);
+  --line-strong: var(--line-control);
   --line-hover: rgba(10, 10, 11, 0.2);
   --line-input: #E3E2DC;
   --line-paper: #ECEBE6;
@@ -157,7 +161,7 @@
 /*
  * Drafting-table aliases (migration §1.1): un-migrated screens and Task 7's chat files still use these names.
  * They point at Orbit tokens and are deleted in O4. Repeated on `.dark` / `.light` so a forced-theme wrapper
- * re-resolves them. `--line` and `--line-strong` are Orbit names now (0.08 / 0.18), so they are not aliased.
+ * re-resolves them. `--line` (0.08) and `--line-strong` (the A17 control line) are Orbit names now, so they are not aliased.
  */
 :root,
 .dark,
@@ -207,6 +211,7 @@
   --color-line-3: var(--line-3);
   --color-line-4: var(--line-4);
   --color-line-strong: var(--line-strong);
+  --color-line-control: var(--line-control);
   --color-line-hover: var(--line-hover);
   --color-line-input: var(--line-input);
   --color-line-paper: var(--line-paper);
@@ -257,11 +262,11 @@
   --radius-control: 12px;
   --radius-row: 10px;
 
-  /* Elevation */
-  --shadow-card: var(--shadow-card);
-  --shadow-composer: var(--shadow-composer);
-  --shadow-draft: var(--shadow-draft);
-  --shadow-hover: var(--shadow-hover);
+  /* Elevation: utility names differ from the runtime variables they read (no self-referencing theme keys). */
+  --shadow-elevation-card: var(--shadow-card);
+  --shadow-elevation-composer: var(--shadow-composer);
+  --shadow-elevation-draft: var(--shadow-draft);
+  --shadow-elevation-hover: var(--shadow-hover);
   --shadow-glow: var(--glow-accent);
   --shadow-highlight: var(--panel-highlight);
   /* Drafting shadow names, re-pointed until O4 */
@@ -269,9 +274,8 @@
   --shadow-raised: var(--shadow-card);
   --shadow-overlay: var(--shadow-draft);
 
-  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-ink: cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-exit: cubic-bezier(0.4, 0, 0.8, 0.4);
+  /* `ease-orbit` utility; components read the runtime `--ease-out` variable directly. */
+  --ease-orbit: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /*
@@ -656,7 +660,7 @@
     position: relative;
     isolation: isolate;
     background: var(--panel);
-    border: 1px solid var(--line-2);
+    border: 1px solid var(--line-control);
     border-radius: 22px;
     box-shadow: var(--panel-highlight), var(--shadow-composer);
     transition:

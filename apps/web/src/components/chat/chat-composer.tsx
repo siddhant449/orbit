@@ -72,7 +72,7 @@ export function ChatComposer({
         e.preventDefault();
         if (canSend) onSend();
       }}
-      className="relative rounded-card border border-keyline bg-surface p-2 shadow-raised focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus"
+      className="relative rounded-card border border-line-control bg-surface p-2 shadow-raised focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus"
     >
       <label htmlFor="chat-composer" className="sr-only">
         Message
