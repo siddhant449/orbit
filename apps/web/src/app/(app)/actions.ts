@@ -9,6 +9,7 @@ import {
   editMemoryLine,
   createProfile,
   saveStrategy,
+  selectVoice,
   softDeleteProfile,
   switchProfile,
   updateProfileSettings,
@@ -98,4 +99,12 @@ export async function saveStrategyAction(data: unknown) {
   const parsed = StrategySchema.safeParse(data);
   if (!parsed.success) return { ok: false, error: "That strategy isn't valid" } as ActionResult;
   return runMemory((profileId) => saveStrategy(profileId, parsed.data));
+}
+
+export async function selectVoiceAction(voiceStyleId: string) {
+  return run(async (userId) => {
+    const profileId = (await getAccount()).currentProfile?.id;
+    if (!profileId) throw new AccountError("Choose a profile first");
+    await selectVoice(userId, profileId, voiceStyleId);
+  });
 }

@@ -4,6 +4,7 @@ import { useRef, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { ArrowUp, BarChart3, GraduationCap, Lightbulb, Mic, PenLine, Plus, Wand2 } from "lucide-react";
 import { Button, cn } from "@brandloop/ui";
+import { VoicePicker, type VoiceOption } from "./voice-picker";
 
 const starters = [
   { label: "Find ideas", icon: Lightbulb, prompt: "Give me five post ideas for this week based on my strategy." },
@@ -22,7 +23,15 @@ function greeting(hour: number) {
   return "Good evening";
 }
 
-export function Composer({ firstName }: { firstName: string }) {
+export function Composer({
+  firstName,
+  voices,
+  selectedVoiceId,
+}: {
+  firstName: string;
+  voices: VoiceOption[];
+  selectedVoiceId: string | null;
+}) {
   const [text, setText] = useState("");
   const inputRef = useRef<HTMLTextAreaElement>(null);
   // Greeting depends on the viewer's clock, so the server renders none.
@@ -78,13 +87,14 @@ export function Composer({ firstName }: { firstName: string }) {
             className="block w-full resize-none bg-transparent px-3 pt-2 text-[15px] leading-relaxed text-ink outline-none placeholder:text-ink-faint"
           />
           <div className="flex items-center justify-between px-1 pt-1">
-            <div className="flex gap-1">
+            <div className="flex min-w-0 items-center gap-1">
               <Button type="button" variant="ghost" size="icon" aria-label="Attach a file" disabled>
                 <Plus />
               </Button>
               <Button type="button" variant="ghost" size="icon" aria-label="Dictate" disabled>
                 <Mic />
               </Button>
+              <VoicePicker voices={voices} selectedId={selectedVoiceId} />
             </div>
             <Button type="submit" size="icon" aria-label="Send" disabled={!text.trim()} className="rounded-full">
               <ArrowUp />
