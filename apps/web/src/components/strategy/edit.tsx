@@ -1,9 +1,9 @@
 "use client";
 
-import { createContext, useContext, useRef, useState, useTransition } from "react";
+import { createContext, useContext, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import type { Strategy as StrategyInput } from "@brandloop/ai";
+import { normalizePercents, type Strategy as StrategyInput } from "@brandloop/ai";
 import { cn } from "@brandloop/ui";
 import { saveStrategyAction } from "@/app/(app)/actions";
 
@@ -16,21 +16,66 @@ export function useStrategy() {
   return ctx;
 }
 
-export function StrategyProvider({ strategy, children }: { strategy: StrategyInput; children: React.ReactNode }) {
+export function StrategyProvider({ strategy: server, children }: { strategy: StrategyInput; children: React.ReactNode }) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
+  // Local copy so edits made before the server refresh lands build on each other instead of on stale props.
+  const [local, setLocal] = useState(server);
+  const [seenServer, setSeenServer] = useState(server);
+  const [inflight, setInflight] = useState(0);
+  const latest = useRef(server);
+  const queue = useRef<Promise<unknown>>(Promise.resolve());
+  const lastGood = useRef(server);
+  const active = useRef(0);
 
-  async function save(patch: Partial<StrategyInput>) {
-    const result = await saveStrategyAction({ ...strategy, ...patch });
-    if (!result.ok) {
-      toast.error(result.error);
-      return false;
-    }
-    toast.success("Strategy saved");
-    startTransition(() => router.refresh());
-    return true;
+  if (server !== seenServer) {
+    setSeenServer(server);
+    if (inflight === 0) setLocal(server);
   }
-  return <StrategyContext value={{ strategy, save, pending }}>{children}</StrategyContext>;
+  useEffect(() => {
+    if (active.current === 0) {
+      latest.current = server;
+      lastGood.current = server;
+    }
+  }, [server]);
+
+  function save(patch: Partial<StrategyInput>): Promise<boolean> {
+    const merged = { ...latest.current, ...patch };
+    merged.contentMix = normalizePercents(merged.contentMix);
+    merged.audienceBalance = normalizePercents(merged.audienceBalance);
+    latest.current = merged;
+    setLocal(merged);
+    active.current += 1;
+    setInflight((n) => n + 1);
+
+    const run = queue.current.then(async () => {
+      // Always send the newest local copy so a queued save never rolls back a later edit.
+      const result = await saveStrategyAction(latest.current);
+      if (!result.ok) {
+        toast.error(result.error);
+        latest.current = lastGood.current;
+        setLocal(lastGood.current);
+        return false;
+      }
+      lastGood.current = latest.current;
+      toast.success("Strategy saved");
+      return true;
+    });
+    queue.current = run.catch(() => false);
+    return run
+      .catch(() => {
+        toast.error("Couldn't save your strategy");
+        latest.current = lastGood.current;
+        setLocal(lastGood.current);
+        return false;
+      })
+      .finally(() => {
+        active.current -= 1;
+        setInflight((n) => n - 1);
+        startTransition(() => router.refresh());
+      });
+  }
+  return <StrategyContext value={{ strategy: local, save, pending: inflight > 0 }}>{children}</StrategyContext>;
 }
 
 /** Text that reads as plain copy and turns into a field on click. Enter or leaving the field saves, Escape cancels. */
@@ -181,9 +226,9 @@ export function NumberField({
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
         onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-        className="h-8 w-12 rounded-row border border-transparent bg-transparent pl-1 pr-0.5 text-right text-sm tabular-nums hover:border-line focus-visible:border-jade focus-visible:bg-paper focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-jade/25"
+        className="h-8 w-9 rounded-row [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none border border-transparent bg-transparent px-0.5 text-right text-sm tabular-nums hover:border-line focus-visible:border-jade focus-visible:bg-paper focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-jade/25"
       />
-      {suffix && <span className="whitespace-nowrap text-sm text-ink-muted">{suffix}</span>}
+      {suffix && <span aria-hidden className={cn("whitespace-nowrap text-sm text-ink-muted", suffix !== "%" && "ml-1.5")}>{suffix}</span>}
     </span>
   );
 }

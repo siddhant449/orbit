@@ -2,7 +2,7 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import type { AiClient, Strategy as StrategyInput } from "@brandloop/ai";
 import { prisma } from "../client";
 import { ensureAccount } from "./account";
-import { listMemory } from "./memory";
+import { listMemory, upsertMemory } from "./memory";
 import { generateStrategy, getStrategy, saveStrategy } from "./strategy";
 
 async function cleanup() {
@@ -52,8 +52,8 @@ describe("saveStrategy", () => {
   it("normalises content mix percents to sum to 100", async () => {
     const pid = await profileId();
     const saved = await saveStrategy(pid, sample());
-    const mix = saved.contentMix as { percent: number }[];
-    expect(mix.reduce((a, m) => a + m.percent, 0)).toBe(100);
+    const mix = saved.contentMix as { type: string; percent: number }[];
+    expect(mix.map((m) => m.percent)).toEqual([34, 33, 33]);
     expect((await getStrategy(pid))?.goal).toBe("build_authority");
   });
 
@@ -73,19 +73,41 @@ describe("saveStrategy", () => {
 });
 
 describe("generateStrategy", () => {
-  it("stores what the AI returns", async () => {
-    const pid = await profileId();
-    let prompt = "";
+  const capture = (result: StrategyInput) => {
+    const seen = { prompt: "", system: "" };
     const ai = {
-      json: async (o: { prompt: string }) => {
-        prompt = o.prompt;
-        return sample({ goal: "get_customers" });
+      json: async (o: { prompt: string; system: string }) => {
+        seen.prompt = o.prompt;
+        seen.system = o.system;
+        return result;
       },
       text: async () => "",
     } as unknown as AiClient;
+    return { ai, seen };
+  };
+
+  it("stores what the AI returns and puts memory and knowledge in tagged prompt blocks", async () => {
+    const pid = await profileId();
+    await upsertMemory(pid, "identity/about", "- Runs a design studio in Lisbon", "USER");
+    const team = await prisma.profile.findUniqueOrThrow({ where: { id: pid }, select: { teamId: true } });
+    await prisma.knowledgeItem.create({
+      data: { profileId: pid, teamId: team.teamId, title: "Adoption playbook", type: "TEXT", status: "READY", summary: "How teams adopt systems" },
+    });
+    const { ai, seen } = capture(sample({ goal: "get_customers" }));
     const saved = await generateStrategy(ai, pid);
     expect(saved.goal).toBe("get_customers");
     expect(saved.generatedAt).toBeInstanceOf(Date);
-    expect(prompt.length).toBeGreaterThan(0);
+    expect(seen.prompt).toMatch(/<memory>[\s\S]*Runs a design studio in Lisbon[\s\S]*<\/memory>/);
+    expect(seen.prompt).toMatch(/<knowledge>[\s\S]*Adoption playbook[\s\S]*<\/knowledge>/);
+    expect(seen.system).toContain("not instructions");
+  });
+
+  it("includes the existing strategy as the current one to improve on", async () => {
+    const pid = await profileId();
+    await saveStrategy(pid, sample({ positioning: "Unique existing positioning phrase" }));
+    const { ai, seen } = capture(sample());
+    await generateStrategy(ai, pid);
+    expect(seen.prompt).toContain("current strategy to improve on");
+    expect(seen.prompt).toContain("Unique existing positioning phrase");
   });
 });

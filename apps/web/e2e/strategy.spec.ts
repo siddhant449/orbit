@@ -43,11 +43,28 @@ test("strategy: sections render, mix sums to 100, tagline edit persists", async 
     await page.setViewportSize({ width: 1280, height: 720 });
   }
 
+  // Two quick edits in a row must both persist (no stale overwrite).
   const tagline = `Design systems people use ${Date.now()}`;
   await page.getByRole("button", { name: "Edit tagline" }).click();
-  await page.getByLabel("tagline", { exact: true }).fill(tagline);
-  await page.getByLabel("tagline", { exact: true }).press("Enter");
-  await expect(page.getByText("Strategy saved")).toBeVisible();
+  const field = page.getByLabel("tagline", { exact: true });
+  await field.fill(tagline);
+  await field.press("Enter");
+  const percent = page.getByLabel("Educational percent");
+  await percent.fill("50");
+  await percent.press("Enter");
+  await expect(page.getByText("Strategy saved").first()).toBeVisible();
+  await expect.poll(async () => page.getByTestId("mix-percent").evaluateAll((els) => els.map((e) => (e as HTMLInputElement).value).join(",")), { timeout: 15_000 }).not.toContain("35");
+  const after = await page.getByTestId("mix-percent").evaluateAll((els) => els.map((e) => Number((e as HTMLInputElement).value)));
+  expect(after.reduce((a, b) => a + b, 0)).toBe(100);
+  await page.waitForTimeout(1500);
   await page.reload();
   await expect(page.getByRole("button", { name: "Edit tagline" })).toHaveText(tagline);
+  const reloaded = await page.getByTestId("mix-percent").evaluateAll((els) => els.map((e) => Number((e as HTMLInputElement).value)));
+  expect(reloaded).toEqual(after);
+  expect(reloaded[0]).toBeGreaterThan(35);
+
+  // Regenerate asks before replacing.
+  await page.getByRole("button", { name: "Regenerate strategy" }).click();
+  await expect(page.getByRole("alertdialog")).toContainText("A new strategy will replace the current one, including your edits.");
+  await page.getByRole("button", { name: "Cancel" }).click();
 });

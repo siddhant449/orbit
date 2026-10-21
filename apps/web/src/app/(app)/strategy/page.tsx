@@ -53,7 +53,7 @@ export default async function Page() {
 
   return (
     <>
-      <PageHeader title="Strategy" actions={<GenerateButton label="Regenerate strategy" variant="secondary" />} />
+      <PageHeader title="Strategy" actions={<GenerateButton label="Regenerate strategy" variant="secondary" confirmReplace />} />
       <PageBody className="max-w-4xl space-y-4">
         <StrategyProvider strategy={toInput(strategy)}>
           <Foundation />
@@ -62,7 +62,7 @@ export default async function Page() {
           <FormatsCadence />
           <Series />
         </StrategyProvider>
-        <p className="text-xs text-ink-muted">Select any text to edit it. Regenerating replaces the current strategy.</p>
+        <p className="text-xs text-ink-muted">Select any text to edit it. Regenerating replaces the current strategy, including your edits.</p>
       </PageBody>
     </>
   );
