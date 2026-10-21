@@ -8,11 +8,13 @@ import {
   deleteMemoryLine,
   editMemoryLine,
   createProfile,
+  saveStrategy,
   softDeleteProfile,
   switchProfile,
   updateProfileSettings,
   type ProfileSettings,
 } from "@brandloop/db";
+import { StrategySchema } from "@brandloop/ai";
 import { getAccount } from "@/lib/account";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
@@ -90,4 +92,10 @@ export async function deleteProfileAction(profileId: string) {
 
 export async function updateProfileSettingsAction(profileId: string, input: ProfileSettings) {
   return run((userId) => updateProfileSettings(userId, profileId, input));
+}
+
+export async function saveStrategyAction(data: unknown) {
+  const parsed = StrategySchema.safeParse(data);
+  if (!parsed.success) return { ok: false, error: "That strategy isn't valid" } as ActionResult;
+  return runMemory((profileId) => saveStrategy(profileId, parsed.data));
 }

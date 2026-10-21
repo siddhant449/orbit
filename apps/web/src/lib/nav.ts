@@ -2,6 +2,7 @@ import {
   BarChart3,
   Bookmark,
   CalendarCheck2,
+  Compass,
   FileText,
   Image,
   LayoutTemplate,
@@ -36,11 +37,12 @@ export const sections: Section[] = [
   {
     id: "ideas",
     title: "Ideas",
-    matches: ["/ideas", "/inspiration", "/following", "/templates", "/images", "/saves"],
+    matches: ["/ideas", "/strategy", "/inspiration", "/following", "/templates", "/images", "/saves"],
     groups: [
       {
         label: "Discover",
         items: [
+          { label: "Strategy", href: "/strategy", icon: Compass },
           { label: "For you", href: "/ideas", icon: Sparkles },
           { label: "Inspiration", href: "/inspiration", icon: Telescope },
           { label: "Following", href: "/following", icon: UserPlus },
