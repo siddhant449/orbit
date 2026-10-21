@@ -17,7 +17,7 @@ type History = { chats: ChatSummary[]; hasMore: boolean };
 const fetchJson = (url: string) => fetch(url).then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))));
 
 const itemClass =
-  "flex h-9 cursor-pointer select-none items-center gap-2.5 rounded-row px-2.5 type-ui text-ink outline-none data-[highlighted]:bg-ink data-[highlighted]:text-on-ink [&_svg]:size-4 [&_svg]:text-ink-muted data-[highlighted]:[&_svg]:text-on-ink";
+  "flex h-9 cursor-pointer select-none items-center gap-2.5 rounded-[10px] px-2.5 text-[14px] text-text-soft outline-none transition-colors duration-150 data-[highlighted]:bg-line-row data-[highlighted]:text-text [&_svg]:size-4 [&_svg]:text-icon data-[highlighted]:[&_svg]:text-text";
 
 const noop = () => () => {};
 
@@ -51,12 +51,12 @@ function RenameField({ chat, onDone }: { chat: ChatSummary; onDone: (title: stri
         else if (e.key === "Escape") finish(null);
       }}
       onBlur={() => finish(value.trim() || null)}
-      className="h-8 w-full rounded-control border border-line-control bg-surface px-2 type-ui text-ink outline-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus"
+      className="h-8 w-full rounded-[8px] border border-line-control bg-panel px-3 text-[13px] text-text outline-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent-text"
     />
   );
 }
 
-/** The sidebar's chat list: grouped by day, the open chat held in graphite, rename / pin / delete per row. */
+/** The sidebar's chat list (system §6.9, p01 / p03): grouped by day, the open chat on a `line-row` fill, rename / pin / delete per row. */
 export function ChatHistory({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -123,20 +123,20 @@ export function ChatHistory({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <>
       {isLoading && (
-        <div className="mt-3 flex flex-col gap-2 px-2.5" aria-hidden="true">
+        <div className="mt-1 flex flex-col gap-3 px-3" aria-hidden="true">
           <div className="skeleton h-3.5 w-[80%]" />
           <div className="skeleton h-3.5 w-[60%]" />
           <div className="skeleton h-3.5 w-[70%]" />
         </div>
       )}
-      {error && !data && <p className="type-ui mt-2 px-2.5 text-signal-ink">{"Your chats didn't load."}</p>}
+      {error && !data && <p className="mt-1 px-3 text-[13px] text-danger">{"Your chats didn't load."}</p>}
       {data && chats.length === 0 && (
-        <p className="type-ui mt-2 max-w-[26ch] px-2.5 text-ink-faint">Your conversations will be listed here once you start one.</p>
+        <p className="mt-1 max-w-[26ch] px-3 text-[13px] leading-[1.5] text-text-3">Your conversations will be listed here once you start one.</p>
       )}
       {groups.map((group) => (
-        <div key={group.label} className="mt-4 first:mt-2">
-          <h3 className="type-caption px-2.5 pb-1 text-ink-muted">{group.label}</h3>
-          <ul className="flex flex-col gap-px">
+        <div key={group.label} className="mt-3.5 first:mt-0">
+          <h3 className="mx-3 mb-1.5 text-[11px] text-text-3">{group.label}</h3>
+          <ul className="flex flex-col gap-0.5">
             {group.chats.map((chat) => {
               const current = pathname === `/chat/${chat.id}`;
               if (renaming === chat.id) {
@@ -153,8 +153,8 @@ export function ChatHistory({ onNavigate }: { onNavigate?: () => void }) {
                     onClick={onNavigate}
                     aria-current={current ? "page" : undefined}
                     className={cn(
-                      "flex h-8 items-center rounded-row pl-2.5 pr-9 type-ui",
-                      current ? "bg-ink text-on-ink" : "text-ink-muted hover:bg-surface-sunk hover:text-ink",
+                      "flex min-h-[34px] items-center rounded-[8px] py-2 pl-3 pr-9 text-[13px] transition-colors duration-150",
+                      current ? "bg-line-row text-text" : "text-text-soft hover:bg-line-soft hover:text-text",
                     )}
                   >
                     {chat.pinned && <Pin aria-label="Pinned" className="mr-1.5 size-3 shrink-0" />}
@@ -167,8 +167,7 @@ export function ChatHistory({ onNavigate }: { onNavigate?: () => void }) {
                         size="icon"
                         aria-label={`Chat options, ${chat.title}`}
                         className={cn(
-                          "history-row__menu absolute right-0.5 top-0 !h-8 !w-8",
-                          current && "text-on-ink hover:text-ink",
+                          "history-row__menu absolute right-0.5 top-[1px] !h-8 !w-8 !rounded-[8px] text-text-2 hover:!bg-line-row hover:text-text",
                         )}
                       >
                         <MoreHorizontal aria-hidden="true" />
@@ -190,11 +189,11 @@ export function ChatHistory({ onNavigate }: { onNavigate?: () => void }) {
                           {chat.pinned ? <PinOff aria-hidden="true" /> : <Pin aria-hidden="true" />}
                           {chat.pinned ? "Unpin" : "Pin"}
                         </DropdownMenu.Item>
-                        <DropdownMenu.Separator className="mx-1 my-1.5 h-px bg-line" />
+                        <DropdownMenu.Separator className="mx-1 my-1.5 h-px bg-line-3" />
                         <DropdownMenu.Item
                           className={cn(
                             itemClass,
-                            "text-signal-ink [&_svg]:text-signal-ink data-[highlighted]:bg-signal-soft data-[highlighted]:text-signal-ink data-[highlighted]:[&_svg]:text-signal-ink",
+                            "text-danger [&_svg]:text-danger data-[highlighted]:text-danger data-[highlighted]:[&_svg]:text-danger",
                           )}
                           onSelect={() => setDeleting(chat)}
                         >

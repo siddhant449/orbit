@@ -100,6 +100,33 @@ export const CopyIcon = make(
 );
 export const PlayIcon = make("play", <path d="M7 4.5l9.5 5.5L7 15.5z" />, { fill: "currentColor", stroke: "none" });
 
+export const HomeIcon = make("home", <path d="M3 9l7-6 7 6v8a1 1 0 0 1-1 1h-4v-5H8v5H4a1 1 0 0 1-1-1z" />);
+export const BulbIcon = make("bulb", <path d="M7 14.5h6M8 17h4M10 2.5a5 5 0 0 0-3 9c.6.5 1 1.2 1 2h4c0-.8.4-1.5 1-2a5 5 0 0 0-3-9z" />);
+export const TasksIcon = make(
+  "tasks",
+  <>
+    <rect x="4" y="4" width="12" height="13" rx="2" />
+    <path d="M7 3v2M13 3v2M7 11l2 2 4-4" />
+  </>,
+);
+export const ChevronLeftIcon = make("chevron-left", <path d="M12 5l-5 5 5 5" />);
+export const MenuIcon = make("menu", <path d="M4 6.5h12M4 10h12M4 13.5h8" />);
+export const SidebarIcon = make(
+  "sidebar",
+  <>
+    <rect x="3" y="4" width="14" height="12" rx="2.5" />
+    <path d="M8 4v12" />
+  </>,
+);
+export const SettingsIcon = make(
+  "settings",
+  <>
+    <circle cx="10" cy="10" r="2.5" />
+    <path d="M10 2.8v2M10 15.2v2M2.8 10h2M15.2 10h2M4.9 4.9l1.4 1.4M13.7 13.7l1.4 1.4M4.9 15.1l1.4-1.4M13.7 6.3l1.4-1.4" />
+  </>,
+);
+export const SignOutIcon = make("sign-out", <path d="M8 4H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3M12 6.5 15.5 10 12 13.5M15.5 10H8" />);
+
 /** Every icon, by name, for catalogues (the /design page). */
 export const icons = {
   send: SendIcon,
@@ -119,6 +146,14 @@ export const icons = {
   search: SearchIcon,
   copy: CopyIcon,
   play: PlayIcon,
+  home: HomeIcon,
+  bulb: BulbIcon,
+  tasks: TasksIcon,
+  "chevron-left": ChevronLeftIcon,
+  menu: MenuIcon,
+  sidebar: SidebarIcon,
+  settings: SettingsIcon,
+  "sign-out": SignOutIcon,
 } as const;
 
 export type IconName = keyof typeof icons;

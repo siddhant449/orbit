@@ -27,7 +27,7 @@ test("showpiece walkthrough", async ({ page }) => {
   await clerk.signIn({ page, emailAddress: email! });
   await page.mouse.move(1100, 620);
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "What are we writing today?" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /What are we putting out there\?/ })).toBeVisible();
   await page.waitForTimeout(1800);
   await shot(page, "1440-day");
 
@@ -85,8 +85,8 @@ test("showpiece walkthrough", async ({ page }) => {
   await page.mouse.wheel(0, -500);
   await page.waitForTimeout(700);
   await shot(page, "1440-day-memories");
-  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "New chat" }).click();
-  await expect(page.getByRole("heading", { name: "What are we writing today?" })).toBeVisible();
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "New draft" }).click();
+  await expect(page.getByRole("heading", { name: /What are we putting out there\?/ })).toBeVisible();
   await page.waitForTimeout(1600);
 
   // 7. Collapse and expand the sidebar.

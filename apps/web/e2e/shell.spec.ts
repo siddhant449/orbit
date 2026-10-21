@@ -11,7 +11,7 @@ test("signed-in shell: create and switch profiles, save settings", async ({ page
   await clerk.signIn({ page, emailAddress: email! });
   await page.goto("/");
 
-  await expect(page.getByRole("heading", { name: "What are we writing today?" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /What are we putting out there\?/ })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Posts" })).toBeVisible();
 
   const profileName = `E2E profile ${Date.now()}`;

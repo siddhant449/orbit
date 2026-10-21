@@ -17,7 +17,6 @@ export {
   stampVariants,
 } from "./motion/presets";
 export { REDUCED_MOTION, useMediaQuery, useReducedMotionPref } from "./motion/use-media";
-export { KineticHeading } from "./motion/kinetic-heading";
 export { CountUp, countUpSeen } from "./motion/count-up";
 export { LineArt, type LineArtName } from "./art/line-art";
 export { Logo, LogoMark } from "./orbit/logo";

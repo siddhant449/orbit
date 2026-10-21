@@ -10,24 +10,16 @@ export function initials(name: string) {
 }
 
 /**
- * Graphite line monogram: a hairline frame with the initials drawn in ink; photos replace the initials. Decorative,
- * the owning control names the person; the initials are CSS-generated so they are not visible text for that control.
+ * Profile avatar (system §2.5): the photo when there is one, otherwise Orbit's gradient orb
+ * (`radial-gradient(circle at 30% 30%, #C9CEFF, #2A3BFF)`). Decorative; the owning control names the person.
  */
-export function Avatar({
-  name,
-  src,
-  className,
-}: {
-  name: string;
-  src?: string | null;
-  className?: string;
-}) {
+export function Avatar({ name, src, className }: { name: string; src?: string | null; className?: string }) {
   return (
     <span
       aria-hidden="true"
-      data-initials={src ? undefined : initials(name)}
+      data-name={name}
       className={cn(
-        "grid size-7 shrink-0 place-items-center overflow-hidden rounded-control border border-keyline bg-surface type-micro text-ink before:content-[attr(data-initials)]",
+        "block size-8 shrink-0 overflow-hidden rounded-full bg-[radial-gradient(circle_at_30%_30%,#C9CEFF,#2A3BFF)]",
         className,
       )}
     >

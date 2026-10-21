@@ -655,6 +655,28 @@
     animation: none;
   }
 
+  /* 7.2 App first paint: fade-rise 18 px over 900 ms, staggered by `--rise-delay`. Hard loads only (system §7.3). */
+  .orbit-rise {
+    animation: orbit-rise var(--dur-reveal) var(--ease-out) both;
+    animation-delay: var(--rise-delay, 0ms);
+  }
+  :root[data-navigated] .orbit-rise {
+    animation: none;
+  }
+
+  /* 2.5 Ambient glow behind a screen's content (p01 / p17); the mobile frame uses one top stop (p16). */
+  .orbit-ambient {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: var(--ambient-glow);
+  }
+  @media (max-width: 767px) {
+    .orbit-ambient {
+      background: radial-gradient(360px 260px at 50% 0%, color-mix(in srgb, var(--accent-text) 12%, transparent), transparent 60%);
+    }
+  }
+
   /* 6.5 Composer box and focus aura. The spin runs only while focused. */
   .orbit-composer {
     position: relative;
@@ -728,6 +750,21 @@
 @keyframes orbit-ring-draw {
   from {
     stroke-dashoffset: var(--ring-c);
+  }
+}
+
+/* Menus, popovers and the palette open from 98 % with a 4 px drop (system §7.2, 200 ms). */
+@keyframes orbit-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+}
+
+@keyframes orbit-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
   }
 }
 

@@ -24,19 +24,25 @@ export const getAccount = cache(async (): Promise<AccountState> => {
 
 export type ShellAccount = {
   user: { name: string | null; email: string };
-  team: { name: string };
+  /** `members` decides the profile footer's workspace label ("Personal workspace" for a team of one). */
+  team: { name: string; members: number };
   role: AccountState["role"];
   profiles: { id: string; name: string; avatarUrl: string | null }[];
   currentProfileId: string | null;
 };
 
 /** The subset of the account the client shell needs. */
-export function toShellAccount(account: AccountState): ShellAccount {
+export function toShellAccount(account: AccountState, members = 1): ShellAccount {
   return {
     user: { name: account.user.name, email: account.user.email },
-    team: { name: account.team.name },
+    team: { name: account.team.name, members },
     role: account.role,
     profiles: account.profiles.map((p) => ({ id: p.id, name: p.name, avatarUrl: p.avatarUrl })),
     currentProfileId: account.currentProfile?.id ?? null,
   };
 }
+
+/** Members of the account's team, for the workspace label. Deduplicated per request. */
+export const getTeamMemberCount = cache(async (teamId: string): Promise<number> =>
+  prisma.membership.count({ where: { teamId } }),
+);

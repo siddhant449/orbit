@@ -4,7 +4,7 @@ import { axeCheck, captureSet, expectNoHorizontalScroll } from "./helpers/shots"
 
 // Task R2★ showpiece: shell + home. Accessible names are load-bearing (system.md section 12).
 const email = process.env.E2E_CLERK_USER_EMAIL;
-const HEADING = "What are we writing today?";
+const HEADING = /What are we putting out there\?/;
 
 test.skip(!email, "Set E2E_CLERK_USER_EMAIL to a Clerk dev-instance test user");
 
@@ -15,14 +15,13 @@ async function signInHome(page: Page) {
   await expect(page.getByRole("heading", { name: HEADING })).toBeVisible();
 }
 
-test("home heading keeps its exact accessible name while the letters animate", async ({ page }) => {
+test("home heading keeps its exact accessible name while the lines animate", async ({ page }) => {
   await signInHome(page);
-  const heading = page.getByRole("heading", { level: 1, name: HEADING, exact: true });
+  const heading = page.getByRole("heading", { level: 1, name: HEADING });
   await expect(heading).toBeVisible();
-  await expect(heading).toHaveAttribute("aria-label", HEADING);
-  // The letters are split for the kinetic set-in, the layer hidden from assistive tech.
-  expect(await heading.locator(".kinetic__layer").count()).toBe(1);
-  await expect(heading.locator(".kinetic__layer").first()).toHaveAttribute("aria-hidden", "true");
+  // The line reveal masks the heading's real text: the full sentence, once, from the first frame.
+  await expect(heading).toHaveText(/^Good (morning|afternoon|evening)\. What are we putting out there\?$/);
+  expect(await heading.locator(".line-reveal__line").count()).toBe(2);
   // Interaction-critical controls exist from the first frame.
   await expect(page.getByLabel("Message")).toBeVisible();
   await expect(page.getByRole("button", { name: "Send" })).toBeDisabled();
@@ -44,7 +43,7 @@ test.describe("reduced motion", () => {
       document.getAnimations().filter((a) => a.playState === "running" && (a.effect?.getTiming().duration as number) > 1).length,
     );
     expect(running).toBe(0);
-    await expect(page.locator(".kinetic__letter").first()).toHaveCSS("animation-name", "none");
+    await expect(page.locator(".line-reveal__line > span").first()).toHaveCSS("transform", /^(none|matrix\(1, 0, 0, 1, 0, 0\))$/);
     // Lenis does not smooth under reduced motion: one wheel tick moves the sheet within a frame.
     await page.goto("/settings/memories");
     const moved = await page.evaluate(async () => {
@@ -100,7 +99,7 @@ test("route change: focus moves to the new heading or the main landmark, instant
     wrappers: document.querySelectorAll("[class*='page-print'], [data-route-transition]").length,
   }));
   expect(transitioning).toEqual({ viewTransitions: 0, wrappers: 0 });
-  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "New chat" }).click();
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "New draft" }).click();
   await expect(page.getByRole("heading", { name: HEADING })).toBeVisible();
 });
 

@@ -57,7 +57,7 @@ test("starts on home, shows tool activity, keeps the history, manages the chat f
   await page.getByLabel("Message", { exact: true }).press("Enter");
 
   // The landing composer hands over to the chat in place; the reply is live in the margin.
-  await expect(page.getByRole("heading", { name: "What are we writing today?" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: /What are we putting out there\?/ })).toHaveCount(0);
   await expect(userNotes(page)).toHaveText(["You: Search my knowledge for onboarding notes"]);
   await expect(page.locator("[data-tool-row]").filter({ hasText: "Searched your knowledge" })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText("Here is what I found in your knowledge base.")).toBeVisible();
@@ -228,7 +228,7 @@ test("New chat while the first reply streams on home starts fresh", async ({ pag
   await expect(page.locator(".md--streaming")).toBeVisible({ timeout: 30_000 });
   await expect(page).toHaveURL(/\/$/);
   await page.getByRole("main").getByRole("link", { name: "New chat" }).click();
-  await expect(page.getByRole("heading", { name: "What are we writing today?" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /What are we putting out there\?/ })).toBeVisible();
   await expect(page.getByLabel("Message", { exact: true })).toHaveValue("");
   expect(created.size).toBe(1);
 });

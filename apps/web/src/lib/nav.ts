@@ -1,14 +1,21 @@
+import type { ComponentType } from "react";
 import {
-  BarChart3,
+  ActivitiesIcon,
+  AnalyticsIcon,
+  BulbIcon,
+  EngageIcon,
+  HomeIcon,
+  IdeasIcon,
+  PencilIcon,
+  PostsIcon,
+  TasksIcon,
+  type IconProps,
+} from "@brandloop/ui/icons";
+import {
   Bookmark,
-  CalendarCheck2,
   Compass,
-  FileText,
   Image,
   LayoutTemplate,
-  Lightbulb,
-  type LucideIcon,
-  MessageSquarePlus,
   Plug,
   Brain,
   Users,
@@ -21,16 +28,37 @@ import {
   Telescope,
 } from "lucide-react";
 
-export type NavItem = { label: string; href: string; icon: LucideIcon; external?: boolean };
+/** Orbit icons and the few lucide icons Orbit does not draw both fit (className, size, aria-hidden). */
+export type NavIcon = ComponentType<IconProps>;
+export type NavItem = {
+  label: string;
+  href: string;
+  icon: NavIcon;
+  external?: boolean;
+  /** Keyboard hint shown at the row's end (decorative; the link carries `aria-keyshortcuts`). */
+  shortcut?: string;
+  /** Rendered only when a real number exists (posts total, tasks left, queue size). None are built yet. */
+  count?: number;
+};
 export type NavGroup = { label?: string; items: NavItem[] };
 export type Section = { id: "ideas" | "settings"; title: string; groups: NavGroup[]; matches: string[] };
 
 export const primaryNav: NavItem[] = [
-  { label: "New chat", href: "/", icon: MessageSquarePlus },
-  { label: "Posts", href: "/posts", icon: FileText },
-  { label: "Ideas", href: "/ideas", icon: Lightbulb },
-  { label: "Activities", href: "/activities", icon: CalendarCheck2 },
-  { label: "Analytics", href: "/analytics", icon: BarChart3 },
+  { label: "New draft", href: "/", icon: PencilIcon, shortcut: "⌘J" },
+  { label: "Posts", href: "/posts", icon: PostsIcon },
+  { label: "Ideas", href: "/ideas", icon: IdeasIcon },
+  { label: "Activities", href: "/activities", icon: ActivitiesIcon },
+  { label: "Engage", href: "/engage", icon: EngageIcon },
+  { label: "Analytics", href: "/analytics", icon: AnalyticsIcon },
+];
+
+/** Mobile bottom tab bar (system §9): icon-only links named by `aria-label`. */
+export const mobileTabs: NavItem[] = [
+  { label: "Home", href: "/", icon: HomeIcon },
+  { label: "Posts", href: "/posts", icon: PostsIcon },
+  { label: "Ideas", href: "/ideas", icon: BulbIcon },
+  { label: "Activities", href: "/activities", icon: TasksIcon },
+  { label: "Analytics", href: "/analytics", icon: AnalyticsIcon },
 ];
 
 export const sections: Section[] = [
@@ -87,7 +115,7 @@ export function sectionFor(pathname: string): Section | null {
 }
 
 export function isActive(pathname: string, href: string) {
-  if (href === "/") return pathname === "/" || pathname.startsWith("/chat/");
+  if (href === "/") return pathname === "/";
   if (href === "/settings") return pathname === "/settings";
   return pathname === href || pathname.startsWith(`${href}/`);
 }

@@ -119,3 +119,22 @@ Measured with `node scripts/bundle-size.mjs apps/web / "/chat/[id]"` after a cle
 | `/chat/[id]` | 1,571,729 B (1,534.9 KiB) | 470,630 B (459.6 KiB) | no earlier figure |
 
 The script flags the motion `features.ts` chunk (`2_hoau_sgzhkm.js`, 26,483 B raw / 8,061 B gzip) as part of first load.
+
+## Orbit
+
+### O2: app shell and home
+
+Measured with `node scripts/bundle-size.mjs` after `next build` (Next.js 16.4.2, Turbopack, Node v24.19.0) on the O2 working
+tree over `3c01439`. Built into a separate dist dir so a running dev server was not disturbed; the numbers are the same
+build output the script reads from `.next`.
+
+| Route | First Load JS raw | First Load JS gzip | Change from the last figure |
+|-------|------------------:|-------------------:|----------------------------:|
+| `/` (home) | 1,083,000 B | 339,060 B (331.1 KiB) | **−893 B** vs 339,953 B; ceiling 356,521 B (migration §5) |
+| `/chat/[id]` | 1,598,822 B | 478,907 B | +8,277 B vs 470,630 B (includes Task 9's post side panel, `3c01439`) |
+| `/strategy` | 1,738,201 B | 503,409 B | no comparable figure since B1 |
+| `/settings` | 1,059,882 B | 330,883 B | no comparable figure since B1 |
+| `/sign-in/[[...sign-in]]` | 857,003 B | 260,357 B | no comparable figure since B1 |
+
+The home stays flat: the shell gains the sprint card, mobile header, tab bar and notifications popover, and loses
+`KineticHeading`, `LineArt` on home, the index label and the lucide shell icons.

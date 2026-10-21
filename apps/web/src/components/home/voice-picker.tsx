@@ -3,7 +3,7 @@
 import { useId, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Dialog, Popover } from "radix-ui";
-import { Check, ChevronDown, Plus, Search } from "lucide-react";
+import { Check, Plus, Search } from "lucide-react";
 import { toast } from "sonner";
 import { Button, Label, cn } from "@brandloop/ui";
 import { selectVoiceAction } from "@/app/(app)/actions";
@@ -122,20 +122,17 @@ export function VoicePicker({ voices, selectedId }: { voices: VoiceOption[]; sel
           <Popover.Trigger asChild>
             <button
               type="button"
-              aria-label={`Change writing style, ${current ? current.name : "Writing style"}`}
+              aria-label={`Change writing style, ${current ? current.name : "Your voice"}`}
               aria-busy={pending}
               title={current?.tagline || "Choose how your posts sound"}
-              className="flex h-8 max-w-[210px] items-center gap-2 rounded-full border border-line-control py-0 pl-1 pr-2.5 text-[13px] text-ink-muted transition-colors hover:border-keyline hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus data-[state=open]:border-keyline data-[state=open]:text-ink"
+              className="orbit-transition flex h-10 max-w-[210px] items-center gap-2 rounded-pill border border-line-control pl-2 pr-3.5 text-[13px] font-medium text-text hover:border-inverse hover:bg-inverse hover:text-on-inverse data-[state=open]:border-inverse data-[state=open]:bg-inverse data-[state=open]:text-on-inverse max-sm:h-9 max-sm:w-[38px] max-sm:justify-center max-sm:px-0"
             >
-              {current ? (
-                <VoiceAvatar name={current.name} />
-              ) : (
-                <span aria-hidden className="grid size-6 place-items-center rounded-full border border-dashed border-ink-faint">
-                  <Plus className="size-3" />
-                </span>
-              )}
-              <span className="truncate">{current ? current.name : "Writing style"}</span>
-              <ChevronDown aria-hidden className="size-3.5 shrink-0" />
+              {/* Orbit's voice orb (system §2.5): a gradient, not a picture of anyone. */}
+              <span
+                aria-hidden
+                className="block size-6 shrink-0 rounded-full bg-[radial-gradient(circle_at_30%_30%,#E8EBFF,#2A3BFF)] max-sm:size-5"
+              />
+              <span className="truncate max-sm:sr-only">{current ? current.name : "Your voice"}</span>
             </button>
           </Popover.Trigger>
           <Popover.Portal>

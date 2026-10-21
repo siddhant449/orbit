@@ -1,35 +1,43 @@
 "use client";
 
-import { useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
+import { useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { toast } from "sonner";
-import { ArrowUp, BarChart3, GraduationCap, Lightbulb, Mic, PenLine, Plus } from "lucide-react";
-import { Button, KineticHeading, LineArt, cn } from "@brandloop/ui";
+import { ComposerShell, pillClass, cn } from "@brandloop/ui";
+import { MicIcon, PlusIcon, SendIcon } from "@brandloop/ui/icons";
+import type { Greeting as GreetingText } from "@/lib/greeting";
+import { Notifications } from "@/components/shell/notifications";
+import { TopBar } from "@/components/shell/top-bar";
+import { Greeting } from "./greeting";
 import { VoicePicker, type VoiceOption } from "./voice-picker";
 
 const starters = [
-  { label: "Find ideas", icon: Lightbulb, prompt: "Give me five post ideas for this week based on my strategy." },
-  { label: "Draft a post", icon: PenLine, prompt: "Help me write a post about " },
-  { label: "Improve a draft", icon: PenLine, prompt: "Make this draft sharper without changing my voice:\n\n" },
-  { label: "Review my posts", icon: BarChart3, prompt: "What's working in my recent posts, and what should I change?" },
-  { label: "Learn the basics", icon: GraduationCap, prompt: "How do I write a strong first line on LinkedIn?" },
+  { label: "Find ideas", prompt: "Give me five post ideas for this week based on my strategy." },
+  { label: "Draft a post", prompt: "Help me write a post about " },
+  { label: "Improve a draft", prompt: "Make this draft sharper without changing my voice:\n\n" },
+  { label: "Review my posts", prompt: "What's working in my recent posts, and what should I change?" },
+  { label: "Learn the basics", prompt: "How do I write a strong first line on LinkedIn?" },
 ];
 
-const noopSubscribe = () => () => {};
+const rise = (ms: number) => ({ "--rise-delay": `${ms}ms` }) as CSSProperties;
 
-function greeting(hour: number) {
-  if (hour < 5) return "Working late";
-  if (hour < 12) return "Good morning";
-  if (hour < 18) return "Good afternoon";
-  return "Good evening";
-}
+/** Composer icon button (system §6.3 `icon`): 40 px circle, control outline, inverts on hover. */
+const iconButton =
+  "orbit-transition grid size-10 shrink-0 place-items-center rounded-full border border-line-control text-text enabled:hover:border-inverse enabled:hover:bg-inverse enabled:hover:text-on-inverse disabled:cursor-not-allowed disabled:opacity-40 max-sm:h-9 max-sm:w-[38px]";
 
+/**
+ * Home (screens.md B1, p01 / p17 / p16): top bar, the greeting, the composer (system §6.5) with its focus aura, the
+ * "Ways to start" chips and the home cards. Entrance motion plays on the document's first paint only.
+ */
 export function Composer({
-  firstName,
+  greeting,
+  cards,
   voices,
   selectedVoiceId,
   onSend,
 }: {
-  firstName: string;
+  greeting: GreetingText;
+  /** The home cards, rendered on the server (real data or honest empty states). */
+  cards?: ReactNode;
   voices: VoiceOption[];
   selectedVoiceId: string | null;
   /** Starts the chat with this text. Without it the composer only says chat isn't connected. */
@@ -37,12 +45,6 @@ export function Composer({
 }) {
   const [text, setText] = useState("");
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  // Greeting depends on the viewer's clock, so the server renders none.
-  const hello = useSyncExternalStore(
-    noopSubscribe,
-    () => greeting(new Date().getHours()),
-    () => null,
-  );
 
   function applyStarter(prompt: string) {
     setText(prompt);
@@ -64,31 +66,15 @@ export function Composer({
   }
 
   return (
-    <div className="relative flex min-h-full flex-col justify-center px-5 pb-[10vh] pt-10 md:px-12">
-      <div className="relative mx-auto w-full max-w-[880px]">
-        {/* The drawing on the table: a sheet and a pencil, drawn in stroke by stroke. */}
-        <LineArt
-          name="sheet"
-          delay={700}
-          className="pointer-events-none absolute -top-6 right-0 hidden w-[220px] text-ink-muted lg:block"
-        />
-        <p className={cn("type-ui text-ink-muted transition-opacity", hello ? "opacity-100" : "opacity-0")}>
-          {hello}
-          {firstName ? `, ${firstName}` : ""}
-        </p>
-        <KineticHeading
-          text="What are we writing today?"
-          lines={["What are we", "writing today?"]}
-          narrowLines={["What are", "we writing", "today?"]}
-          className="type-display-1 mt-2 text-ink focus-visible:outline-none"
-        />
+    <div className="relative flex min-h-full flex-col">
+      <TopBar crumb="Home" actions={<Notifications />} className="max-md:hidden" />
+      <div className="flex flex-1 flex-col items-center justify-center gap-[18px] px-5 pb-6 pt-4 md:gap-[26px] md:px-8 md:pb-16 md:pt-6">
+        <div className="w-full max-w-[760px]">
+          <Greeting greeting={greeting} />
+        </div>
 
-        <div className="land mt-10 rounded-card">
-          <span aria-hidden="true" className="land__plate" />
-          <form
-            onSubmit={send}
-            className="land__sheet rounded-card border border-line-control bg-surface p-2 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus"
-          >
+        <form onSubmit={send} className="orbit-rise w-full max-w-[760px]" style={rise(120)}>
+          <ComposerShell className="flex flex-col max-md:!rounded-[20px]">
             <label htmlFor="composer" className="sr-only">
               Message
             </label>
@@ -102,49 +88,42 @@ export function Composer({
               }}
               rows={3}
               data-lenis-prevent
-              placeholder="A story from this week, a lesson, a hot take…"
-              className="block w-full resize-none bg-transparent px-3 pt-3 type-body text-ink outline-none placeholder:text-ink-faint"
+              placeholder="Give Orbit a thought, a link or a voice note…"
+              className="block w-full resize-none bg-transparent px-[18px] pt-[18px] text-[16px] leading-[1.5] text-text outline-none placeholder:text-text-3 md:px-6 md:pt-[22px] md:text-[17px]"
             />
-            <div className="flex items-center justify-between px-1 pb-1 pt-1">
-              <div className="flex min-w-0 items-center gap-1">
-                <Button type="button" variant="ghost" size="icon" aria-label="Attach a file" disabled>
-                  <Plus />
-                </Button>
-                <Button type="button" variant="ghost" size="icon" aria-label="Dictate" disabled>
-                  <Mic />
-                </Button>
+            <div className="flex items-center justify-between gap-3 px-3 pb-3 pt-2.5 md:px-4 md:pb-4 md:pt-3.5">
+              <div className="flex min-w-0 items-center gap-1.5 md:gap-2">
+                <button type="button" aria-label="Attach a file" disabled className={iconButton}>
+                  <PlusIcon size={16} />
+                </button>
                 <VoicePicker voices={voices} selectedId={selectedVoiceId} />
+                <button type="button" aria-label="Dictate" disabled className={iconButton}>
+                  <MicIcon size={15} />
+                </button>
               </div>
-              <Button type="submit" variant="generate" size="icon-lg" aria-label="Send" disabled={!text.trim()}>
-                <ArrowUp />
-              </Button>
+              <button
+                type="submit"
+                aria-label="Send"
+                disabled={!text.trim()}
+                className="orbit-transition grid h-11 w-[46px] shrink-0 place-items-center rounded-pill bg-accent text-on-accent enabled:hover:bg-accent-hover enabled:hover:shadow-glow motion-safe:enabled:hover:-translate-y-px motion-safe:enabled:active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 max-sm:w-[42px]"
+              >
+                <SendIcon size={19} />
+              </button>
             </div>
-          </form>
-        </div>
+          </ComposerShell>
+        </form>
 
-        {/* Measured: the composer's width, drawn in after it lands. */}
-        <span aria-hidden="true" className="dim dim--draw mt-4 block">
-          <span className="dim__label">880</span>
-        </span>
-
-        <ul className="mt-6 flex flex-wrap gap-3" aria-label="Ways to start">
-          {starters.map(({ label, icon: Icon, prompt }, i) => (
+        <ul className="orbit-rise flex w-full max-w-[760px] flex-wrap gap-2" style={rise(230)} aria-label="Ways to start">
+          {starters.map(({ label, prompt }) => (
             <li key={label}>
-              <button type="button" onClick={() => applyStarter(prompt)} className="tab tab--rise" style={{ "--i": i } as CSSProperties}>
-                <span aria-hidden="true" className="tab__plate" />
-                <span className="tab__face">
-                  <Icon aria-hidden="true" className="tab__icon" />
-                  <span className="tab__label">
-                    <span className="tab__text">{label}</span>
-                    <span aria-hidden="true" className="tab__text tab__text--dup">
-                      {label}
-                    </span>
-                  </span>
-                </span>
+              <button type="button" onClick={() => applyStarter(prompt)} className={cn(pillClass(), "min-h-8")}>
+                {label}
               </button>
             </li>
           ))}
         </ul>
+
+        {cards}
       </div>
     </div>
   );

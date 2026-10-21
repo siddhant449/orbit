@@ -8,13 +8,6 @@
 
 @layer components {
   /* ------------------------------------------------------------------ D1 construction grid, marks, rules */
-  .desk-grid {
-    background-image:
-      linear-gradient(var(--grid-line) 1px, transparent 1px),
-      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
-    background-size: 32px 32px;
-    background-position: -1px -1px;
-  }
   .crosshair {
     position: fixed;
     width: 11px;
@@ -43,33 +36,6 @@
     width: 11px;
     height: 1px;
   }
-  .ruler {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 24px;
-    width: 1px;
-    background: var(--line);
-    pointer-events: none;
-    z-index: 1;
-  }
-  .ruler::before,
-  .ruler::after {
-    content: "";
-    position: absolute;
-    top: 0;
-    bottom: 0;
-  }
-  .ruler::before {
-    left: -4px;
-    width: 4px;
-    background-image: repeating-linear-gradient(to bottom, var(--line-strong) 0 1px, transparent 1px 32px);
-  }
-  .ruler::after {
-    left: -8px;
-    width: 8px;
-    background-image: repeating-linear-gradient(to bottom, var(--line-strong) 0 1px, transparent 1px 128px);
-  }
   /* A rule that draws in from its origin. */
   .rule-draw {
     transform-origin: left center;
@@ -80,54 +46,6 @@
     transform-origin: center top;
     animation-name: draw-y;
   }
-  /* Dimension line: hairline with end ticks and a measured label. */
-  .dim {
-    position: relative;
-    display: block;
-    height: 8px;
-    border-bottom: 1px solid var(--line-strong);
-  }
-  .dim::before,
-  .dim::after {
-    content: "";
-    position: absolute;
-    bottom: -1px;
-    width: 1px;
-    height: 8px;
-    background: var(--line-strong);
-  }
-  .dim::before {
-    left: 0;
-  }
-  .dim::after {
-    right: 0;
-  }
-  .dim__label {
-    position: absolute;
-    left: 50%;
-    bottom: -7px;
-    translate: -50% 0;
-    padding: 0 6px;
-    background: var(--surface);
-    color: var(--ink-muted);
-    font-family: var(--font-sans);
-    font-size: 11px;
-    font-weight: 500;
-    letter-spacing: 0.02em;
-    line-height: 1;
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-  }
-  .dim--draw {
-    transform-origin: left center;
-    animation: draw-x 700ms var(--ease-ink) both;
-    animation-delay: var(--draw-delay, 900ms);
-  }
-  .dim--draw .dim__label {
-    animation: fade-up 320ms var(--ease-ink) both;
-    animation-delay: calc(var(--draw-delay, 900ms) + 500ms);
-  }
-
   /* ------------------------------------------------------------------ D5 line art: strokes draw in */
   .draw :is(path, line, circle, rect, polyline, polygon, ellipse) {
     stroke-dasharray: 1;
@@ -136,253 +54,6 @@
     animation-delay: calc(var(--draw-delay, 240ms) + var(--i, 0) * 90ms);
   }
 
-  /* ------------------------------------------------------------------ D2 kinetic heading: weight and tracking */
-  .kinetic {
-    white-space: nowrap;
-    --kinetic-delay: 160ms;
-    --kinetic-stagger: 22ms;
-  }
-  .kinetic__layer {
-    display: block;
-  }
-  .kinetic__word {
-    display: inline-block;
-    white-space: nowrap;
-  }
-  .kinetic__letter {
-    display: inline-block;
-    animation: kinetic-set 480ms var(--ease-ink) both;
-    animation-delay: calc(var(--kinetic-delay) + var(--i, 0) * var(--kinetic-stagger));
-  }
-  .kinetic__br--wide {
-    display: none;
-  }
-  @media (min-width: 640px) {
-    .kinetic__br--wide {
-      display: inline;
-    }
-    .kinetic__br--narrow {
-      display: none;
-    }
-  }
-
-  /* ------------------------------------------------------------------ D6 object landing (composer) */
-  .land {
-    position: relative;
-    transform-origin: 50% 0;
-    animation: land-drop 540ms
-      linear(
-        0, 0.057, 0.19, 0.353, 0.516, 0.662, 0.783, 0.876, 0.944, 0.989, 1.016, 1.031, 1.036, 1.035, 1.031, 1.025,
-        1.019, 1.014, 1.009, 1.005, 1.003, 1.001, 1, 0.999, 0.999, 0.999, 1
-      )
-      both;
-    animation-delay: var(--land-delay, 520ms);
-  }
-  .land__plate {
-    position: absolute;
-    inset: 0;
-    background: var(--ink);
-    border-radius: inherit;
-    translate: 1px 1px;
-    animation: land-plate 220ms var(--ease-ink) both;
-    animation-delay: calc(var(--land-delay, 520ms) + 160ms);
-  }
-  .land__sheet {
-    position: relative;
-  }
-
-  /* ------------------------------------------------------------------ D7 tabs (starter chips): rise in, hairline, label roll */
-  .tab {
-    position: relative;
-    display: inline-flex;
-    height: 32px;
-    padding: 0;
-    border: 0;
-    border-radius: var(--radius-control);
-    background: transparent;
-    color: var(--ink);
-    font-family: var(--font-sans);
-    font-size: 13px;
-    font-weight: 500;
-    letter-spacing: 0.01em;
-    line-height: 1;
-    white-space: nowrap;
-  }
-  .tab__plate {
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    background: var(--ink);
-    translate: 0 0;
-    transition: translate 160ms var(--ease-ink);
-  }
-  .tab:hover .tab__plate,
-  .tab:focus-visible .tab__plate {
-    translate: 1px 1px;
-  }
-  .tab:active {
-    translate: 1px 1px;
-  }
-  .tab:active .tab__plate {
-    translate: 0 0;
-  }
-  .tab__face {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    height: 100%;
-    padding: 0 12px;
-    border: 1px solid var(--line-strong);
-    border-radius: inherit;
-    background: var(--surface);
-    transition: border-color 160ms var(--ease-ink);
-  }
-  .tab:hover .tab__face,
-  .tab:focus-visible .tab__face {
-    border-color: var(--keyline);
-  }
-  .tab__icon {
-    width: 14px;
-    height: 14px;
-    flex-shrink: 0;
-    stroke-width: 1.75;
-  }
-  .tab__label {
-    position: relative;
-    display: block;
-    height: 16px;
-    line-height: 16px;
-    overflow: hidden;
-  }
-  .tab__text {
-    display: block;
-    transition: translate 200ms var(--ease-ink);
-  }
-  .tab__text--dup {
-    position: absolute;
-    inset: 0;
-    translate: 0 100%;
-  }
-  .tab:hover .tab__text,
-  .tab:focus-visible .tab__text {
-    translate: 0 -100%;
-  }
-  .tab:hover .tab__text--dup,
-  .tab:focus-visible .tab__text--dup {
-    translate: 0 0;
-  }
-  .tab--rise {
-    animation: rise-in 240ms var(--ease-ink) both;
-    animation-delay: calc(var(--rise-delay, 820ms) + var(--i, 0) * 50ms);
-  }
-
-  /* ------------------------------------------------------------------ Index: nav rows and the clipped label */
-  .nav-row {
-    position: relative;
-    isolation: isolate;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    height: 36px;
-    padding: 0 10px;
-    border-radius: var(--radius-control);
-    color: var(--ink-muted);
-    font-family: var(--font-sans);
-    font-size: 14px;
-    font-weight: 500;
-    line-height: 1;
-    transition: color 200ms var(--ease-ink);
-  }
-  .nav-row__bar {
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    background: var(--ink);
-    border-radius: inherit;
-    transform-origin: left center;
-    scale: 0 1;
-    transition: scale 120ms var(--ease-exit);
-  }
-  .nav-row:hover,
-  .nav-row:focus-visible,
-  .nav-row[aria-current="page"] {
-    color: var(--on-ink);
-  }
-  .nav-row:hover > .nav-row__bar,
-  .nav-row:focus-visible > .nav-row__bar,
-  .nav-row[aria-current="page"] > .nav-row__bar {
-    scale: 1 1;
-    transition: scale 200ms var(--ease-ink);
-  }
-  .nav-row svg {
-    width: 16px;
-    height: 16px;
-    flex-shrink: 0;
-  }
-  .nav-row__label {
-    position: relative;
-    flex: 1;
-    min-width: 0;
-    height: 18px;
-    line-height: 18px;
-    overflow: hidden;
-  }
-  .nav-row__text {
-    display: block;
-    transition: translate 200ms var(--ease-ink);
-  }
-  .nav-row__text--dup {
-    position: absolute;
-    inset: 0;
-    translate: 0 100%;
-  }
-  .nav-row:hover > .nav-row__label > .nav-row__text,
-  .nav-row:focus-visible > .nav-row__label > .nav-row__text {
-    translate: 0 -100%;
-  }
-  .nav-row:hover > .nav-row__label > .nav-row__text--dup,
-  .nav-row:focus-visible > .nav-row__label > .nav-row__text--dup {
-    translate: 0 0;
-  }
-  .nav-row--icon {
-    width: 36px;
-    justify-content: center;
-    padding: 0;
-  }
-  .index-label {
-    position: absolute;
-    left: 10px;
-    right: 0;
-    bottom: 64px;
-    height: 84px;
-    overflow: hidden;
-    pointer-events: none;
-    user-select: none;
-    font-family: var(--font-display);
-    font-weight: 700;
-    font-stretch: 92%;
-    font-size: 84px;
-    line-height: 1;
-    letter-spacing: -0.045em;
-    color: var(--ghost);
-    white-space: nowrap;
-  }
-  .index-label > span {
-    position: absolute;
-    left: 0;
-    bottom: 0;
-    display: block;
-  }
-  @media (max-height: 620px) {
-    .index-label {
-      display: none;
-    }
-  }
-  /* D3 panels slide in on their rail. */
-  .rail-in {
-    animation: rail-in 320ms var(--ease-ink) both;
-  }
   /* D4 meters draw from the left. */
   .meter-fill {
     transform-origin: left center;
@@ -391,88 +62,17 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .kinetic__letter,
-    .land,
-    .land__plate,
-    .tab--rise,
     .rule-draw,
-    .dim--draw,
-    .dim--draw .dim__label,
     .draw :is(path, line, circle, rect, polyline, polygon, ellipse),
-    .rail-in,
     .meter-fill {
       animation: none;
     }
     .draw :is(path, line, circle, rect, polyline, polygon, ellipse) {
       stroke-dashoffset: 0;
     }
-    .nav-row__bar,
-    .nav-row__text,
-    .tab__plate,
-    .tab__face,
-    .tab__text {
-      transition: none;
-    }
   }
 }
 
-@keyframes kinetic-set {
-  from {
-    opacity: 0;
-    translate: 0 0.12em;
-    font-weight: 300;
-    letter-spacing: 0.06em;
-  }
-  to {
-    opacity: 1;
-    translate: 0 0;
-    font-weight: var(--kinetic-weight, 700);
-    letter-spacing: var(--kinetic-tracking, -0.035em);
-  }
-}
-@keyframes land-drop {
-  from {
-    opacity: 0;
-    translate: 0 -24px;
-    scale: 1.01;
-  }
-  18% {
-    opacity: 1;
-  }
-  to {
-    opacity: 1;
-    translate: 0 0;
-    scale: 1;
-  }
-}
-@keyframes land-plate {
-  from {
-    translate: 0 0;
-  }
-  to {
-    translate: 1px 1px;
-  }
-}
-@keyframes rise-in {
-  from {
-    opacity: 0;
-    translate: 0 8px;
-  }
-  to {
-    opacity: 1;
-    translate: 0 0;
-  }
-}
-@keyframes fade-up {
-  from {
-    opacity: 0;
-    translate: -50% 4px;
-  }
-  to {
-    opacity: 1;
-    translate: -50% 0;
-  }
-}
 @keyframes draw-x {
   from {
     scale: 0 1;
@@ -492,15 +92,5 @@
 @keyframes draw-path {
   to {
     stroke-dashoffset: 0;
-  }
-}
-@keyframes rail-in {
-  from {
-    opacity: 0;
-    translate: -12px 0;
-  }
-  to {
-    opacity: 1;
-    translate: 0 0;
   }
 }
