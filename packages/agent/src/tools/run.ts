@@ -5,10 +5,10 @@ import { capOutput } from "./cap";
 
 export const MEMORY_CONFLICT = "Failed: your memory changed while saving. Read it again and retry.";
 
-/** An abort or cancellation: an `AbortError` from fetch, an aborted signal's default reason, or our own. */
+/** An abort or cancellation: `AbortError` (fetch, an aborted signal, our own) or `TimeoutError` (the turn deadline's `AbortSignal.timeout`). */
 export function isAbort(err: unknown): boolean {
   if (err instanceof Error || (typeof DOMException !== "undefined" && err instanceof DOMException)) {
-    return (err as Error).name === "AbortError";
+    return (err as Error).name === "AbortError" || (err as Error).name === "TimeoutError";
   }
   return false;
 }

@@ -420,12 +420,15 @@ describe("runChatTurn fix round 1", () => {
     expect(String(part.errorText)).not.toContain("secret");
   });
 
-  it("a turn past its deadline is saved as aborted", async () => {
+  it("a turn past its deadline is saved as aborted, without logging an error", async () => {
+    const logSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const model = scriptedModel([{ text: "one two three four five six seven eight" }], { chunkDelayMs: 40 });
     await (await runChatTurn(deps(model, { turnTimeoutMs: 100 }), caller, body("Hi"))).text().catch(() => {});
     await settle();
     const last = (await listMessages(p, chatId)).at(-1)!;
     expect((last.context as any).finish).toBe("aborted");
+    expect(logSpy.mock.calls.flat().join(" ")).toBe("");
+    logSpy.mockRestore();
   });
 
   it("does not log a stop as a stream error", async () => {
@@ -438,5 +441,16 @@ describe("runChatTurn fix round 1", () => {
     await settle();
     expect(log.mock.calls.flat().join(" ")).not.toMatch(/abort/i);
     log.mockRestore();
+  });
+});
+
+describe("claimRun is not re-entrant", () => {
+  it("rejects a second claim with the same runId while the lock is held", async () => {
+    await getOrCreateChat(p, u, chatId);
+    await claimRun(chatId, "run-same", "m1");
+    await expect(claimRun(chatId, "run-same", "m2")).rejects.toMatchObject({
+      code: "chat_turn_active",
+      activeTurn: { runId: "run-same", requestMessageId: "m1" },
+    });
   });
 });

@@ -59,14 +59,32 @@ function allowedOrigins(env: Record<string, string | undefined>): Set<string> {
 }
 
 /**
- * Accepts only same-origin upload paths (made absolute against the request origin) and https/http URLs on
- * an allowlisted origin. Returns the body with normalised URLs, or null when any attachment is refused.
+ * The app's own public origin, from `APP_URL`. Never derived from the request: its Host header is client
+ * controlled. Unset in production means "no trusted origin" (null); in dev it defaults to localhost:3000.
+ */
+export function appOrigin(env: Record<string, string | undefined> = process.env): string | null {
+  const raw = env.APP_URL?.trim();
+  if (!raw) return env.NODE_ENV === "production" ? null : "http://localhost:3000";
+  try {
+    const u = new URL(raw);
+    return u.protocol === "https:" || u.protocol === "http:" ? u.origin : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Accepts only our own upload paths on the configured app origin (relative paths are resolved against it)
+ * and http(s) URLs on an allowlisted blob origin. Returns the body with absolute URLs, or null when any
+ * attachment is refused. With no trusted app origin, own-origin paths are refused.
  */
 export function checkAttachments(
   body: ChatRequestBody,
-  requestOrigin: string,
   env: Record<string, string | undefined> = process.env,
 ): ChatRequestBody | null {
+  const files = body.message.parts.filter((p) => p.type === "file");
+  if (files.length === 0) return body;
+  const app = appOrigin(env);
   const allowed = allowedOrigins(env);
   const parts: ChatRequestBody["message"]["parts"] = [];
   for (const part of body.message.parts) {
@@ -76,11 +94,12 @@ export function checkAttachments(
     }
     let url: URL;
     try {
-      url = new URL(part.url, requestOrigin);
+      // Without a trusted origin, a relative path can't resolve (the base is a dead placeholder).
+      url = new URL(part.url, app ?? "invalid:");
     } catch {
       return null;
     }
-    const own = url.origin === requestOrigin && url.pathname.startsWith(UPLOAD_PATH_PREFIX);
+    const own = app !== null && url.origin === app && url.pathname.startsWith(UPLOAD_PATH_PREFIX);
     const blob = allowed.has(url.origin) && (url.protocol === "https:" || url.protocol === "http:");
     if (!own && !blob) return null;
     parts.push({ ...part, url: url.href });

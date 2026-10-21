@@ -55,7 +55,7 @@ export async function postChatHandler(request: Request): Promise<Response> {
   }
   const parsed = ChatRequestSchema.safeParse(read.value);
   if (!parsed.success) return badRequest();
-  const body = checkAttachments(parsed.data, new URL(request.url).origin);
+  const body = checkAttachments(parsed.data);
   if (!body) return badRequest("Attachments must be files uploaded to Brandloop.");
   return runChatTurn(getChatDeps(), ids, body);
 }
@@ -71,13 +71,16 @@ export async function getChatStreamHandler(_request: Request, { params }: Ctx): 
   return new Response(stream.pipeThrough(new TextEncoderStream()), { headers: UI_MESSAGE_STREAM_HEADERS });
 }
 
+const STOP_BODY_BYTES = 8_192;
 const StopSchema = z.object({ chatId: z.string().min(1).max(200), runId: z.string().min(1).max(200) });
 
 /** POST /api/chat/stop: abort here if the run is local, and flag it for other instances. Always 200. */
 export async function stopChatHandler(request: Request): Promise<Response> {
   const ids = await currentIds();
   if (!ids) return noProfile();
-  const parsed = StopSchema.safeParse(await request.json().catch(() => null));
+  const read = await readCappedJson(request, STOP_BODY_BYTES);
+  if (!read.ok) return read.tooLarge ? chatError("request_too_large", "That request is too large.", 413) : badRequest();
+  const parsed = StopSchema.safeParse(read.value);
   if (!parsed.success) return badRequest();
   const { chatId, runId } = parsed.data;
   if (!(await getChat(ids.profileId, chatId))) return Response.json({ stopped: false });

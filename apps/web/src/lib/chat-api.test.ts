@@ -29,6 +29,7 @@ import {
   postChatHandler,
   stopChatHandler,
 } from "./chat-api";
+import { appOrigin, checkAttachments } from "./chat-request";
 
 const CLERK = "user_test_webchat";
 let profileId: string;
@@ -279,5 +280,65 @@ describe("cross-profile access", () => {
     env.account = { user: { id: other.user.id }, currentProfile: { id: other.currentProfile!.id } };
     expect((await getChatStreamHandler(new Request("http://test"), params(chatId))).status).toBe(404);
     expect((await getChatMessagesHandler(new Request("http://test"), params(chatId))).status).toBe(404);
+  });
+});
+
+describe("attachment origin (fix round 2)", () => {
+  const text = { type: "text", text: "hi" };
+  const send = (origin: string, parts: unknown[]) =>
+    postChatHandler(
+      new Request(`${origin}/api/chat`, {
+        method: "POST",
+        body: JSON.stringify(chatBody(randomUUID(), "x", { message: { id: randomUUID(), role: "user", parts } })),
+      }),
+    );
+  const file = (url: string, mediaType = "image/png") => ({ type: "file", mediaType, url });
+
+  it("never trusts the request's Host: a spoofed origin's absolute URL is refused, relative paths resolve to APP_URL", async () => {
+    vi.stubEnv("APP_URL", "https://app.brandloop.test");
+    const spoof = "http://169.254.169.254";
+    expect((await send(spoof, [text, file(`${spoof}/api/files/x.png`)])).status).toBe(400);
+    expect((await send("http://localhost:3000", [text, file("http://localhost:3000/api/files/x.png")])).status).toBe(400);
+    const chatId = randomUUID();
+    const ok = await postChatHandler(
+      new Request(`${spoof}/api/chat`, {
+        method: "POST",
+        body: JSON.stringify(chatBody(chatId, "x", { message: { id: randomUUID(), role: "user", parts: [text, file("/api/files/x.png")] } })),
+      }),
+    );
+    expect(ok.status).toBe(200);
+    await ok.text();
+    const stored = await prisma.message.findFirst({ where: { chatId, role: "USER" } });
+    expect(JSON.stringify(stored!.parts)).toContain("https://app.brandloop.test/api/files/x.png");
+    expect(JSON.stringify(stored!.parts)).not.toContain("169.254");
+  });
+
+  it("refuses every file part in production when APP_URL is unset (unit level: no real model is built)", () => {
+    const body = chatBody(randomUUID(), "x", { message: { id: "m", role: "user", parts: [text, file("/api/files/x.png")] } });
+    expect(appOrigin({ NODE_ENV: "production" })).toBeNull();
+    expect(appOrigin({ NODE_ENV: "production", APP_URL: "https://app.brandloop.test/some/path" })).toBe("https://app.brandloop.test");
+    expect(appOrigin({ NODE_ENV: "development" })).toBe("http://localhost:3000");
+    expect(appOrigin({ NODE_ENV: "development", APP_URL: "not a url" })).toBeNull();
+    expect(checkAttachments(body as never, { NODE_ENV: "production" })).toBeNull();
+    expect(checkAttachments({ ...body, message: { ...body.message, parts: [text] } } as never, { NODE_ENV: "production" })).not.toBeNull();
+  });
+
+  it("only accepts image and PDF media types", async () => {
+    expect((await send("http://localhost:3000", [text, file("/api/files/x.txt", "text/plain")])).status).toBe(400);
+    expect((await send("http://localhost:3000", [text, file("/api/files/x.html", "text/html")])).status).toBe(400);
+    for (const mt of ["image/jpeg", "image/gif", "image/webp", "application/pdf"]) {
+      const res = await send("http://localhost:3000", [text, file("/api/files/x", mt)]);
+      expect(res.status, mt).toBe(200);
+      await res.text();
+    }
+  });
+});
+
+describe("stop body cap", () => {
+  it("refuses a stop body over 8 KB", async () => {
+    const res = await stopChatHandler(
+      new Request("http://test/api/chat/stop", { method: "POST", body: JSON.stringify({ chatId: "x".repeat(9000), runId: "r" }) }),
+    );
+    expect(res.status).toBe(413);
   });
 });

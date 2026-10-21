@@ -15,6 +15,11 @@ describe("runTool and cancellation", () => {
     log.mockRestore();
   });
 
+  it("treats a deadline (TimeoutError) as an abort", async () => {
+    const timeout = new DOMException("The operation timed out.", "TimeoutError");
+    await expect(runTool("searchKB", null, async () => Promise.reject(timeout))).rejects.toBe(timeout);
+  });
+
   it("still converts ordinary errors into a Failed: result", async () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
     expect(await runTool("searchKB", null, async () => Promise.reject(new Error("db down")))).toBe(

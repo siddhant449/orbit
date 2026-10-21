@@ -1,10 +1,13 @@
 import { z } from "zod";
 import { LIMITS } from "./limits";
 
+export const ATTACHMENT_MEDIA_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp", "application/pdf"] as const;
+
 const TextPartSchema = z.object({ type: z.literal("text"), text: z.string() });
 const FilePartSchema = z.object({
   type: z.literal("file"),
-  mediaType: z.string(),
+  /** Images and PDFs only: other types (text, HTML) would be fetched and inlined as model input. */
+  mediaType: z.enum(ATTACHMENT_MEDIA_TYPES),
   url: z
     .string()
     .min(1)
