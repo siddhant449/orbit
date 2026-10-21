@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { getChat, getSelectedVoice, listMessages, listVoices } from "@brandloop/db";
+import { getChat, getChatDocument, getSelectedVoice, listMessages, listVoices } from "@brandloop/db";
 import type { ChatUIMessage } from "@brandloop/agent/client";
 import { ChatView } from "@/components/chat/chat-view";
 import { getAccount } from "@/lib/account";
@@ -10,10 +10,11 @@ export default async function ChatPage({ params }: { params: Promise<{ id: strin
   if (!profile) notFound();
   const chat = await getChat(profile.id, id);
   if (!chat) notFound();
-  const [messages, voices, selected] = await Promise.all([
+  const [messages, voices, selected, doc] = await Promise.all([
     listMessages(profile.id, id),
     listVoices(profile.id),
     getSelectedVoice(profile.id),
+    getChatDocument(profile.id, id),
   ]);
   const initialMessages = messages.map((m) => ({
     id: m.id,
@@ -29,6 +30,7 @@ export default async function ChatPage({ params }: { params: Promise<{ id: strin
       initialMessages={initialMessages}
       voices={voices.map((v) => ({ id: v.id, name: v.name, tagline: v.tagline, own: v.kind === "OWN" }))}
       selectedVoiceId={selected?.id ?? null}
+      initialDocument={doc ? { id: doc.id, title: doc.title, version: doc.version, text: doc.text } : null}
     />
   );
 }

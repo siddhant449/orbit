@@ -3,6 +3,7 @@
 import { lazy, Suspense } from "react";
 import { collapseToolRuns, type ChatUIMessage } from "@brandloop/agent/client";
 import { cn } from "@brandloop/ui";
+import { DraftCard } from "./document-panel";
 import { ToolGroup, ToolRow, type ToolPartLike } from "./tool-row";
 
 // Its own chunk, requested as soon as the chat code loads, so stored replies rarely show the plain fallback.
@@ -42,6 +43,7 @@ export function MessageParts({ message, streaming }: { message: ChatUIMessage; s
   items.forEach((it, i) => {
     if (it.type === "text") lastText = i;
   });
+  const draft = createdPost(message.parts as Part[]);
   return (
     <>
       {items.map((it, i) => {
@@ -54,8 +56,21 @@ export function MessageParts({ message, streaming }: { message: ChatUIMessage; s
         if (isToolPart(it)) return <ToolRow key={i} part={it as ToolPartLike} />;
         return null;
       })}
+      {draft && <DraftCard fallback={draft} />}
     </>
   );
+}
+
+/** The post a createDocument call in this message made, as its output had it. */
+function createdPost(parts: Part[]): { id: string; title: string; version: number; text: string } | null {
+  for (const p of parts as ToolPartLike[]) {
+    if (p.type !== "tool-createDocument" || p.state !== "output-available") continue;
+    const o = p.output as { success?: unknown; id?: unknown; title?: unknown; postContent?: unknown } | undefined;
+    if (o?.success === true && typeof o.id === "string" && typeof o.title === "string" && typeof o.postContent === "string") {
+      return { id: o.id, title: o.title, version: 1, text: o.postContent };
+    }
+  }
+  return null;
 }
 
 export function wordCount(message: ChatUIMessage): number {

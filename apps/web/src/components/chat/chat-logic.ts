@@ -52,7 +52,12 @@ export function recoveryDelay(attempt: number): number {
   return DELAYS[attempt] ?? 10_000;
 }
 
-export type StoredChat<M = unknown> = { messages: M[]; activeTurn: ActiveTurn };
+/** `document`: the chat's post (Task 8), when the route sends it. */
+export type StoredChat<M = unknown> = {
+  messages: M[];
+  activeTurn: ActiveTurn;
+  document?: { id: string; title: string; version: number; text: string } | null;
+};
 
 /** Why polling can't go on: the chat is gone (404) or the session ended (401, 403). */
 export type Terminal = "gone" | "signed-out";

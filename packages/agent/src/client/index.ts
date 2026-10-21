@@ -6,3 +6,12 @@ export { HIDDEN_OUTPUT_TOOLS, isToolError, TOOL_LABELS, toolLabel, type ToolLabe
 export { groupChatsByDate, type HistoryGroupLabel } from "./history-groups";
 export { collapseToolRuns, type ToolGroup } from "./tool-runs";
 export { QUICK_LINKS, type QuickLinkKey } from "./quick-links";
+export {
+  applyDataPart,
+  charCount,
+  emptyPanel,
+  POST_CHAR_LIMIT,
+  withDocument,
+  type PanelDoc,
+  type PanelState,
+} from "./document-state";

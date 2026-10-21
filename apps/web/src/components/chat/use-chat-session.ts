@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { toast } from "sonner";
 import { mutate } from "swr";
-import type { ChatUIMessage } from "@brandloop/agent/client";
+import type { ChatUIMessage, PanelDoc } from "@brandloop/agent/client";
 import { ChatTurnActiveError, ChatTurnCompleteError } from "./chat-fetch";
 import {
   dropsOnRetry,
@@ -49,6 +49,12 @@ const textOf = (m: ChatUIMessage | undefined) =>
     .join("")
     .trim();
 
+/** What a send tells the server about the open post, so "make it shorter" means this version. */
+export type DocumentContext = { id: string; version: number };
+
+/** A stream data part, as `useChat`'s `onData` hands it over. */
+export type StreamDataPart = { type: string; data: unknown };
+
 /** A notice under the conversation that isn't a failed send: recovery ended, or Stop failed. */
 export type ChatNotice = { text: string; reload?: boolean };
 
@@ -63,6 +69,9 @@ export function useChatSession({
   selections,
   onRestoreDraft,
   onFirstFinish,
+  onData,
+  onDocument,
+  documentContext,
 }: {
   chatId: string;
   initialMessages: ChatUIMessage[];
@@ -71,16 +80,24 @@ export function useChatSession({
   onRestoreDraft?: (text: string) => void;
   /** Runs once, after the first turn of this view ends. */
   onFirstFinish?: () => void;
+  /** Every `data-*` part as it streams in (transient ones included). */
+  onData?: (part: StreamDataPart) => void;
+  /** The chat's post as the stored conversation has it, whenever recovery adopts that conversation. */
+  onDocument?: (doc: PanelDoc | null) => void;
+  /** Sent with every message while a post is open. */
+  documentContext?: DocumentContext | null;
 }) {
   // `pendingId`: the user message the current request answers, polled for and dropped again when refused.
   const [turn] = useState(() => new TurnState(initialMessages.at(-1)?.role === "user" ? initialMessages.at(-1)!.id : null));
   const [transport] = useState(() => turn.transport());
   const lastErrorRef = useRef<Error | null>(null);
-  const callbacks = useRef({ onRestoreDraft, onFirstFinish });
+  const callbacks = useRef({ onRestoreDraft, onFirstFinish, onData, onDocument });
+  const docContext = useRef(documentContext ?? null);
   const finishedOnce = useRef(false);
   useEffect(() => {
     turn.update(selections);
-    callbacks.current = { onRestoreDraft, onFirstFinish };
+    callbacks.current = { onRestoreDraft, onFirstFinish, onData, onDocument };
+    docContext.current = documentContext ?? null;
   });
 
   const dangling = initialMessages.at(-1)?.role === "user";
@@ -90,6 +107,7 @@ export function useChatSession({
     transport,
     generateId: () => crypto.randomUUID(),
     throttle: 50,
+    onData: (part) => callbacks.current.onData?.(part as StreamDataPart),
     onFinish: () => {
       turn.finished();
       void mutate(HISTORY_KEY);
@@ -142,8 +160,13 @@ export function useChatSession({
 
   async function sync() {
     const res = await loadMessages(chatId);
-    if (res.ok) chatRef.current.setMessages(res.chat.messages);
+    if (res.ok) adopt(res.chat);
     void mutate(HISTORY_KEY);
+  }
+
+  function adopt(stored: { messages: ChatUIMessage[]; document?: PanelDoc | null }) {
+    chatRef.current.setMessages(stored.messages);
+    if (stored.document !== undefined) callbacks.current.onDocument?.(stored.document);
   }
 
   async function recover() {
@@ -161,7 +184,7 @@ export function useChatSession({
     if (result.status === "aborted") return;
     setRecovering(false);
     turn.finished();
-    if (result.status === "idle") chatRef.current.setMessages(result.chat.messages);
+    if (result.status === "idle") adopt(result.chat);
     const text = recoveryMessage(result);
     if (text) setNotice({ text, reload: result.status === "timeout" });
     void mutate(HISTORY_KEY);
@@ -207,7 +230,7 @@ export function useChatSession({
       if (cancelled) return;
       if (res.ok && hasReplyTo(res.chat.messages, turn.pending())) {
         await chatRef.current.stop();
-        chatRef.current.setMessages(res.chat.messages);
+        adopt(res.chat);
         void mutate(HISTORY_KEY);
         return;
       }
@@ -224,7 +247,25 @@ export function useChatSession({
     const t = text.trim();
     if (!t) return;
     lastErrorRef.current = null;
-    await chatRef.current.sendMessage({ text: t, metadata: { createdAt: new Date().toISOString() } });
+    const ctx = docContext.current;
+    await chatRef.current.sendMessage(
+      { text: t, metadata: { createdAt: new Date().toISOString() } },
+      ctx ? { body: { documentContext: ctx } } : undefined,
+    );
+  }, []);
+
+  /** A quick link: a hidden user message that names its key, so the server runs that action on the post. */
+  const sendQuickLink = useCallback(async (key: string, prompt: string) => {
+    lastErrorRef.current = null;
+    const ctx = docContext.current;
+    await chatRef.current.sendMessage(
+      {
+        role: "user",
+        parts: [{ type: "text", text: prompt }],
+        metadata: { createdAt: new Date().toISOString(), hideInUI: true, quickLinkKey: key },
+      },
+      { body: { quickLinkKey: key, uiAction: "quick-link", ...(ctx ? { documentContext: ctx } : {}) } },
+    );
   }, []);
 
   /**
@@ -283,5 +324,5 @@ export function useChatSession({
   // While recovering, the view reads as waiting on the reply.
   const viewStatus = recovering && status !== "streaming" && status !== "submitted" ? "submitted" : status;
 
-  return { messages: chat.messages, status: viewStatus, errorText, canRetry, notice, send, stop, retry };
+  return { messages: chat.messages, status: viewStatus, errorText, canRetry, notice, send, sendQuickLink, stop, retry };
 }
