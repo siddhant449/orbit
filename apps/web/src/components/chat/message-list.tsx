@@ -1,6 +1,6 @@
 "use client";
 
-import { RotateCcw } from "lucide-react";
+import { RefreshCw, RotateCcw } from "lucide-react";
 import type { ChatUIMessage } from "@brandloop/agent/client";
 import { Button, cn } from "@brandloop/ui";
 import { MessageParts, wordCount } from "./message-parts";
@@ -60,6 +60,7 @@ export function MessageList({
   initialIds,
   errorText,
   onRetry,
+  notice,
 }: {
   messages: ChatUIMessage[];
   status: Status;
@@ -67,6 +68,8 @@ export function MessageList({
   errorText: string | null;
   /** Absent when the refused text went back to the composer. */
   onRetry?: () => void;
+  /** Recovery ended without a reply to show, or Stop failed. */
+  notice?: { text: string; reload?: boolean } | null;
 }) {
   const shown = messages.filter((m) => !m.metadata?.hideInUI);
   // Live and waiting read the full list: a hidden quick-link message still starts a turn.
@@ -98,6 +101,19 @@ export function MessageList({
               <Button variant="secondary" size="sm" onClick={onRetry}>
                 <RotateCcw aria-hidden="true" />
                 Try again
+              </Button>
+            )}
+          </div>
+        </li>
+      )}
+      {notice && !busy && (
+        <li>
+          <div role="alert" className="flex flex-wrap items-center gap-3 border-l border-signal pl-4">
+            <p className="type-ui text-signal-ink">{notice.text}</p>
+            {notice.reload && (
+              <Button variant="secondary" size="sm" onClick={() => window.location.reload()}>
+                <RefreshCw aria-hidden="true" />
+                Reload
               </Button>
             )}
           </div>

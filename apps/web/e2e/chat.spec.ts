@@ -156,10 +156,13 @@ test("renders markdown safely and streams live", async ({ page }) => {
 
 test("shows 409 recovery: a refused send comes back to the composer, rapid sends make one bubble", async ({ page }) => {
   await signIn(page);
-  await startChat(page, "Hello there");
+  const id = await startChat(page, "Hello there");
   await expect(page.getByText("Mock reply.")).toBeVisible();
 
-  // The server says a turn is still running: the client tells the user, resumes, and hands the text back.
+  // The server says another message's turn is still running (a second send while the first runs): the client
+  // tells the user, resumes, and hands the refused text back without showing it as sent.
+  const stored = (await (await page.request.get(`/api/chat/${id}/messages`)).json()) as { messages: { id: string; role: string }[] };
+  const firstId = stored.messages.find((m) => m.role === "user")!.id;
   let refused = 0;
   await page.route(
     (url) => url.pathname === "/api/chat",
@@ -169,7 +172,11 @@ test("shows 409 recovery: a refused send comes back to the composer, rapid sends
       await route.fulfill({
         status: 409,
         contentType: "application/json",
-        body: JSON.stringify({ code: "chat_turn_active", cause: "This chat is still finishing its last reply.", activeTurn: null }),
+        body: JSON.stringify({
+          code: "chat_turn_active",
+          cause: "This chat is still finishing its last reply.",
+          activeTurn: { runId: "00000000-0000-4000-8000-000000000000", requestMessageId: firstId },
+        }),
       });
     },
   );
@@ -178,6 +185,10 @@ test("shows 409 recovery: a refused send comes back to the composer, rapid sends
   await expect(page.getByText("This chat is still finishing its last reply.")).toBeVisible();
   await expect(page.getByLabel("Message", { exact: true })).toHaveValue("Second message");
   await expect(userNotes(page)).toHaveCount(1);
+  await expect(userNotes(page).filter({ hasText: "Second message" })).toHaveCount(0);
+  // Recovery settles on the stored chat: still one exchange, nothing waiting.
+  await expect(page.locator('[data-message="assistant"][data-live]')).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Send" })).toBeEnabled();
   await page.unrouteAll({ behavior: "wait" });
 
   // Pressing Enter twice in a row sends once.

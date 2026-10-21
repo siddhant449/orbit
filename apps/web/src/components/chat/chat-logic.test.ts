@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { ChatRequestError, ChatTurnActiveError } from "./chat-fetch";
 import {
-  draftToRestore,
+  dropsOnRetry,
   friendlyError,
   hasReplyTo,
   pollUntilIdle,
   RECOVERY_CAP_MS,
   recoveryDelay,
+  recoveryMessage,
+  loadOutcome,
   restoresDraft,
   safeUrl,
 } from "./chat-logic";
@@ -30,6 +32,14 @@ describe("safeUrl", () => {
     ["https://example.com/guide", "https://example.com/guide"],
     ["HTTPS://EXAMPLE.COM", "HTTPS://EXAMPLE.COM"],
     ["  https://example.com  ", "https://example.com"],
+    ["&#106;avascript:alert(1)", ""],
+    ["%6Aavascript:alert(1)", ""],
+    ["javascript&colon;alert(1)", ""],
+    ["\u0001javascript:alert(1)", ""],
+    ["\u0000", ""],
+    ["\u0000https://example.com", ""],
+    ["http:foo", ""],
+    ["https:example.com", ""],
   ])("%j -> %j", (input, out) => {
     expect(safeUrl(input)).toBe(out);
   });
@@ -50,20 +60,6 @@ describe("hasReplyTo", () => {
   });
 });
 
-describe("draftToRestore (dropRefused)", () => {
-  it("hands the refused text back", () => {
-    expect(draftToRestore({ id: "m2", text: "Second" }, null)).toBe("Second");
-    expect(draftToRestore({ id: "m2", text: "Second" }, { runId: "r", requestMessageId: "m1" })).toBe("Second");
-  });
-  it("keeps it when the running turn is that very message (it is already stored)", () => {
-    expect(draftToRestore({ id: "m2", text: "Second" }, { runId: "r", requestMessageId: "m2" })).toBeNull();
-  });
-  it("has nothing to restore without a refused message or text", () => {
-    expect(draftToRestore(null, null)).toBeNull();
-    expect(draftToRestore({ id: "m2", text: "  " }, null)).toBeNull();
-  });
-});
-
 describe("errors", () => {
   it("restores the draft for refused requests (4xx), not for server errors or turn conflicts", () => {
     expect(restoresDraft(new ChatRequestError("message_too_long", "Too long.", 413))).toBe(true);
@@ -71,6 +67,12 @@ describe("errors", () => {
     expect(restoresDraft(new ChatRequestError("ai_unavailable", "Down.", 503))).toBe(false);
     expect(restoresDraft(new ChatTurnActiveError(null))).toBe(false);
     expect(restoresDraft(new TypeError("Failed to fetch"))).toBe(false);
+  });
+  it("drops the on-screen message before a retry when it may never have been stored", () => {
+    expect(dropsOnRetry(new ChatRequestError("ai_unavailable", "Down.", 503))).toBe(true);
+    expect(dropsOnRetry(new TypeError("Failed to fetch"))).toBe(true);
+    expect(dropsOnRetry(new Error("Something went wrong while answering. Try again."))).toBe(false);
+    expect(dropsOnRetry(null)).toBe(false);
   });
   it("names network failures plainly and keeps server causes", () => {
     const net = "Brandloop couldn't be reached. Check your connection, then try again.";
@@ -84,10 +86,14 @@ describe("errors", () => {
 });
 
 describe("pollUntilIdle", () => {
-  const stored = (activeTurn: { runId: string; requestMessageId: string | null } | null) => ({ messages: [], activeTurn });
+  const stored = (activeTurn: { runId: string; requestMessageId: string | null } | null) => ({
+    ok: true as const,
+    chat: { messages: [], activeTurn },
+  });
+  const transient = { ok: false as const, terminal: null };
 
-  it("backs off while a turn is active, reports its run, and returns once idle", async () => {
-    const answers = [stored({ runId: "run_9", requestMessageId: "m1" }), null, stored({ runId: "run_9", requestMessageId: "m1" }), stored(null)];
+  it("backs off while a turn is active or a load fails, reports the run, and returns once idle", async () => {
+    const answers = [stored({ runId: "run_9", requestMessageId: "m1" }), transient, stored({ runId: "run_9", requestMessageId: "m1" }), stored(null)];
     const slept: number[] = [];
     const runs: string[] = [];
     let clock = 0;
@@ -100,12 +106,29 @@ describe("pollUntilIdle", () => {
       },
       now: () => clock,
     });
-    expect(out).toEqual(stored(null));
+    expect(out).toEqual({ status: "idle", chat: { messages: [], activeTurn: null } });
     expect(runs).toEqual(["run_9", "run_9"]);
     expect(slept).toEqual([recoveryDelay(0), recoveryDelay(1), recoveryDelay(2)]);
   });
 
-  it("gives up at the cap", async () => {
+  it.each([
+    ["gone", "This chat is no longer available."],
+    ["signed-out", "Your session ended. Sign in again to see this chat."],
+  ] as const)("stops at once on a terminal answer (%s)", async (terminal, message) => {
+    let loads = 0;
+    const out = await pollUntilIdle({
+      load: async () => {
+        loads++;
+        return loads === 1 ? stored({ runId: "r", requestMessageId: null }) : { ok: false as const, terminal };
+      },
+      sleep: async () => {},
+    });
+    expect(out).toEqual({ status: "terminal", reason: terminal });
+    expect(loads).toBe(2);
+    expect(recoveryMessage(out)).toBe(message);
+  });
+
+  it("gives up at the cap with a reload message", async () => {
     let clock = 0;
     let loads = 0;
     const out = await pollUntilIdle({
@@ -118,7 +141,8 @@ describe("pollUntilIdle", () => {
       },
       now: () => clock,
     });
-    expect(out).toBeNull();
+    expect(out).toEqual({ status: "timeout" });
+    expect(recoveryMessage(out)).toBe("The reply is taking longer than expected. Reload to check on it.");
     expect(clock).toBeGreaterThanOrEqual(RECOVERY_CAP_MS);
     expect(clock).toBeLessThan(RECOVERY_CAP_MS + 20_000);
     expect(loads).toBeGreaterThan(5);
@@ -134,12 +158,25 @@ describe("pollUntilIdle", () => {
       sleep: async () => {},
       signal: ctrl.signal,
     });
-    expect(out).toBeNull();
+    expect(out).toEqual({ status: "aborted" });
+    expect(recoveryMessage(out)).toBeNull();
   });
 
   it("backs off from half a second to ten seconds", () => {
     expect(recoveryDelay(0)).toBe(500);
     expect(recoveryDelay(1)).toBeGreaterThan(recoveryDelay(0));
     expect(recoveryDelay(50)).toBe(10_000);
+  });
+});
+
+describe("loadOutcome", () => {
+  it.each([
+    [401, "signed-out"],
+    [403, "signed-out"],
+    [404, "gone"],
+    [500, null],
+    [502, null],
+  ] as const)("maps HTTP %i", (status, terminal) => {
+    expect(loadOutcome(status)).toEqual({ ok: false, terminal });
   });
 });

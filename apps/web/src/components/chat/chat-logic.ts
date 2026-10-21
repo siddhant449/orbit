@@ -23,19 +23,14 @@ export function hasReplyTo(messages: Role[], requestId: string | null): boolean 
   return at !== -1 && messages.slice(at + 1).some((m) => m.role === "assistant");
 }
 
-/**
- * The text a refused send hands back to the composer, or null. When the running turn is answering that very
- * message, it is already stored and will show up with its reply, so nothing is restored.
- */
-export function draftToRestore(refused: { id: string; text: string } | null, activeTurn: ActiveTurn): string | null {
-  if (!refused || !refused.text.trim()) return null;
-  if (activeTurn?.requestMessageId === refused.id) return null;
-  return refused.text;
-}
-
 /** Refused before the turn started (4xx other than the turn conflicts): the message wasn't stored. */
 export function restoresDraft(err: unknown): boolean {
   return err instanceof ChatRequestError && err.status >= 400 && err.status < 500;
+}
+
+/** On retry, the failed message leaves the screen: a refused request or a network failure may never have stored it. */
+export function dropsOnRetry(err: unknown): boolean {
+  return err instanceof ChatRequestError || (err instanceof TypeError && NETWORK.test(err.message));
 }
 
 const NETWORK = /failed to fetch|networkerror|load failed|network request failed/i;
@@ -59,9 +54,35 @@ export function recoveryDelay(attempt: number): number {
 
 export type StoredChat<M = unknown> = { messages: M[]; activeTurn: ActiveTurn };
 
+/** Why polling can't go on: the chat is gone (404) or the session ended (401, 403). */
+export type Terminal = "gone" | "signed-out";
+export type LoadResult<M = unknown> = { ok: true; chat: StoredChat<M> } | { ok: false; terminal: Terminal | null };
+
+/** A failed `GET …/messages`: 401/403/404 end polling; anything else is worth another try. */
+export function loadOutcome(status: number): { ok: false; terminal: Terminal | null } {
+  if (status === 401 || status === 403) return { ok: false, terminal: "signed-out" };
+  if (status === 404) return { ok: false, terminal: "gone" };
+  return { ok: false, terminal: null };
+}
+
+export type PollResult<M = unknown> =
+  | { status: "idle"; chat: StoredChat<M> }
+  | { status: "terminal"; reason: Terminal }
+  | { status: "timeout" }
+  | { status: "aborted" };
+
+/** What the chat says when recovery ends without a reply to show, or null. */
+export function recoveryMessage(result: PollResult): string | null {
+  if (result.status === "terminal") {
+    return result.reason === "gone" ? "This chat is no longer available." : "Your session ended. Sign in again to see this chat.";
+  }
+  if (result.status === "timeout") return "The reply is taking longer than expected. Reload to check on it.";
+  return null;
+}
+
 /**
- * Polls the stored chat until no turn is running, then returns it. Reports the running turn on every poll
- * (Stop needs its run id). Returns null when aborted or after `capMs`.
+ * Polls the stored chat until no turn is running. Reports the running turn on every poll (Stop needs its run
+ * id). Transient failures back off and retry; a terminal answer, the cap or an abort ends it.
  */
 export async function pollUntilIdle<M>({
   load,
@@ -71,21 +92,22 @@ export async function pollUntilIdle<M>({
   now = Date.now,
   capMs = RECOVERY_CAP_MS,
 }: {
-  load: () => Promise<StoredChat<M> | null>;
+  load: () => Promise<LoadResult<M>>;
   onActive?: (turn: NonNullable<ActiveTurn>) => void;
   sleep: (ms: number) => Promise<void>;
   signal?: AbortSignal;
   now?: () => number;
   capMs?: number;
-}): Promise<StoredChat<M> | null> {
+}): Promise<PollResult<M>> {
   const start = now();
   for (let attempt = 0; ; attempt++) {
-    const stored = await load();
-    if (signal?.aborted) return null;
-    if (stored && !stored.activeTurn) return stored;
-    if (stored?.activeTurn) onActive?.(stored.activeTurn);
-    if (now() - start >= capMs) return null;
+    const res = await load();
+    if (signal?.aborted) return { status: "aborted" };
+    if (res.ok && !res.chat.activeTurn) return { status: "idle", chat: res.chat };
+    if (!res.ok && res.terminal) return { status: "terminal", reason: res.terminal };
+    if (res.ok && res.chat.activeTurn) onActive?.(res.chat.activeTurn);
+    if (now() - start >= capMs) return { status: "timeout" };
     await sleep(recoveryDelay(attempt));
-    if (signal?.aborted) return null;
+    if (signal?.aborted) return { status: "aborted" };
   }
 }

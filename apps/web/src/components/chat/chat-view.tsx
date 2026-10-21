@@ -24,7 +24,8 @@ const fetchJson = (url: string) => fetch(url).then((r) => (r.ok ? r.json() : Pro
  */
 function liveStatus(messages: ChatUIMessage[], status: string, initialIds: ReadonlySet<string>) {
   const last = messages.at(-1);
-  if (status === "submitted") return "Sent. Waiting for the reply.";
+  // A chat opened while its reply is still being written isn't announced as a fresh send.
+  if (status === "submitted") return last && initialIds.has(last.id) ? "" : "Sent. Waiting for the reply.";
   if (status === "streaming" && last?.role === "assistant") {
     const active = (last.parts as ToolPartLike[]).filter((p) => p.type.startsWith("tool-") && toolStateOf(p) === "active").at(-1);
     return active ? `${toolLabel(toolNameOf(active), "active")}.` : "Writing the reply.";
@@ -59,7 +60,7 @@ export function ChatView({
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const initialIds = useMemo(() => new Set(initialMessages.map((m) => m.id)), [initialMessages]);
 
-  const { messages, status, errorText, canRetry, send, stop, retry } = useChatSession({
+  const { messages, status, errorText, canRetry, notice, send, stop, retry } = useChatSession({
     chatId,
     initialMessages,
     selections: {
@@ -142,7 +143,14 @@ export function ChatView({
       </header>
 
       <div className="mx-auto w-full max-w-[768px] flex-1 px-4 pb-10 pt-10 sm:px-6">
-        <MessageList messages={messages} status={status} initialIds={initialIds} errorText={errorText} onRetry={canRetry ? () => void retry() : undefined} />
+        <MessageList
+          messages={messages}
+          status={status}
+          initialIds={initialIds}
+          errorText={errorText}
+          onRetry={canRetry ? () => void retry() : undefined}
+          notice={notice}
+        />
         <div ref={endRef} aria-hidden="true" className="h-px" />
       </div>
 

@@ -2,30 +2,37 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
 import { toast } from "sonner";
 import { mutate } from "swr";
 import type { ChatUIMessage } from "@brandloop/agent/client";
-import { chatFetch, ChatRequestError, ChatTurnActiveError, ChatTurnCompleteError, type ActiveTurn } from "./chat-fetch";
-import { draftToRestore, friendlyError, hasReplyTo, pollUntilIdle, restoresDraft, type StoredChat } from "./chat-logic";
+import { ChatTurnActiveError, ChatTurnCompleteError } from "./chat-fetch";
+import {
+  dropsOnRetry,
+  friendlyError,
+  hasReplyTo,
+  loadOutcome,
+  pollUntilIdle,
+  recoveryMessage,
+  restoresDraft,
+  type LoadResult,
+} from "./chat-logic";
 import { HISTORY_KEY } from "./history-key";
+import { handleTurnActive, TurnState, type ChatSelections } from "./turn-state";
 
-export type ChatSelections = {
-  selectedKnowledgeBaseIds: string[];
-  selectedWritingStyleId: string | null;
-  webSearchEnabled: boolean;
-};
+export type { ChatSelections } from "./turn-state";
 
 const POLL_FIRST_MS = 15_000;
 const POLL_EVERY_MS = 10_000;
 export const TURN_ACTIVE_TOAST = "This chat is still finishing its last reply.";
+const STOP_FAILED = "The reply couldn't be stopped. Try again.";
 
-async function loadMessages(chatId: string): Promise<StoredChat<ChatUIMessage> | null> {
+async function loadMessages(chatId: string, signal?: AbortSignal): Promise<LoadResult<ChatUIMessage>> {
   try {
-    const res = await fetch(`/api/chat/${encodeURIComponent(chatId)}/messages`, { cache: "no-store" });
-    return res.ok ? ((await res.json()) as StoredChat<ChatUIMessage>) : null;
+    const res = await fetch(`/api/chat/${encodeURIComponent(chatId)}/messages`, { cache: "no-store", signal });
+    if (!res.ok) return loadOutcome(res.status);
+    return { ok: true, chat: await res.json() };
   } catch {
-    return null;
+    return { ok: false, terminal: null };
   }
 }
 
@@ -42,56 +49,8 @@ const textOf = (m: ChatUIMessage | undefined) =>
     .join("")
     .trim();
 
-/**
- * What the transport needs between renders: the latest selections (written after each render) and the ids
- * of the request in flight (written by the transport itself). Plain mutable state, outside React's render.
- */
-class TurnState {
-  selections: ChatSelections = { selectedKnowledgeBaseIds: [], selectedWritingStyleId: null, webSearchEnabled: true };
-  runId: string | null = null;
-  constructor(public pendingId: string | null) {}
-
-  update(selections: ChatSelections) {
-    this.selections = selections;
-  }
-
-  pending() {
-    return this.pendingId;
-  }
-
-  run() {
-    return this.runId;
-  }
-
-  clearPending() {
-    this.pendingId = null;
-  }
-
-  /** The run that is really live on the server (from a 409 or the messages route): Stop must target it. */
-  adopt(turn: ActiveTurn) {
-    this.runId = turn?.runId ?? null;
-    if (turn?.requestMessageId) this.pendingId = turn.requestMessageId;
-  }
-
-  /** Our request ended: its run id is no longer the live one. */
-  finished() {
-    this.runId = null;
-  }
-
-  /** Sends only the newest message plus the composer's selections, with a fresh run id per request. */
-  transport() {
-    return new DefaultChatTransport<ChatUIMessage>({
-      api: "/api/chat",
-      fetch: chatFetch,
-      prepareSendMessagesRequest: ({ id, messages, body }) => {
-        const message = messages.at(-1)!;
-        this.runId = crypto.randomUUID();
-        this.pendingId = message.id;
-        return { body: { id, runId: this.runId, message, ...this.selections, ...body } };
-      },
-    });
-  }
-}
+/** A notice under the conversation that isn't a failed send: recovery ended, or Stop failed. */
+export type ChatNotice = { text: string; reload?: boolean };
 
 /**
  * `useChat` wired to our routes (design section 12): last-message-only POSTs with the composer's selections,
@@ -145,13 +104,15 @@ export function useChatSession({
       lastErrorRef.current = err;
       if (err instanceof ChatTurnActiveError) {
         toast(TURN_ACTIVE_TOAST);
-        turn.adopt(err.activeTurn);
-        dropRefused(err.activeTurn);
+        const current = chatRef.current;
+        const out = handleTurnActive(turn, current.messages, err.activeTurn);
+        if (out.messages !== current.messages) current.setMessages(out.messages);
+        if (out.draft) callbacks.current.onRestoreDraft?.(out.draft);
         void resumeThenRecover();
       } else if (err instanceof ChatTurnCompleteError) {
         void recover();
       } else if (restoresDraft(err)) {
-        dropRefused(null);
+        dropRefused();
       }
     },
   });
@@ -160,41 +121,49 @@ export function useChatSession({
     chatRef.current = chat;
   });
 
-  /**
-   * Removes the optimistic user message of a refused send and hands its text back. When the running turn is
-   * answering that very message it is already stored, so it stays on screen and nothing is restored.
-   */
-  function dropRefused(activeTurn: ActiveTurn) {
+  /** A request refused before its turn started (4xx): the message wasn't stored, so its text goes back. */
+  function dropRefused() {
     const id = turn.pending();
     const current = chatRef.current;
     const refused = current.messages.find((m) => m.id === id && m.role === "user");
-    if (!refused || activeTurn?.requestMessageId === refused.id) return;
-    const draft = draftToRestore({ id: refused.id, text: textOf(refused) }, activeTurn);
+    if (!refused) return;
     current.setMessages((ms) => ms.filter((m) => m.id !== refused.id));
-    if (draft) callbacks.current.onRestoreDraft?.(draft);
+    const text = textOf(refused);
+    if (text) callbacks.current.onRestoreDraft?.(text);
     turn.clearPending();
   }
 
   // Recovery: poll the stored chat (with backoff, up to six minutes) until no turn runs, then adopt it.
   const [recovering, setRecovering] = useState(false);
+  const [notice, setNotice] = useState<ChatNotice | null>(null);
   const recoveryRef = useRef<AbortController | null>(null);
-  useEffect(() => () => recoveryRef.current?.abort(), []);
+  // A different chat (or unmount) ends any recovery still running for this one.
+  useEffect(() => () => recoveryRef.current?.abort(), [chatId]);
+
+  async function sync() {
+    const res = await loadMessages(chatId);
+    if (res.ok) chatRef.current.setMessages(res.chat.messages);
+    void mutate(HISTORY_KEY);
+  }
 
   async function recover() {
     recoveryRef.current?.abort();
     const ctrl = new AbortController();
     recoveryRef.current = ctrl;
     setRecovering(true);
-    const stored = await pollUntilIdle({
-      load: () => loadMessages(chatId),
+    setNotice(null);
+    const result = await pollUntilIdle({
+      load: () => loadMessages(chatId, ctrl.signal),
       onActive: (t) => turn.adopt(t),
       sleep: (ms) => sleep(ms, ctrl.signal),
       signal: ctrl.signal,
     });
-    if (ctrl.signal.aborted) return;
+    if (result.status === "aborted") return;
     setRecovering(false);
     turn.finished();
-    if (stored) chatRef.current.setMessages(stored.messages);
+    if (result.status === "idle") chatRef.current.setMessages(result.chat.messages);
+    const text = recoveryMessage(result);
+    if (text) setNotice({ text, reload: result.status === "timeout" });
     void mutate(HISTORY_KEY);
   }
 
@@ -234,11 +203,11 @@ export function useChatSession({
     let timer: ReturnType<typeof setTimeout>;
     let cancelled = false;
     const tick = async () => {
-      const stored = await loadMessages(chatId);
+      const res = await loadMessages(chatId);
       if (cancelled) return;
-      if (stored && hasReplyTo(stored.messages, turn.pending())) {
+      if (res.ok && hasReplyTo(res.chat.messages, turn.pending())) {
         await chatRef.current.stop();
-        chatRef.current.setMessages(stored.messages);
+        chatRef.current.setMessages(res.chat.messages);
         void mutate(HISTORY_KEY);
         return;
       }
@@ -258,19 +227,38 @@ export function useChatSession({
     await chatRef.current.sendMessage({ text: t, metadata: { createdAt: new Date().toISOString() } });
   }, []);
 
-  /** Stops the live run on the server (its real run id, asked for if unknown) and the local stream. */
+  /**
+   * Stops the live run on the server (its real run id, asked for if unknown) and the local stream. Once the
+   * server confirms, any recovery poll ends and the stored chat is adopted (the partial reply lands a moment later).
+   */
   const stop = useCallback(async () => {
+    setNotice(null);
     const local = chatRef.current.stop();
-    const runId = turn.run() ?? (await loadMessages(chatId))?.activeTurn?.runId ?? null;
+    let runId = turn.run();
+    if (!runId) {
+      const res = await loadMessages(chatId);
+      runId = res.ok ? (res.chat.activeTurn?.runId ?? null) : null;
+    }
     if (runId) {
-      void fetch("/api/chat/stop", {
+      const ok = await fetch("/api/chat/stop", {
         method: "POST",
         keepalive: true,
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ chatId, runId }),
-      }).catch(() => {});
+      })
+        .then((r) => r.ok)
+        .catch(() => false);
+      if (!ok) setNotice({ text: STOP_FAILED });
+      else if (recoveryRef.current && !recoveryRef.current.signal.aborted) {
+        recoveryRef.current.abort();
+        setRecovering(false);
+        turn.finished();
+        await sync();
+        setTimeout(() => void sync(), 1500);
+      }
     }
     await local;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatId, turn]);
 
   /** A user-initiated retry: always a new message id (the old one may already have its reply). */
@@ -279,8 +267,8 @@ export function useChatSession({
     const lastUser = [...current.messages].reverse().find((m) => m.role === "user");
     const text = textOf(lastUser);
     if (!text) return;
-    // Refused by the server before the turn started: that message was never stored.
-    if (lastErrorRef.current instanceof ChatRequestError && lastUser) {
+    // Refused, or lost on the network: that message may never have been stored, so a new one replaces it.
+    if (dropsOnRetry(lastErrorRef.current) && lastUser) {
       current.setMessages((ms) => ms.filter((m) => m.id !== lastUser.id));
     }
     current.clearError();
@@ -295,5 +283,5 @@ export function useChatSession({
   // While recovering, the view reads as waiting on the reply.
   const viewStatus = recovering && status !== "streaming" && status !== "submitted" ? "submitted" : status;
 
-  return { messages: chat.messages, status: viewStatus, errorText, canRetry, send, stop, retry };
+  return { messages: chat.messages, status: viewStatus, errorText, canRetry, notice, send, stop, retry };
 }

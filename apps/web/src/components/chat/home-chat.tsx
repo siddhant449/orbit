@@ -33,11 +33,15 @@ export function HomeChat(props: Omit<ComponentProps<typeof Composer>, "onSend">)
   useEffect(() => {
     if (!started) return;
     const onClick = (e: MouseEvent) => {
-      const link = (e.target as Element | null)?.closest?.('a[href="/"]');
-      if (link && window.location.pathname === "/") setStarted(null);
+      // Only a plain left click that the page itself will follow; new tabs and handled clicks are left alone.
+      // Capture phase: Next's Link prevents the default itself, so this runs before it does.
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const link = (e.target as Element | null)?.closest?.<HTMLAnchorElement>('a[href="/"]');
+      if (!link || (link.target && link.target !== "_self")) return;
+      if (window.location.pathname === "/") setStarted(null);
     };
-    document.addEventListener("click", onClick);
-    return () => document.removeEventListener("click", onClick);
+    document.addEventListener("click", onClick, true);
+    return () => document.removeEventListener("click", onClick, true);
   }, [started]);
 
   // Back on "/" after the address moved to the chat (the home link, the back button): start fresh.

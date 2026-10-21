@@ -86,9 +86,19 @@ export function ChatHistory({ onNavigate }: { onNavigate?: () => void }) {
   }
 
   async function togglePin(chat: ChatSummary) {
+    const flip = (cur: History | undefined): History => ({
+      chats: (cur?.chats ?? []).map((c) => (c.id === chat.id ? { ...c, pinned: !chat.pinned } : c)),
+      hasMore: cur?.hasMore ?? false,
+    });
     try {
-      await patchChat(chat.id, { pinned: !chat.pinned });
-      await mutate();
+      // Optimistic, then the server's order (pinned first) on revalidation.
+      await mutate(
+        async (cur) => {
+          await patchChat(chat.id, { pinned: !chat.pinned });
+          return flip(cur);
+        },
+        { optimisticData: flip, rollbackOnError: true, revalidate: true },
+      );
       toast.success(chat.pinned ? "Chat unpinned" : "Chat pinned");
     } catch (err) {
       toast.error((err as Error).message);
