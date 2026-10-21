@@ -32,11 +32,10 @@ export function VoiceAvatar({ name, className }: { name: string; className?: str
   return (
     <span
       aria-hidden
+      data-initials={initials}
       style={{ background }}
-      className={cn("grid size-6 shrink-0 place-items-center rounded-full text-[10px] font-semibold tracking-wide text-white", className)}
-    >
-      {initials}
-    </span>
+      className={cn("grid size-6 shrink-0 place-items-center rounded-full text-[10px] font-semibold tracking-wide text-white before:content-[attr(data-initials)]", className)}
+    />
   );
 }
 
@@ -120,7 +119,7 @@ export function VoicePicker({ voices, selectedId }: { voices: VoiceOption[]; sel
           <Popover.Trigger asChild>
             <button
               type="button"
-              aria-label="Change writing style"
+              aria-label={`Change writing style, ${current ? current.name : "Writing style"}`}
               aria-busy={pending}
               title={current?.tagline || "Choose how your posts sound"}
               className="flex h-8 max-w-[210px] items-center gap-2 rounded-full border border-line py-0 pl-1 pr-2.5 text-[13px] text-ink-muted transition-colors hover:border-accent/40 hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent data-[state=open]:border-accent/60 data-[state=open]:text-ink"
