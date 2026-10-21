@@ -3,6 +3,10 @@
 import { revalidatePath } from "next/cache";
 import {
   AccountError,
+  appendMemoryLines,
+  assertProfileAccess,
+  deleteMemoryLine,
+  editMemoryLine,
   createProfile,
   softDeleteProfile,
   switchProfile,
@@ -23,6 +27,44 @@ async function run(fn: (userId: string) => Promise<unknown>): Promise<ActionResu
   }
   revalidatePath("/", "layout");
   return { ok: true };
+}
+
+/** Resolve the current profile and check the caller may touch it before running a memory change. */
+function runMemory(fn: (profileId: string) => Promise<unknown>): Promise<ActionResult> {
+  return run(async (userId) => {
+    const account = await getAccount();
+    const profileId = account.currentProfile?.id;
+    if (!profileId) throw new AccountError("Choose a profile first");
+    await assertProfileAccess(userId, profileId);
+    await fn(profileId);
+  });
+}
+
+const MEMORY_KEY = /^[a-z0-9-]+(\/[a-z0-9-]+)*$/;
+function checkKey(key: string) {
+  if (!MEMORY_KEY.test(key)) throw new AccountError("Unknown memory section");
+}
+
+export async function editMemoryLineAction(key: string, lineIndex: number, text: string) {
+  return runMemory((profileId) => {
+    checkKey(key);
+    return editMemoryLine(profileId, key, lineIndex, text);
+  });
+}
+
+export async function deleteMemoryLineAction(key: string, lineIndex: number) {
+  return runMemory((profileId) => {
+    checkKey(key);
+    return deleteMemoryLine(profileId, key, lineIndex);
+  });
+}
+
+export async function addMemoryAction(key: string, text: string) {
+  return runMemory((profileId) => {
+    checkKey(key);
+    if (!text.trim()) throw new AccountError("Write something to remember");
+    return appendMemoryLines(profileId, key, [text], "USER");
+  });
 }
 
 export async function switchProfileAction(profileId: string) {
