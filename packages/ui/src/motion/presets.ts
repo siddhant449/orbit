@@ -16,6 +16,27 @@ export const springLayout = { type: "spring", stiffness: 380, damping: 36 } as c
 /** Durations in seconds: hover 200 ms, entry 180 ms, exit 120 ms, draw 400 ms, settle 240 ms, loader loop 1.2 s. */
 export const durations = { hover: 0.2, entry: 0.18, exit: 0.12, draw: 0.4, settle: 0.24, loop: 1.2 } as const;
 
+/**
+ * Cinematic one-shots (micro-interactions.md section 9), in seconds. The first-paint sequences (kinetic greeting,
+ * composer landing, ticket stamps) are CSS animations with the same numbers in `cinematic.css`, so they start before
+ * any JS chunk and are static under reduced motion; these values drive the Motion-powered pieces.
+ */
+export const cinematic = {
+  /** Kinetic type: per-letter duration and stagger; the pink copy lags 70 ms, the blue copy 140 ms. */
+  set: 0.42,
+  setStagger: 0.022,
+  /** Object landing: the composer drops on a spring. */
+  land: { type: "spring", stiffness: 320, damping: 26 } as const,
+  /** Stamped stagger: tickets and list entries. */
+  stamp: 0.18,
+  stampStagger: 0.06,
+  /** Label roll (nav rows, index label). */
+  roll: 0.26,
+  /** Scroll reveal. */
+  reveal: 0.42,
+  revealStagger: 0.04,
+} as const;
+
 /** `stamp`: entries of plates, dialogs, toasts and routes (180 ms `ease-ink`; exit is opacity only). */
 export const stampVariants = {
   initial: { opacity: 0, scale: 0.96 },

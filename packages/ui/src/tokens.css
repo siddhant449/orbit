@@ -31,7 +31,7 @@
   --on-overprint: #F7F6F2;
   --on-danger: #F7F6F2;
 
-  /* Rename map so screens re-skin rather than rewrite: jade -> accent. */
+  /* Role aliases so screens re-skin rather than rewrite when an ink changes. */
   --accent: var(--blue);
   --on-accent: var(--on-blue);
   --accent-soft: var(--stock-blue);
@@ -46,10 +46,9 @@
   --shadow-overlay: 6px 6px 0 0 var(--plate-shadow);
   --ease-ink: cubic-bezier(0.2, 0.7, 0.2, 1);
   --ease-exit: cubic-bezier(0.4, 0, 0.8, 0.4);
-  --grain-opacity: 0.07;
   --grain-blend: multiply;
-  /* One 128 px noise tile (section 5.4); the browser rasterises it once. */
-  --grain-tile: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='128'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='discrete' tableValues='0 0 0 0 0 .5 1'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='128' height='128' filter='url(%23g)'/%3E%3C/svg%3E");
+  /* One 128 px noise tile (section 5.4) with the day strength (.07) baked into its alpha table; rasterised once. */
+  --grain-tile: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='128'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='discrete' tableValues='0 0 0 0 0 .035 .07'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='128' height='128' filter='url(%23g)'/%3E%3C/svg%3E");
 }
 
 /* Night print: light ink on black stock, fully specified rather than inverted (section 2.3). */
@@ -79,8 +78,9 @@
   --on-blue: #16161D;
   --on-overprint: #16161D;
   --on-danger: #16161D;
-  --grain-opacity: 0.09;
   --grain-blend: screen;
+  /* Night strength .09, screened onto the black stock. */
+  --grain-tile: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='128'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='discrete' tableValues='0 0 0 0 0 .045 .09'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='128' height='128' filter='url(%23g)'/%3E%3C/svg%3E");
 }
 
 @theme inline {
@@ -133,8 +133,8 @@
 
 /*
  * Type scale (section 3.2). Two registers with a gap between them: Archivo display (wdth axis) and Hanken text.
- * The display steps carry their 390 px clamp; below 20 px nothing is fluid. Hanken steps read the weight that a
- * `font-medium` / `font-semibold` class sets, so a utility can still override the default weight.
+ * The display steps carry their 390 px clamp. Hanken steps read the weight that a `font-medium` / `font-semibold`
+ * class sets, so a utility can still override the default weight.
  */
 @utility type-display-1 {
   font-family: var(--font-display);
@@ -241,39 +241,28 @@
     color-scheme: dark;
   }
 
+  /*
+   * The desk: paper with static grain beneath everything (section 5.4, ruling U11). The grain is a background layer
+   * blended into the paper colour, so no text, input or button is ever painted under it, whatever its position.
+   */
   body {
-    background: var(--paper);
+    background-color: var(--paper);
+    background-image: var(--grain-tile);
+    background-size: 128px 128px;
+    background-blend-mode: var(--grain-blend);
     color: var(--ink);
     font-family: var(--font-sans);
     font-size: 14px;
     line-height: 1.45;
     -webkit-font-smoothing: antialiased;
   }
-
-  /*
-   * Static grain over the desk and the sheet (section 5.4), one 128 px tile. It sits at z-index 0 in tree order:
-   * in-flow content is under it, positioned elements (inputs, tables, dialogs, sticky bars) paint above it.
-   */
-  body::before {
-    content: "";
-    position: fixed;
-    inset: 0;
-    z-index: 0;
-    pointer-events: none;
-    background-image: var(--grain-tile);
-    background-size: 128px 128px;
-    opacity: var(--grain-opacity);
-    mix-blend-mode: var(--grain-blend);
-  }
   @media (forced-colors: active) {
-    body::before {
-      display: none;
+    body {
+      background-image: none;
     }
   }
 
-  /* Controls are opaque plates: lift them above the grain layer. */
   :where(input, textarea, select, table) {
-    position: relative;
     font-variant-numeric: tabular-nums;
   }
 

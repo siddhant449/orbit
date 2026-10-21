@@ -1,0 +1,637 @@
+/*
+ * Brandloop cinematic recipes (docs/design/micro-interactions.md section 9, riso-system.md section 10).
+ * Imported after tokens.css. Every sequence here is a CSS animation so it starts with first paint and renders its
+ * final frame under prefers-reduced-motion. Springs are CSS linear() curves sampled from the Motion presets
+ * (landing 320 / 26, press 500 / 30).
+ */
+
+@layer components {
+  /* ------------------------------------------------------------------ C2 kinetic heading */
+  .kinetic {
+    position: relative;
+    isolation: isolate;
+    white-space: nowrap;
+    --kinetic-delay: 160ms;
+    --kinetic-stagger: 22ms;
+  }
+  .kinetic__layer {
+    display: block;
+  }
+  .kinetic__layer--pink,
+  .kinetic__layer--blue {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    mix-blend-mode: multiply;
+  }
+  .kinetic__layer--pink {
+    color: var(--pink);
+    translate: calc(var(--misreg-display) * -1) calc(var(--misreg-display) * -0.5);
+    --layer-lag: 70ms;
+  }
+  .kinetic__layer--blue {
+    color: var(--blue);
+    translate: var(--misreg-display) calc(var(--misreg-display) * 0.5);
+    --layer-lag: 140ms;
+  }
+  :is(.dark, [data-theme="dark"]) :is(.kinetic__layer--pink, .kinetic__layer--blue) {
+    mix-blend-mode: screen;
+  }
+  .kinetic__word {
+    display: inline-block;
+    white-space: nowrap;
+  }
+  .kinetic__letter {
+    display: inline-block;
+    animation: kinetic-set 420ms var(--ease-ink) both;
+    animation-delay: calc(var(--kinetic-delay) + var(--i, 0) * var(--kinetic-stagger) + var(--layer-lag, 0ms));
+  }
+  .kinetic__br--wide {
+    display: none;
+  }
+  @media (min-width: 640px) {
+    .kinetic__br--wide {
+      display: inline;
+    }
+    .kinetic__br--narrow {
+      display: none;
+    }
+  }
+
+  /* ------------------------------------------------------------------ C5 object landing */
+  .land {
+    position: relative;
+    transform-origin: 50% 0;
+    animation: land-drop 540ms
+      linear(
+        0, 0.057, 0.19, 0.353, 0.516, 0.662, 0.783, 0.876, 0.944, 0.989, 1.016, 1.031, 1.036, 1.035, 1.031, 1.025,
+        1.019, 1.014, 1.009, 1.005, 1.003, 1.001, 1, 0.999, 0.999, 0.999, 1
+      )
+      both;
+    animation-delay: var(--land-delay, 520ms);
+  }
+  .land__plate {
+    position: absolute;
+    inset: 0;
+    background: var(--plate-shadow);
+    border-radius: inherit;
+    translate: 6px 6px;
+    animation: land-plate 220ms var(--ease-ink) both;
+    animation-delay: calc(var(--land-delay, 520ms) + 160ms);
+  }
+  .land__sheet {
+    position: relative;
+  }
+
+  /* ------------------------------------------------------------------ C6 stamped tickets */
+  .ticket {
+    position: relative;
+    display: inline-flex;
+    height: 32px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-control);
+    background: transparent;
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    line-height: 1;
+    white-space: nowrap;
+  }
+  .ticket__plate {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    transition: translate 180ms var(--ease-ink);
+  }
+  .ticket__plate--pink {
+    background: var(--pink);
+    translate: -2px 2px;
+  }
+  .ticket__plate--blue {
+    background: var(--blue);
+    translate: 2px -2px;
+  }
+  .ticket:hover .ticket__plate--pink,
+  .ticket:focus-visible .ticket__plate--pink {
+    translate: 2px -2px;
+  }
+  .ticket:hover .ticket__plate--blue,
+  .ticket:focus-visible .ticket__plate--blue {
+    translate: -2px 2px;
+  }
+  .ticket:active {
+    translate: 1px 1px;
+  }
+  .ticket__face {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 100%;
+    padding: 0 12px 0 16px;
+    border: 1px solid var(--keyline);
+    border-radius: inherit;
+    background: var(--surface);
+  }
+  .ticket__perf {
+    position: absolute;
+    left: 7px;
+    top: 3px;
+    bottom: 3px;
+    border-left: 1px dashed var(--line-strong);
+  }
+  .ticket__icon {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    stroke-width: 2;
+  }
+  .ticket__label {
+    position: relative;
+    display: block;
+    height: 16px;
+    line-height: 16px;
+    overflow: hidden;
+  }
+  .ticket__text {
+    display: block;
+    transition: translate 200ms var(--ease-ink);
+  }
+  .ticket__text--dup {
+    position: absolute;
+    inset: 0;
+    translate: 0 100%;
+  }
+  .ticket:hover .ticket__text,
+  .ticket:focus-visible .ticket__text {
+    translate: 0 -100%;
+  }
+  .ticket:hover .ticket__text--dup,
+  .ticket:focus-visible .ticket__text--dup {
+    translate: 0 0;
+  }
+  .ticket--stamp {
+    animation: stamp-in 180ms var(--ease-ink) both;
+    animation-delay: calc(var(--stamp-delay, 820ms) + var(--i, 0) * 60ms);
+  }
+
+  /* ------------------------------------------------------------------ Buttons (B1–B4) */
+  .btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border: 0;
+    border-radius: var(--radius-control);
+    background: transparent;
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .btn svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+  }
+  .btn:disabled {
+    pointer-events: none;
+  }
+  .btn--sm {
+    height: 32px;
+    font-size: 13px;
+  }
+  .btn--md {
+    height: 36px;
+  }
+  .btn--icon {
+    width: 32px;
+    height: 32px;
+  }
+  .btn--icon-lg {
+    width: 40px;
+    height: 40px;
+  }
+  .btn--sm.btn--flat,
+  .btn--sm > .btn__face {
+    padding: 0 12px;
+  }
+  .btn--md.btn--flat,
+  .btn--md > .btn__face {
+    padding: 0 16px;
+  }
+  .btn--icon.btn--flat,
+  .btn--icon > .btn__face,
+  .btn--icon-lg.btn--flat,
+  .btn--icon-lg > .btn__face {
+    padding: 0;
+  }
+
+  /* Plated: the button is the static ink plate; the face moves onto it. */
+  .btn--plated {
+    isolation: isolate;
+    padding: 0 3px 3px 0;
+    background: var(--plate-shadow);
+  }
+  .btn__face {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    height: 100%;
+    border: 1px solid var(--keyline);
+    border-radius: inherit;
+    translate: 0 0;
+    transition: translate 300ms
+      linear(0, 0.072, 0.237, 0.431, 0.618, 0.774, 0.894, 0.976, 1.026, 1.051, 1.058, 1.055, 1.046, 1.034, 1.023, 1.014, 1);
+  }
+  .btn--plated:active > .btn__face,
+  .btn--plated[data-pressed] > .btn__face {
+    translate: 3px 3px;
+    transition-duration: 120ms;
+  }
+  .btn--primary > .btn__face {
+    background: var(--ink);
+    color: var(--on-ink);
+  }
+  .btn--generate > .btn__face {
+    background: var(--blue);
+    color: var(--on-blue);
+  }
+  .btn--danger > .btn__face {
+    background: var(--danger);
+    color: var(--on-danger);
+  }
+  .btn--plated:disabled {
+    background: transparent;
+  }
+  .btn--plated:disabled > .btn__face {
+    background: var(--surface-sunk);
+    color: var(--ink-faint);
+    border-color: var(--line-strong);
+  }
+  /* B2: misregistered pink and blue plates behind the face on hover and focus. */
+  .btn--primary > .btn__face::before,
+  .btn--primary > .btn__face::after,
+  .btn--generate > .btn__face::before,
+  .btn--generate > .btn__face::after,
+  .btn--danger > .btn__face::before,
+  .btn--danger > .btn__face::after {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    z-index: -1;
+    border-radius: inherit;
+    transition: translate 200ms var(--ease-ink);
+  }
+  .btn--plated > .btn__face::before {
+    background: var(--pink);
+  }
+  .btn--plated > .btn__face::after {
+    background: var(--blue);
+  }
+  .btn--danger > .btn__face::after {
+    background: var(--ink);
+  }
+  .btn--plated:hover > .btn__face::before,
+  .btn--plated:focus-visible > .btn__face::before {
+    translate: -2px -1px;
+  }
+  .btn--plated:hover > .btn__face::after,
+  .btn--plated:focus-visible > .btn__face::after {
+    translate: 2px 1px;
+  }
+
+  /* Flat variants. */
+  .btn--flat {
+    border: 1px solid transparent;
+  }
+  .btn--secondary {
+    isolation: isolate;
+    overflow: hidden;
+    border-color: var(--keyline);
+    transition: color 220ms var(--ease-ink);
+  }
+  .btn--secondary::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: var(--ink);
+    clip-path: circle(0 at var(--soak-x, 0%) var(--soak-y, 50%));
+    transition: clip-path 220ms var(--ease-ink);
+  }
+  .btn--secondary:hover,
+  .btn--secondary:focus-visible {
+    color: var(--on-ink);
+  }
+  .btn--secondary:hover::before,
+  .btn--secondary:focus-visible::before {
+    clip-path: circle(150% at var(--soak-x, 0%) var(--soak-y, 50%));
+  }
+  .btn--secondary:active {
+    translate: 1px 1px;
+  }
+  .btn--secondary:disabled {
+    border-color: var(--line-strong);
+    color: var(--ink-faint);
+  }
+  .btn--ghost {
+    color: var(--ink-muted);
+    transition:
+      background-color 150ms var(--ease-ink),
+      color 150ms var(--ease-ink),
+      rotate 150ms var(--ease-ink),
+      scale 150ms var(--ease-ink);
+  }
+  .btn--ghost:hover,
+  .btn--ghost:focus-visible {
+    background: var(--surface-sunk);
+    color: var(--ink);
+  }
+  .btn--ghost:active {
+    translate: 1px 1px;
+  }
+  .btn--icon.btn--ghost:active,
+  .btn--icon-lg.btn--ghost:active {
+    translate: 0 0;
+    rotate: 6deg;
+    scale: 0.94;
+  }
+  .btn--ghost:disabled {
+    color: var(--ink-faint);
+  }
+
+  /* ------------------------------------------------------------------ C7 printed index: nav rows */
+  .nav-row {
+    position: relative;
+    isolation: isolate;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 36px;
+    padding: 0 10px;
+    border-radius: var(--radius-control);
+    color: var(--ink-muted);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1;
+    transition: color 200ms var(--ease-ink);
+  }
+  .nav-row__bar {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: var(--ink);
+    border-radius: inherit;
+    transform-origin: left center;
+    scale: 0 1;
+    transition: scale 120ms var(--ease-exit);
+  }
+  .nav-row:hover,
+  .nav-row:focus-visible,
+  .nav-row[aria-current="page"] {
+    color: var(--on-ink);
+  }
+  .nav-row:hover > .nav-row__bar,
+  .nav-row:focus-visible > .nav-row__bar,
+  .nav-row[aria-current="page"] > .nav-row__bar {
+    scale: 1 1;
+    transition: scale 200ms var(--ease-ink);
+  }
+  .nav-row svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+  }
+  .nav-row__label {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    height: 18px;
+    line-height: 18px;
+    overflow: hidden;
+  }
+  .nav-row__text {
+    display: block;
+    transition: translate 200ms var(--ease-ink);
+  }
+  .nav-row__text--dup {
+    position: absolute;
+    inset: 0;
+    translate: 0 100%;
+  }
+  .nav-row:hover > .nav-row__label > .nav-row__text,
+  .nav-row:focus-visible > .nav-row__label > .nav-row__text {
+    translate: 0 -100%;
+  }
+  .nav-row:hover > .nav-row__label > .nav-row__text--dup,
+  .nav-row:focus-visible > .nav-row__label > .nav-row__text--dup {
+    translate: 0 0;
+  }
+  .nav-row--icon {
+    width: 36px;
+    justify-content: center;
+    padding: 0;
+  }
+
+  /* The index label at the foot of the sidebar: the page name set huge and clipped by the edge. */
+  .index-label {
+    position: absolute;
+    left: 10px;
+    right: 0;
+    bottom: 64px;
+    height: 92px;
+    overflow: hidden;
+    pointer-events: none;
+    user-select: none;
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-stretch: 125%;
+    font-size: 88px;
+    line-height: 1;
+    letter-spacing: -0.035em;
+    color: var(--ghost);
+    white-space: nowrap;
+  }
+  .index-label > span {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    display: block;
+  }
+  @media (max-height: 620px) {
+    .index-label {
+      display: none;
+    }
+  }
+
+  /* ------------------------------------------------------------------ Drafting table: desk crosses and ruler */
+  .reg-cross {
+    position: fixed;
+    width: 9px;
+    height: 9px;
+    pointer-events: none;
+    z-index: 1;
+  }
+  .reg-cross::before,
+  .reg-cross::after {
+    content: "";
+    position: absolute;
+    background: var(--line-strong);
+  }
+  .reg-cross::before {
+    left: 4px;
+    top: 0;
+    width: 1px;
+    height: 9px;
+  }
+  .reg-cross::after {
+    top: 4px;
+    left: 0;
+    width: 9px;
+    height: 1px;
+  }
+  .ruler {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 24px;
+    width: 1px;
+    background: var(--line);
+    pointer-events: none;
+    z-index: 1;
+  }
+  .ruler::before,
+  .ruler::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+  }
+  .ruler::before {
+    left: -4px;
+    width: 4px;
+    background-image: repeating-linear-gradient(to bottom, var(--line-strong) 0 1px, transparent 1px 32px);
+  }
+  .ruler::after {
+    left: -8px;
+    width: 8px;
+    background-image: repeating-linear-gradient(to bottom, var(--line-strong) 0 1px, transparent 1px 128px);
+  }
+
+  /* ------------------------------------------------------------------ C4 dither field */
+  .dither {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+    opacity: 0;
+    transition: opacity 600ms var(--ease-ink);
+  }
+  .dither[data-ready],
+  .dither--static {
+    opacity: 1;
+  }
+  .dither__canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    image-rendering: pixelated;
+    opacity: 0.42;
+  }
+  .dither--static {
+    background-image:
+      radial-gradient(circle, var(--pink) 0.6px, transparent 0.9px),
+      radial-gradient(circle, var(--blue) 0.6px, transparent 0.9px);
+    background-size: 6px 6px;
+    background-position:
+      0 0,
+      3px 3px;
+    opacity: 0.22;
+    clip-path: ellipse(60% 50% at 50% 60%);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .kinetic__letter,
+    .land,
+    .land__plate,
+    .ticket--stamp {
+      animation: none;
+    }
+    .nav-row__bar,
+    .nav-row__text,
+    .ticket__plate,
+    .ticket__text,
+    .btn__face,
+    .btn__face::before,
+    .btn__face::after,
+    .btn--secondary,
+    .btn--secondary::before,
+    .dither {
+      transition: none;
+    }
+  }
+}
+
+@keyframes kinetic-set {
+  from {
+    opacity: 0;
+    translate: 0 0.18em;
+    font-stretch: 75%;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+    font-stretch: 125%;
+  }
+}
+@keyframes land-drop {
+  from {
+    opacity: 0;
+    translate: 0 -28px;
+    rotate: -1.2deg;
+    scale: 1.02;
+  }
+  18% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+    rotate: 0deg;
+    scale: 1;
+  }
+}
+@keyframes land-plate {
+  from {
+    translate: 0 0;
+  }
+  to {
+    translate: 6px 6px;
+  }
+}
+@keyframes stamp-in {
+  from {
+    opacity: 0;
+    scale: 1.12;
+    rotate: -2deg;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+    rotate: 0deg;
+  }
+}

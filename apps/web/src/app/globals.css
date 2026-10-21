@@ -1,5 +1,40 @@
 @import "tailwindcss";
 @import "@brandloop/ui/tokens.css";
+@import "@brandloop/ui/cinematic.css";
 @import "lenis/dist/lenis.css";
 
 @custom-variant dark (&:where(.dark, .dark *));
+
+
+/* Radix open / close states (dialogs, drawer, menus): stamp in, fade out. Reduced motion is clamped globally. */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes plate-in {
+  from {
+    opacity: 0;
+    scale: 0.96;
+  }
+}
+@keyframes drawer-in {
+  from {
+    translate: -100% 0;
+  }
+}
+@keyframes drawer-out {
+  to {
+    translate: -100% 0;
+  }
+}
+
+/* Focus moved to a heading after a route change is announced, not ringed: headings are not operable. */
+h1[tabindex="-1"]:focus-visible {
+  outline: none;
+}
