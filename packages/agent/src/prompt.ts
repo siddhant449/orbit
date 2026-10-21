@@ -1,6 +1,7 @@
 import { GOALS, type Goal } from "@brandloop/ai";
 import { getSelectedVoice, getStrategy, listMemory, prisma, renderMemoryIndex } from "@brandloop/db";
 import type { TurnContext } from "./context";
+import { defuseTags } from "./data";
 import { renderActiveTask } from "./ledger";
 import type { ActiveTask } from "./types";
 
@@ -51,13 +52,7 @@ export const STATIC_PREFIX = `You are Brandloop's writing partner for one person
 - Output starting with "Refused:": the step was not allowed. Don't retry the same call; explain in one sentence if it matters.
 `;
 
-/** Our own context tags; their closing (or opening) form inside data must not end the block early. */
-const TAG = /<(\/?)(profile|memory_index|active_task|composer|open_document|skills|flow|context)\b/gi;
-
-/** Neutralise anything inside data that looks like one of our tags, so data can't close its block. */
-function data(text: string): string {
-  return text.replace(TAG, "‹$1$2");
-}
+const data = defuseTags;
 
 const attr = (text: string) => data(text).replace(/[\s"<>]+/g, " ").trim();
 

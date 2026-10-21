@@ -134,7 +134,7 @@ describe("buildTools", () => {
   it("getContentStrategy explains a missing strategy", async () => {
     const ctx = await testContext();
     const out = await buildTools(ctx).getContentStrategy.execute!({}, { toolCallId: "c", messages: [], context: {} as never });
-    expect(out).toMatch(/^No content strategy yet/);
+    expect(out).toContain("No content strategy yet"); // framed as strategy data since fix round 1
     await prisma.strategy.create({ data: { profileId: ctx.profileId, positioning: "Design ops", tagline: "Calm ops" } });
     const out2 = (await buildTools(ctx).getContentStrategy.execute!({}, { toolCallId: "c", messages: [], context: {} as never })) as string;
     expect(out2).toContain("Positioning: Design ops");

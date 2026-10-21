@@ -16,8 +16,9 @@ import {
 import { tool } from "ai";
 import { z } from "zod";
 import type { TurnContext } from "../context";
+import { oneLine } from "../data";
 import { checkMemoryFact } from "../guard";
-import { capOutput } from "./cap";
+import { runTool } from "./run";
 
 export const MEMORY_EMPTY = "Memory is empty. Nothing has been saved about this user yet.";
 const REFUSED_ASSISTANT =
@@ -70,7 +71,7 @@ export async function readMemoryText(profileId: string, path: string): Promise<s
 
 export async function searchMemoryText(profileId: string, query: string): Promise<string> {
   const hits = searchMemoryLines(await listMemory(profileId), query);
-  if (hits.length === 0) return `No memory lines match "${query}".`;
+  if (hits.length === 0) return `No memory lines match "${oneLine(query)}".`;
   return hits.map((h) => `${h.path}: ${h.text}`).join("\n");
 }
 
@@ -137,7 +138,13 @@ export async function editMemoryText(
     }
   }
 
-  const result = await replaceInSection(profileId, key, input.find, input.replace, "EXTRACTED");
+  // Keep the section's source (a USER section stays USER), as appendMemoryLines does.
+  const existing = await prisma.memoryDoc.findUnique({
+    where: { profileId_key: { profileId, key } },
+    select: { source: true },
+  });
+  if (!existing) return missingFile(path);
+  const result = await replaceInSection(profileId, key, input.find, input.replace, existing.source);
   if (result.ok) return `✓ Updated ${path} (memory version ${result.version})`;
   if (result.reason === "missing_section") return missingFile(path);
   if (result.reason === "not_found") {
@@ -153,17 +160,18 @@ export function memoryTools(ctx: TurnContext) {
       description:
         "List the user's memory files (path, description, last update). With includeContents, also return the identity and writing-rules files in full.",
       inputSchema: z.object({ includeContents: z.boolean().nullable() }),
-      execute: async ({ includeContents }) => capOutput(await viewMemoryText(profileId, includeContents ?? false)),
+      execute: ({ includeContents }) =>
+        runTool("viewMemory", "memory", () => viewMemoryText(profileId, includeContents ?? false)),
     }),
     readMemory: tool({
       description: "Read one memory file verbatim, for example identity/about.md or voice/style.md.",
       inputSchema: z.object({ path: z.string().min(1).max(200) }),
-      execute: async ({ path }) => capOutput(await readMemoryText(profileId, path)),
+      execute: ({ path }) => runTool("readMemory", "memory", () => readMemoryText(profileId, path)),
     }),
     searchMemory: tool({
       description: "Find saved memory lines that contain any of the query words.",
       inputSchema: z.object({ query: z.string().min(1).max(500) }),
-      execute: async ({ query }) => capOutput(await searchMemoryText(profileId, query)),
+      execute: ({ query }) => runTool("searchMemory", "memory", () => searchMemoryText(profileId, query)),
     }),
     saveMemory: tool({
       description:
@@ -173,7 +181,7 @@ export function memoryTools(ctx: TurnContext) {
         topic: z.string().max(80).nullable(),
         facts: z.array(z.string().max(1000)).min(1).max(10),
       }),
-      execute: async (input) => capOutput(await saveMemoryFacts(profileId, input)),
+      execute: (input) => runTool("saveMemory", null, () => saveMemoryFacts(profileId, input)),
     }),
     editMemory: tool({
       description:
@@ -183,7 +191,7 @@ export function memoryTools(ctx: TurnContext) {
         find: z.string().max(2000),
         replace: z.string().max(2000),
       }),
-      execute: async (input) => capOutput(await editMemoryText(profileId, input)),
+      execute: (input) => runTool("editMemory", null, () => editMemoryText(profileId, input)),
     }),
   };
 }

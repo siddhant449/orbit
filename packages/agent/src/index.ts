@@ -20,3 +20,5 @@ export {
 export { knowledgeTools, listKBText, readKBText, searchKBText } from "./tools/knowledge";
 export { strategyMarkdown, strategyTools } from "./tools/strategy";
 export { capOutput } from "./tools/cap";
+export { defuseTags, frameData, oneLine, type DataSource } from "./data";
+export { MEMORY_CONFLICT, runTool } from "./tools/run";

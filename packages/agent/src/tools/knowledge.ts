@@ -4,7 +4,9 @@ import { tool } from "ai";
 import { z } from "zod";
 import type { TurnContext } from "../context";
 import { LIMITS } from "../limits";
+import { oneLine } from "../data";
 import { capOutput } from "./cap";
+import { runTool } from "./run";
 
 /** Items up to this size are inlined whole in searchKB; larger ones show their best chunks. */
 export const INLINE_ITEM_CHARS = 2_000;
@@ -22,18 +24,40 @@ export async function listKBText(profileId: string, opts: { type: KnowledgeType 
     return opts.type ? `The knowledge base has no ${typeName(opts.type)} items.` : "The knowledge base is empty.";
   }
   return rows
-    .map((i) => `${i.id} | ${i.title} | ${typeName(i.type)} | ${i.status.toLowerCase()} | ${isoDay(i.createdAt)}`)
+    .map((i) => `${i.id} | ${oneLine(i.title)} | ${typeName(i.type)} | ${i.status.toLowerCase()} | ${isoDay(i.createdAt)}`)
     .join("\n");
 }
 
-/** Plain-text records, best match first; no scores (Kleo's observed format). */
+/** Body lines that could pass for a record boundary or a record header are indented so they stay content. */
+function inertBody(text: string): string {
+  return text.replace(/^(---+\s*$|(?:id|title|type|content):)/gim, " $1");
+}
+
+/** Header, separators and the "more results" note must fit inside the tool cap alongside the records. */
+const SEARCH_BUDGET = LIMITS.toolOutputChars - 200;
+
+async function searchHits(profileId: string, embedder: Embedder | null, query: string, limit: number) {
+  if (!embedder) return hybridSearch(profileId, query, { embedder: null, limit });
+  try {
+    return await hybridSearch(profileId, query, { embedder, limit });
+  } catch (err) {
+    // A failing embedder or vector query must not cost the user their search: retry on full-text only.
+    console.warn(`[agent] searchKB: vector search failed, using full-text only: ${err instanceof Error ? err.message : String(err)}`);
+    return hybridSearch(profileId, query, { embedder: null, limit });
+  }
+}
+
+/**
+ * Plain-text records, best match first; no scores (Kleo's observed format). Records are never cut:
+ * when the next one would pass the budget, it and the rest are dropped and counted in a closing note.
+ */
 export async function searchKBText(
   profileId: string,
   embedder: Embedder | null,
   query: string,
   limit: number,
 ): Promise<string> {
-  const hits = await hybridSearch(profileId, query, { embedder, limit: Math.max(1, Math.min(limit, 20)) });
+  const hits = await searchHits(profileId, embedder, query, Math.max(1, Math.min(limit, 20)));
   const ids = hits.filter((h) => h.sourceType === "KNOWLEDGE").map((h) => h.sourceId);
   const items = ids.length
     ? await prisma.knowledgeItem.findMany({ where: { profileId, id: { in: ids }, status: "READY" } })
@@ -49,22 +73,37 @@ export async function searchKBText(
       full.length > 0 && full.length <= INLINE_ITEM_CHARS
         ? full
         : `${[...hit.chunks].sort((a, b) => a.ordinal - b.ordinal).map((c) => c.text.trim()).join("\n\n[…]\n\n")}\n\n${EXCERPT_NOTE}`;
-    records.push(`id: ${item.id}\ntitle: ${item.title}\ntype: ${typeName(item.type)}\ncontent:\n${body}`);
+    records.push(`id: ${oneLine(item.id)}\ntitle: ${oneLine(item.title)}\ntype: ${typeName(item.type)}\ncontent:\n${inertBody(body)}`);
   }
-  if (records.length === 0) return `No knowledge base items match "${query}".`;
-  return records.join(RECORD_SEPARATOR);
+  if (records.length === 0) return `No knowledge base items match "${oneLine(query)}".`;
+
+  const kept: string[] = [];
+  let used = 0;
+  for (const record of records) {
+    const cost = record.length + (kept.length > 0 ? RECORD_SEPARATOR.length : 0);
+    if (used + cost > SEARCH_BUDGET) {
+      // A single record over budget (not expected: inline ≤2,000, two chunks ≤~6,400) is cut rather than lost.
+      if (kept.length === 0) kept.push(`${record.slice(0, SEARCH_BUDGET - 60)}\n\n${EXCERPT_NOTE}`);
+      break;
+    }
+    kept.push(record);
+    used += cost;
+  }
+  const dropped = records.length - kept.length;
+  const note = dropped > 0 ? `\n\n(${dropped} more ${dropped === 1 ? "result" : "results"} not shown)` : "";
+  return kept.join(RECORD_SEPARATOR) + note;
 }
 
 export async function readKBText(profileId: string, id: string): Promise<string> {
   const item = await getProfileKnowledge(profileId, id);
-  if (!item) return `Failed: no knowledge base item with id ${id}.`;
+  if (!item) return `Failed: no knowledge base item with id ${oneLine(id)}.`;
   if (item.status === "PROCESSING") {
-    return `"${item.title}" is still being processed. Try readKB again in a minute, or carry on without it.`;
+    return `"${oneLine(item.title)}" is still being processed. Try readKB again in a minute, or carry on without it.`;
   }
   if (item.status === "FAILED" || !item.content) {
-    return `Failed: "${item.title}" couldn't be read when it was added. The user can re-add it on the Knowledge page.`;
+    return `Failed: "${oneLine(item.title)}" couldn't be read when it was added. The user can re-add it on the Knowledge page.`;
   }
-  return capOutput(`# ${item.title}\n\nType: ${typeName(item.type)}\n\nContent:\n${item.content}`, LIMITS.readKBChars);
+  return capOutput(`# ${oneLine(item.title)}\n\nType: ${typeName(item.type)}\n\nContent:\n${item.content}`, LIMITS.readKBChars);
 }
 
 export function knowledgeTools(ctx: TurnContext) {
@@ -76,8 +115,10 @@ export function knowledgeTools(ctx: TurnContext) {
         type: z.enum(KB_TYPES).nullable(),
         limit: z.number().int().min(1).max(50).nullable(),
       }),
-      execute: async ({ type, limit }) =>
-        capOutput(await listKBText(profileId, { type: type ? (type.toUpperCase() as KnowledgeType) : null, limit: limit ?? 20 })),
+      execute: ({ type, limit }) =>
+        runTool("listKB", "knowledge base", () =>
+          listKBText(profileId, { type: type ? (type.toUpperCase() as KnowledgeType) : null, limit: limit ?? 20 }),
+        ),
     }),
     searchKB: tool({
       description:
@@ -86,12 +127,13 @@ export function knowledgeTools(ctx: TurnContext) {
         query: z.string().min(1).max(500),
         limit: z.number().int().min(1).max(20).nullable(),
       }),
-      execute: async ({ query, limit }) => capOutput(await searchKBText(profileId, ctx.embedder, query, limit ?? 10)),
+      execute: ({ query, limit }) =>
+        runTool("searchKB", "knowledge base", () => searchKBText(profileId, ctx.embedder, query, limit ?? 10)),
     }),
     readKB: tool({
       description: "Read the full text of one knowledge base item by id.",
       inputSchema: z.object({ id: z.string().min(1).max(100) }),
-      execute: async ({ id }) => readKBText(profileId, id),
+      execute: ({ id }) => runTool("readKB", "knowledge base", () => readKBText(profileId, id), LIMITS.readKBChars + 200),
     }),
   };
 }

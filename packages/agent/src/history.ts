@@ -50,7 +50,9 @@ export function windowHistory(messages: ChatUIMessage[], opts: Partial<WindowOpt
     return { ...m, parts };
   });
 
-  // Drop the oldest messages to fit, but never past the newest user message.
+  // Drop the oldest messages to fit, but never past the newest user message. A single newest user
+  // message larger than the budget is still sent whole: the route rejects anything over
+  // LIMITS.messageChars with a 413 before it gets here, so that size is bounded.
   const lastUser = window.findLastIndex((m) => m.role === "user");
   let first = 0;
   let total = window.reduce((s, m) => s + size(m), 0);

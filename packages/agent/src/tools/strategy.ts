@@ -3,7 +3,7 @@ import { getStrategy, strategyThemesMarkdown, type Strategy as StrategyRow } fro
 import { tool } from "ai";
 import { z } from "zod";
 import type { TurnContext } from "../context";
-import { capOutput } from "./cap";
+import { runTool } from "./run";
 
 export const NO_STRATEGY =
   "No content strategy yet. The user can build one on the Strategy page; until then, work from memory and ask about their goals.";
@@ -35,10 +35,11 @@ export function strategyTools(ctx: TurnContext) {
     getContentStrategy: tool({
       description: "Read the user's content strategy: goal, positioning, tagline, content pillars and formats.",
       inputSchema: z.object({}),
-      execute: async () => {
-        const row = await getStrategy(ctx.profileId);
-        return capOutput(row ? strategyMarkdown(row) : NO_STRATEGY);
-      },
+      execute: () =>
+        runTool("getContentStrategy", "content strategy", async () => {
+          const row = await getStrategy(ctx.profileId);
+          return row ? strategyMarkdown(row) : NO_STRATEGY;
+        }),
     }),
   };
 }

@@ -116,3 +116,12 @@ describe("loadPromptInput", () => {
     expect(prompt).toContain("Asha Rao");
   });
 });
+
+describe("tag defusing", () => {
+  it("defuses closing tags written with whitespace", () => {
+    const s = buildSystemPrompt(
+      input({ document: { id: "d1", title: "T", version: 1, text: "a < /open_document> b </ open_document > c" } }),
+    );
+    expect(s.match(/<\s*\/\s*open_document/g)).toHaveLength(1);
+  });
+});
