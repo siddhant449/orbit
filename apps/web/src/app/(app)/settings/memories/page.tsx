@@ -4,6 +4,7 @@ import { PageBody, PageHeader } from "@/components/page";
 import { AddMemory } from "@/components/memories/add-memory";
 import { ImportDialog } from "@/components/memories/import-dialog";
 import { MemoryCard, type MemoryGroupView } from "@/components/memories/memory-card";
+import { Reveal } from "@brandloop/ui";
 
 export const metadata = { title: "Memories" };
 
@@ -56,6 +57,7 @@ export default async function Page() {
           </div>
         ) : (
           <>
+            <Reveal index={0}>
             <MemoryCard
               title="Identity"
               description="Background and details we use to ground your posts."
@@ -63,6 +65,8 @@ export default async function Page() {
               updated={latest(identity)}
               addKey={MEMORY_KEYS.personal}
             />
+            </Reveal>
+            <Reveal index={1}>
             <MemoryCard
               title="Writing preferences"
               description="Your rules for how your posts are written."
@@ -70,6 +74,8 @@ export default async function Page() {
               updated={latest(rules)}
               addKey={MEMORY_KEYS.rules}
             />
+            </Reveal>
+            <Reveal index={2}>
             <MemoryCard
               title="Voice"
               description="How your writing sounds, in your own patterns."
@@ -77,6 +83,8 @@ export default async function Page() {
               updated={latest(voice)}
               addKey={MEMORY_KEYS.voice}
             />
+            </Reveal>
+            <Reveal index={3}>
             <MemoryCard
               title="Topics you know"
               description="What you can speak about with authority, one topic at a time."
@@ -84,13 +92,16 @@ export default async function Page() {
               updated={latest(topics)}
               addTopic
             />
+            </Reveal>
             {strategy.length > 0 && (
-              <MemoryCard
-                title="Strategy notes"
-                description="Decisions about audience and goals that shape what we suggest."
-                groups={strategy.map((d) => group(d, titleCase(d.key.split("/")[1]!)))}
-                updated={latest(strategy)}
-              />
+              <Reveal index={4}>
+                <MemoryCard
+                  title="Strategy notes"
+                  description="Decisions about audience and goals that shape what we suggest."
+                  groups={strategy.map((d) => group(d, titleCase(d.key.split("/")[1]!)))}
+                  updated={latest(strategy)}
+                />
+              </Reveal>
             )}
           </>
         )}

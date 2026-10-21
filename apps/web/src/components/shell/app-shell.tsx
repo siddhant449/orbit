@@ -4,12 +4,13 @@ import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Dialog } from "radix-ui";
 import { Menu, X } from "lucide-react";
-import { Button } from "@brandloop/ui";
+import { Button, SmoothScroll, cn } from "@brandloop/ui";
 import type { ShellAccount } from "@/lib/account";
 import { sectionFor } from "@/lib/nav";
 import { AccountProvider } from "./account-context";
 import { CommandPalette } from "./command-palette";
 import { Logo } from "./logo";
+import { RouteFocus } from "./route-focus";
 import { MainSidebar, Rail, SectionPanel } from "./sidebar";
 
 const COLLAPSED_KEY = "brandloop:sidebar-collapsed";
@@ -40,6 +41,18 @@ function subscribeCollapsed(onChange: () => void) {
   };
 }
 
+/** Registration crosses at the four corners of the desk (riso-system.md section 5.7). */
+function RegistrationMarks() {
+  return (
+    <div aria-hidden="true" className="hidden md:contents">
+      <span className="reg-cross left-3 top-3" />
+      <span className="reg-cross right-3 top-3" />
+      <span className="reg-cross bottom-3 left-3" />
+      <span className="reg-cross bottom-3 right-3" />
+    </div>
+  );
+}
+
 export function AppShell({ account, children }: { account: ShellAccount; children: ReactNode }) {
   const pathname = usePathname();
   const section = sectionFor(pathname);
@@ -66,46 +79,57 @@ export function AppShell({ account, children }: { account: ShellAccount; childre
   }, [toggleCollapsed]);
 
   const openSearch = () => setPaletteOpen(true);
+  const asideWidth = section ? 56 + 228 : collapsed ? 56 : 248;
 
   return (
     <AccountProvider account={account}>
       <div className="flex h-svh">
-        <aside aria-label="Sidebar" className="hidden shrink-0 md:flex">
+        <RegistrationMarks />
+        <aside
+          aria-label="Sidebar"
+          style={{ width: asideWidth }}
+          className={cn(
+            "hidden shrink-0 overflow-hidden md:flex",
+            "motion-safe:transition-[width] motion-safe:duration-[240ms] motion-safe:ease-[var(--ease-ink)]",
+          )}
+        >
           {section ? (
             <>
               <Rail onSearch={openSearch} />
-              <div className="w-[228px]">
-                <SectionPanel section={section} />
-              </div>
+              <SectionPanel section={section} />
             </>
           ) : collapsed ? (
             <Rail onSearch={openSearch} onExpand={toggleCollapsed} />
           ) : (
-            <div className="w-[248px]">
-              <MainSidebar onSearch={openSearch} onCollapse={toggleCollapsed} />
-            </div>
+            <MainSidebar onSearch={openSearch} onCollapse={toggleCollapsed} />
           )}
         </aside>
 
         <main className="flex min-w-0 flex-1 flex-col md:py-3 md:pr-3">
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-surface md:rounded-card md:border md:border-line">
+          <div
+            data-sheet=""
+            className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-surface md:rounded-card md:border md:border-keyline md:shadow-raised"
+          >
             <div className="flex h-14 shrink-0 items-center justify-between border-b border-line px-4 md:hidden">
               <Logo />
               <Button variant="ghost" size="icon" onClick={() => setDrawerOpen(true)} aria-label="Open navigation">
                 <Menu />
               </Button>
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
+            <span aria-hidden="true" className="ruler hidden md:block" />
+            <SmoothScroll className="min-h-0 flex-1 overflow-y-auto md:pl-8">{children}</SmoothScroll>
+            <RouteFocus />
           </div>
         </main>
       </div>
 
       <Dialog.Root open={drawerOpen} onOpenChange={setDrawerOpen}>
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-40 bg-ink/30 md:hidden" />
+          <Dialog.Overlay className="fixed inset-0 z-40 bg-ink/40 data-[state=closed]:animate-[fade-out_180ms_var(--ease-exit)_both] data-[state=open]:animate-[fade-in_240ms_var(--ease-ink)_both] md:hidden" />
           <Dialog.Content
             aria-describedby={undefined}
-            className="fixed inset-y-0 left-0 z-40 flex w-[min(300px,86vw)] flex-col bg-paper shadow-xl md:hidden"
+            data-lenis-prevent
+            className="fixed inset-y-0 left-0 z-40 flex w-[min(300px,86vw)] flex-col border-r border-keyline bg-paper data-[state=closed]:animate-[drawer-out_180ms_var(--ease-exit)_both] data-[state=open]:animate-[drawer-in_260ms_var(--ease-ink)_both] md:hidden"
           >
             <Dialog.Title className="sr-only">Navigation</Dialog.Title>
             <Dialog.Close asChild>

@@ -1,10 +1,14 @@
 import type { ReactNode } from "react";
 import { cn } from "@brandloop/ui";
 
+/** Sticky page header: opaque surface, title-2 after a short keyline rule (riso-system.md section 9). */
 export function PageHeader({ title, actions }: { title: string; actions?: ReactNode }) {
   return (
-    <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b border-line bg-surface/90 px-6 backdrop-blur">
-      <h1 className="font-display text-[17px] font-semibold tracking-[-0.01em]">{title}</h1>
+    <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b border-line bg-surface px-6">
+      <h1 className="type-title-2 flex items-center gap-3 focus-visible:outline-none">
+        <span aria-hidden="true" className="h-5 w-px bg-keyline" />
+        {title}
+      </h1>
       {actions}
     </header>
   );
@@ -16,10 +20,10 @@ export function Upcoming({ title, description, points }: { title: string; descri
     <>
       <PageHeader title={title} />
       <div className="mx-auto max-w-xl px-6 py-16">
-        <p className="text-[15px] leading-relaxed text-ink">{description}</p>
-        <ul className="mt-6 space-y-2.5 border-l-2 border-accent-soft pl-4">
+        <p className="type-body text-ink">{description}</p>
+        <ul className="mt-6 space-y-2.5 border-l border-keyline pl-4">
           {points.map((point) => (
-            <li key={point} className="text-sm leading-relaxed text-ink-muted">
+            <li key={point} className="type-ui text-ink-muted">
               {point}
             </li>
           ))}

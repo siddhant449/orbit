@@ -9,6 +9,7 @@ export function initials(name: string) {
     .join("");
 }
 
+/** Square print portrait on a pink plate (pink is the person); photos replace the initials. Decorative: the owning control names the person. */
 export function Avatar({
   name,
   src,
@@ -20,16 +21,16 @@ export function Avatar({
 }) {
   return (
     <span
+      aria-hidden="true"
+      data-initials={src ? undefined : initials(name)}
       className={cn(
-        "grid size-7 shrink-0 place-items-center overflow-hidden rounded-full bg-accent-soft text-[11px] font-semibold text-accent",
+        "grid size-7 shrink-0 place-items-center overflow-hidden rounded-control bg-pink type-micro text-on-pink before:content-[attr(data-initials)]",
         className,
       )}
     >
-      {src ? (
+      {src && (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={src} alt="" className="size-full object-cover" />
-      ) : (
-        initials(name)
       )}
     </span>
   );
