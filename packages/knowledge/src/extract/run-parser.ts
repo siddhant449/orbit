@@ -1,12 +1,20 @@
 import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { Worker, type ResourceLimits } from "node:worker_threads";
+import type { ResourceLimits } from "node:worker_threads";
 import { IngestError } from "../errors";
 
 export const PARSE_TIMEOUT_MS = 60_000;
 export const PARSE_RESOURCE_LIMITS: ResourceLimits = { maxOldGenerationSizeMb: 256, maxYoungGenerationSizeMb: 64 };
 const TOO_COMPLEX = "That file is too large or complex to read.";
+
+/**
+ * Taken via getBuiltinModule rather than imported: Turbopack treats `new Worker(path)` from
+ * node:worker_threads as a bundling entry and ignores `turbopackIgnore` there. A path it can only
+ * partly evaluate becomes "any file in the project", and it then bundles vitest/eslint configs, vite
+ * and native addons into the route, which fails the build.
+ */
+const { Worker } = process.getBuiltinModule("node:worker_threads");
 
 export type ParseJob = { buf: Buffer; mime: string; maxChars: number; maxInflateBytes?: number };
 export type ParseOptions = { timeoutMs?: number; resourceLimits?: ResourceLimits; workerFile?: string };
@@ -36,7 +44,7 @@ export function parseInWorker(job: ParseJob, opts: ParseOptions = {}): Promise<s
   const timeoutMs = opts.timeoutMs ?? PARSE_TIMEOUT_MS;
   return new Promise<string>((resolvePromise, reject) => {
     const copy = new Uint8Array(job.buf); // a private copy, because a pooled Buffer's ArrayBuffer can't be transferred
-    const worker = new Worker(/* webpackIgnore: true */ opts.workerFile ?? workerPath(), {
+    const worker = new Worker(opts.workerFile ?? workerPath(), {
       workerData: { ...job, buf: copy },
       transferList: [copy.buffer],
       resourceLimits: opts.resourceLimits ?? PARSE_RESOURCE_LIMITS,

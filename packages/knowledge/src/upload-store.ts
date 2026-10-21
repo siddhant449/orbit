@@ -12,23 +12,24 @@ export type UploadStore = {
 const KEY = /^[A-Za-z0-9-]+(\.[a-z0-9]+)?$/;
 
 export function localUploadStore(root = ".data/uploads"): UploadStore {
-  const base = resolve(root);
+  // `turbopackIgnore` on each runtime path: a dynamic root makes Turbopack trace (and bundle) the whole project.
+  const base = resolve(/* turbopackIgnore: true */ root);
   const pathFor = (key: string) => {
     if (!KEY.test(key)) throw new Error("Invalid file key");
-    return join(base, key);
+    return join(/* turbopackIgnore: true */ base, key);
   };
   return {
     async put(buf, mime) {
       const key = `${randomUUID()}${DOCUMENT_TYPES[mime] ?? IMAGE_TYPES[mime] ?? ""}`;
-      await mkdir(base, { recursive: true });
-      await writeFile(pathFor(key), buf);
+      await mkdir(/* turbopackIgnore: true */ base, { recursive: true });
+      await writeFile(/* turbopackIgnore: true */ pathFor(key), buf);
       return key;
     },
     async get(key) {
-      return readFile(pathFor(key));
+      return readFile(/* turbopackIgnore: true */ pathFor(key));
     },
     async delete(key) {
-      await rm(pathFor(key), { force: true });
+      await rm(/* turbopackIgnore: true */ pathFor(key), { force: true });
     },
   };
 }

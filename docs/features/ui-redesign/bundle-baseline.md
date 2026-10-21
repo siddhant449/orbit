@@ -106,3 +106,16 @@ no colour plates), `MotionProvider` imported through `@brandloop/ui/motion` and 
 
 Lazy chunks: only the `features.ts` stub remains (`349d1vbvyhych.js`, 239 B raw / 209 B gzip); the dither chunk is gone
 with the component. The framer-motion feature implementations stay in the eager framer-motion chunk as noted above.
+
+## After the build fix (B1: upload store and parse worker no longer trace the whole project)
+
+`pnpm --filter @brandloop/web build` failed before this fix, so there was no comparable figure from the builds just before it.
+Measured with `node scripts/bundle-size.mjs apps/web / "/chat/[id]"` after a clean build (`.next` removed first) on top of
+`50e4cf6`, Next.js 16.4.2 (Turbopack), Node v24.19.0. The fix is server-only, so client first-load JS is unaffected by it.
+
+| Route | First Load JS raw | First Load JS gzip | Change from baseline |
+|-------|------------------:|-------------------:|---------------------:|
+| `/` (home) | 1,083,932 B (1,058.5 KiB) | 339,953 B (332.0 KiB) | +75,592 B (+73.8 KiB), within the 90 KB budget |
+| `/chat/[id]` | 1,571,729 B (1,534.9 KiB) | 470,630 B (459.6 KiB) | no earlier figure |
+
+The script flags the motion `features.ts` chunk (`2_hoau_sgzhkm.js`, 26,483 B raw / 8,061 B gzip) as part of first load.
