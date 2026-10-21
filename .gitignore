@@ -16,3 +16,6 @@ packages/db/src/generated
 # Downloaded Kleo bundles and captures for recon (third-party code, never committed)
 .recon/
 .superpowers/
+
+# Parallel feature worktrees
+.worktrees/
