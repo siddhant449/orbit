@@ -100,6 +100,11 @@ async function findVisibleProfile(userId: string, profileId: string) {
   return { profile, membership };
 }
 
+/** Throws AccountError("Profile not found") unless the user can see the profile. */
+export async function assertProfileAccess(userId: string, profileId: string): Promise<Profile> {
+  return (await findVisibleProfile(userId, profileId)).profile;
+}
+
 export async function createProfile(userId: string, input: { name: string }) {
   const name = input.name.trim();
   if (!name) throw new AccountError("Profile name is required");
