@@ -11,6 +11,7 @@
     "e2e": "playwright test"
   },
   "dependencies": {
+    "@brandloop/ai": "workspace:*",
     "@brandloop/db": "workspace:*",
     "@brandloop/ui": "workspace:*",
     "@clerk/nextjs": "^7.9.17",
