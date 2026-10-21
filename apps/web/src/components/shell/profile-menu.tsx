@@ -73,7 +73,7 @@ export function ProfileMenu({ iconOnly = false }: { iconOnly?: boolean }) {
                 <Avatar name={p.name} src={p.avatarUrl} className="size-6 text-[10px]" />
                 <span className="min-w-0 flex-1 truncate">{p.name}</span>
                 {p.id === account.currentProfileId && (
-                  <Check className="icon-sm !text-overprint data-[highlighted]:!text-on-ink" aria-label="Current profile" />
+                  <Check className="icon-sm" aria-label="Current profile" />
                 )}
               </DropdownMenu.Item>
             ))}
@@ -100,7 +100,7 @@ export function ProfileMenu({ iconOnly = false }: { iconOnly?: boolean }) {
                   onClick={() => setTheme(value)}
                   className={cn(
                     "grid h-8 place-items-center rounded-control border border-transparent text-ink-muted transition-colors hover:bg-surface-sunk hover:text-ink",
-                    theme === value && "border-keyline bg-pink text-on-pink hover:bg-pink hover:text-on-pink",
+                    theme === value && "border-keyline bg-ink text-on-ink hover:bg-ink hover:text-on-ink",
                   )}
                 >
                   <Icon className="size-3.5" aria-hidden="true" />
@@ -109,7 +109,7 @@ export function ProfileMenu({ iconOnly = false }: { iconOnly?: boolean }) {
             </div>
             <DropdownMenu.Separator className="mx-1 my-1.5 h-px bg-line" />
             <DropdownMenu.Item
-              className={cn(itemClass, "text-danger [&_svg]:text-danger data-[highlighted]:bg-danger data-[highlighted]:text-on-danger data-[highlighted]:[&_svg]:text-on-danger")}
+              className={cn(itemClass, "text-signal-ink [&_svg]:text-signal-ink data-[highlighted]:bg-signal-soft data-[highlighted]:text-signal-ink data-[highlighted]:[&_svg]:text-signal-ink")}
               onSelect={() => signOut({ redirectUrl: "/sign-in" })}
             >
               <LogOut className="icon-sm" aria-hidden="true" />

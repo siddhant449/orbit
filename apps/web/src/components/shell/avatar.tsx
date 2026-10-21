@@ -9,7 +9,10 @@ export function initials(name: string) {
     .join("");
 }
 
-/** Square print portrait on a pink plate (pink is the person); photos replace the initials. Decorative: the owning control names the person. */
+/**
+ * Graphite line monogram: a hairline frame with the initials drawn in ink; photos replace the initials. Decorative,
+ * the owning control names the person; the initials are CSS-generated so they are not visible text for that control.
+ */
 export function Avatar({
   name,
   src,
@@ -24,7 +27,7 @@ export function Avatar({
       aria-hidden="true"
       data-initials={src ? undefined : initials(name)}
       className={cn(
-        "grid size-7 shrink-0 place-items-center overflow-hidden rounded-control bg-pink type-micro text-on-pink before:content-[attr(data-initials)]",
+        "grid size-7 shrink-0 place-items-center overflow-hidden rounded-control border border-keyline bg-surface type-micro text-ink before:content-[attr(data-initials)]",
         className,
       )}
     >

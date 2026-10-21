@@ -4,7 +4,9 @@ import { PageBody, PageHeader } from "@/components/page";
 import { AddMemory } from "@/components/memories/add-memory";
 import { ImportDialog } from "@/components/memories/import-dialog";
 import { MemoryCard, type MemoryGroupView } from "@/components/memories/memory-card";
-import { Reveal } from "@brandloop/ui";
+import { Reveal } from "@brandloop/ui/scroll";
+import { LineArt } from "@brandloop/ui";
+import { Frame } from "@/components/page";
 
 export const metadata = { title: "Memories" };
 
@@ -46,14 +48,19 @@ export default async function Page() {
         {!profile ? (
           <p className="text-sm text-ink-muted">Add a profile to start building its memories.</p>
         ) : !hasAny ? (
-          <div className="max-w-xl py-6">
-            <p className="font-display text-xl font-semibold leading-snug tracking-[-0.01em]">
-              Memories are the facts we use to make every post sound like you and talk about what you actually know.
-            </p>
-            <div className="mt-5 flex flex-wrap items-center gap-2">
-              <ImportDialog variant="primary" />
-              <AddMemory memoryKey={MEMORY_KEYS.personal} variant="secondary" />
+          <div className="grid gap-10 py-6 md:grid-cols-[1fr_220px] md:items-start">
+            <div className="max-w-xl">
+              <p className="type-title-1">
+                Memories are the facts we use to make every post sound like you and talk about what you actually know.
+              </p>
+              <div className="mt-6 flex flex-wrap items-center gap-2">
+                <ImportDialog variant="primary" />
+                <AddMemory memoryKey={MEMORY_KEYS.personal} variant="secondary" />
+              </div>
             </div>
+            <Frame className="mx-auto hidden w-[220px] text-ink-muted md:block">
+              <LineArt name="stack" />
+            </Frame>
           </div>
         ) : (
           <>

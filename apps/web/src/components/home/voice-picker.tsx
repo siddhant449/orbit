@@ -19,7 +19,7 @@ function hash(s: string) {
   return h;
 }
 
-/** Generated avatar: initials on a colour from the accent family. */
+/** Graphite line monogram: a hairline circle with the initials drawn in ink (CSS-generated, so not visible text). */
 export function VoiceAvatar({ name, className }: { name: string; className?: string }) {
   const initials = name
     .split(/\s+/)
@@ -27,14 +27,17 @@ export function VoiceAvatar({ name, className }: { name: string; className?: str
     .slice(0, 2)
     .map((w) => w[0]!.toUpperCase())
     .join("");
-  const h = hash(name);
-  const background = `hsl(${150 + (h % 36)} ${38 + (h % 14)}% ${24 + (h % 9)}%)`;
+  // The ring weight varies per name so the presets stay distinguishable without colour.
+  const weight = 1 + (hash(name) % 2);
   return (
     <span
       aria-hidden
       data-initials={initials}
-      style={{ background }}
-      className={cn("grid size-6 shrink-0 place-items-center rounded-full text-[10px] font-semibold tracking-wide text-white before:content-[attr(data-initials)]", className)}
+      style={{ borderWidth: weight }}
+      className={cn(
+        "grid size-6 shrink-0 place-items-center rounded-full border-keyline bg-surface text-[10px] font-semibold tracking-wide text-ink before:content-[attr(data-initials)]",
+        className,
+      )}
     />
   );
 }
@@ -122,7 +125,7 @@ export function VoicePicker({ voices, selectedId }: { voices: VoiceOption[]; sel
               aria-label={`Change writing style, ${current ? current.name : "Writing style"}`}
               aria-busy={pending}
               title={current?.tagline || "Choose how your posts sound"}
-              className="flex h-8 max-w-[210px] items-center gap-2 rounded-full border border-line py-0 pl-1 pr-2.5 text-[13px] text-ink-muted transition-colors hover:border-accent/40 hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent data-[state=open]:border-accent/60 data-[state=open]:text-ink"
+              className="flex h-8 max-w-[210px] items-center gap-2 rounded-full border border-line-strong py-0 pl-1 pr-2.5 text-[13px] text-ink-muted transition-colors hover:border-keyline hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus data-[state=open]:border-keyline data-[state=open]:text-ink"
             >
               {current ? (
                 <VoiceAvatar name={current.name} />
@@ -145,7 +148,7 @@ export function VoicePicker({ voices, selectedId }: { voices: VoiceOption[]; sel
                 e.preventDefault();
                 (e.currentTarget as HTMLElement).querySelector("input")?.focus();
               }}
-              className="z-50 w-[min(340px,calc(100vw-32px))] overflow-hidden rounded-card border border-line bg-surface shadow-xl"
+              className="plate plate--raised z-50 w-[min(340px,calc(100vw-32px))] overflow-hidden data-[state=open]:animate-[plate-in_120ms_var(--ease-ink)_both]"
             >
               <div className="flex items-center gap-2 border-b border-line px-3">
                 <Search aria-hidden className="size-4 shrink-0 text-ink-faint" />
@@ -182,7 +185,7 @@ export function VoicePicker({ voices, selectedId }: { voices: VoiceOption[]; sel
                   if (row.type === "add") {
                     return (
                       <div key="add" role="option" aria-selected={false} {...common}>
-                        <span aria-hidden className="grid size-7 shrink-0 place-items-center rounded-full border border-dashed border-accent/60 text-accent">
+                        <span aria-hidden className="grid size-7 shrink-0 place-items-center rounded-full border border-dashed border-line-strong text-ink-muted">
                           <Plus className="size-3.5" />
                         </span>
                         <span className="min-w-0">
@@ -201,7 +204,7 @@ export function VoicePicker({ voices, selectedId }: { voices: VoiceOption[]; sel
                         <span className="block truncate text-sm font-medium text-ink">{v.own ? `${v.name} (your style)` : v.name}</span>
                         <span className="block truncate text-xs text-ink-muted">{v.tagline}</span>
                       </span>
-                      {sel && <Check aria-hidden className="size-4 shrink-0 text-accent" />}
+                      {sel && <Check aria-hidden className="size-4 shrink-0 text-ink" />}
                     </div>
                   );
                 })}

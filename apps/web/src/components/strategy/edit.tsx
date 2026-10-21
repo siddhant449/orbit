@@ -128,7 +128,7 @@ export function EditableText({
       <button
         ref={btn}
         type="button"
-        aria-label={`Edit ${label}`}
+        aria-label={`Edit ${label}: ${value}`}
         onClick={() => {
           setDraft(value);
           setEditing(true);

@@ -1,107 +1,91 @@
-import type { CSSProperties, ReactNode } from "react";
+import type { ReactNode } from "react";
+import { Button, KineticHeading, LineArt } from "@brandloop/ui";
+import { Frame } from "@/components/page";
 
-// Static recipes from docs/design/riso-system.md section 5. No components yet: the classes come from tokens.css.
+// Drafting devices from docs/design/system.md section 5: recipes in tokens.css and drafting.css.
 
 function Specimen({ title, children, caption }: { title: string; children: ReactNode; caption: string }) {
   return (
     <li className="min-w-0 border-t border-line pt-6">
       <h3 className="type-title-3">{title}</h3>
-      <div className="mt-5 flex flex-wrap items-start gap-x-6 gap-y-6">{children}</div>
+      <div className="mt-5 flex flex-wrap items-start gap-x-8 gap-y-6">{children}</div>
       <p className="type-caption mt-4 max-w-[44ch] text-ink-muted">{caption}</p>
     </li>
   );
 }
 
-function ElevationPlate({ cls, label }: { cls: string; label: string }) {
-  return (
-    <div className={`plate type-caption grid h-20 w-24 place-items-center text-ink ${cls}`}>
-      <span>{label}</span>
-    </div>
-  );
-}
-
-const grainUse: CSSProperties = {
-  opacity: "var(--grain-opacity)",
-  mixBlendMode: "var(--grain-blend)" as CSSProperties["mixBlendMode"],
-};
-
 export function DevicesSection() {
   return (
     <section id="devices" aria-labelledby="devices-title" className="scroll-mt-4 border-t border-line py-12 md:py-16">
       <h2 id="devices-title" className="type-title-1">
-        Printing devices
+        Drafting devices
       </h2>
       <p className="type-body mt-3 max-w-[68ch] text-ink-muted">
-        Hard edges, hard offset shadows, grain at rest. No gradients, blur or glow. Each specimen is plain CSS from the
-        system, ready for the components that come next.
+        Hairline grids, measured lines with ticks, crosshair marks, monochrome line drawings and graphite plates. No
+        gradients, blur, glow or colour. Each specimen is plain CSS or SVG from the system.
       </p>
       <ul className="mt-10 grid gap-x-12 gap-y-12 md:grid-cols-2">
-        <Specimen
-          title="Keyline and ink shadow"
-          caption="Elevation is a 1 px keyline and a hard offset plate: flat, popover at 2 px, raised at 4 px, overlay at 6 px. Nothing lifts on hover."
-        >
-          <ElevationPlate cls="" label="Flat" />
-          <ElevationPlate cls="plate--sm" label="Popover" />
-          <ElevationPlate cls="plate--raised" label="Raised" />
-          <ElevationPlate cls="plate--overlay" label="Overlay" />
+        <Specimen title="Construction grid" caption="The desk carries a 32 px hairline grid at 55% of the line tone. The sheet covers it; nothing is set on top of it except the index.">
+          <div aria-hidden className="desk-grid h-40 w-full max-w-[420px] border border-line bg-paper" />
         </Specimen>
 
-        <Specimen
-          title="Overprint"
-          caption="Live overprint blends a blue plate at 70% with a pink plate at 84% so the overlap lands on the purple token. The flat square is the token itself, used for fills."
-        >
-          <div aria-hidden className="overprint relative h-28 w-44">
-            <span className="plate-blue absolute left-0 top-0 size-16" />
-            <span className="plate-pink absolute left-12 top-10 size-16" />
-          </div>
-          <div className="flex flex-col gap-2">
-            <div aria-hidden className="size-16 border border-keyline bg-overprint" />
-            <p className="type-caption text-ink-muted">Flat fill</p>
-          </div>
+        <Specimen title="Crosshair marks" caption="11 px crosses in the strong line tone at the four corners of the desk and around framed figures. Thin, exact, never on data.">
+          <Frame className="h-40 w-full max-w-[420px] border border-line bg-surface">
+            <div className="grid h-full place-items-center type-caption text-ink-muted">framed figure</div>
+          </Frame>
         </Specimen>
 
-        <Specimen
-          title="Misregistration"
-          caption="Pink and blue copies of display text sit 3 px off the ink line. Smaller text and UI never misregister."
-        >
-          <p className="misreg type-display-2" data-size="display-2">
-            Out of register
-            <span aria-hidden className="misreg__pink">
-              Out of register
+        <Specimen title="Dimension line" caption="A hairline with end ticks and a measured label, drawn in from the left. It states a real measure: here the width of the specimen.">
+          <div className="w-full max-w-[420px]">
+            <div aria-hidden className="h-16 border border-line bg-surface" />
+            <span aria-hidden className="dim dim--draw mt-4 block" style={{ "--draw-delay": "200ms" } as React.CSSProperties}>
+              <span className="dim__label">420</span>
             </span>
-            <span aria-hidden className="misreg__blue">
-              Out of register
-            </span>
-          </p>
-        </Specimen>
-
-        <Specimen
-          title="Grain"
-          caption="One 128 px noise tile over the desk and the sheet. The first square shows it at full strength; the second at print strength, 7% by day and 9% at night."
-        >
-          <div className="flex flex-col gap-2">
-            <div
-              aria-hidden
-              className="size-32 border border-keyline"
-              style={{ backgroundColor: "var(--paper)", backgroundImage: "var(--grain-tile)", backgroundSize: "128px 128px" }}
-            />
-            <p className="type-caption text-ink-muted">Full strength</p>
-          </div>
-          <div className="flex flex-col gap-2">
-            <div aria-hidden className="relative isolate size-32 border border-keyline bg-paper">
-              <div
-                className="absolute inset-0"
-                style={{ ...grainUse, backgroundImage: "var(--grain-tile)", backgroundSize: "128px 128px" }}
-              />
-            </div>
-            <p className="type-caption text-ink-muted">Print strength</p>
           </div>
         </Specimen>
 
-        <Specimen
-          title="Halftone skeleton"
-          caption="Loading blocks are a dot grid with a hard-edged paper band sweeping across, not a shimmer. The band stops under reduced motion."
-        >
+        <Specimen title="Ruled margin" caption="The sheet's left margin: a hairline with ticks every 32 px and a longer tick every 128 px, the way a drafting sheet is ruled.">
+          <div aria-hidden className="relative h-40 w-full max-w-[420px] border border-line bg-surface">
+            <span className="ruler" />
+          </div>
+        </Specimen>
+
+        <Specimen title="Elevation" caption="Flat is a hairline. Raised and overlay plates add a single 1 px graphite offset. Nothing blurs and nothing lifts on hover.">
+          <div className="plate type-caption grid h-20 w-28 place-items-center text-ink">Flat</div>
+          <div className="plate plate--raised type-caption grid h-20 w-28 place-items-center text-ink">Raised</div>
+          <div className="plate plate--overlay type-caption grid h-20 w-28 place-items-center text-ink">Overlay</div>
+        </Specimen>
+
+        <Specimen title="Graphite press" caption="Primary actions are a graphite face on a 2 px plate; the face lands on the plate when pressed. Secondary and destructive actions are hairline frames; the destructive frame is the only signal red.">
+          <Button>Save changes</Button>
+          <Button variant="secondary">Import memories</Button>
+          <Button variant="danger">Delete profile</Button>
+          <Button variant="ghost">Cancel</Button>
+        </Specimen>
+
+        <Specimen title="Line drawings" caption="Monochrome ink line art in the current text colour, every stroke drawn in sequence. Used for the hero and empty states; complete at once under reduced motion.">
+          <div className="w-[200px] text-ink-muted">
+            <LineArt name="sheet" delay={200} />
+          </div>
+          <div className="w-[200px] text-ink-muted">
+            <LineArt name="stack" delay={400} />
+          </div>
+          <div className="w-[200px] text-ink-muted">
+            <LineArt name="compass" delay={600} />
+          </div>
+        </Specimen>
+
+        <Specimen title="Kinetic heading" caption="Display type sets in letter by letter, from light and tracked-out to its weight and tight tracking. The accessible name is the whole sentence.">
+          <KineticHeading as="h4" text="Measured twice" lines={["Measured twice"]} className="type-display-2 text-ink" delay={300} />
+        </Specimen>
+
+        <Specimen title="Monogram" caption="Avatars are graphite line monograms: a hairline frame with the initials in ink. Presets vary the ring weight; photos replace the initials.">
+          <span aria-hidden data-initials="TA" className="grid size-10 place-items-center rounded-control border border-keyline bg-surface type-caption text-ink before:content-[attr(data-initials)]" />
+          <span aria-hidden data-initials="CS" className="grid size-10 place-items-center rounded-pill border-2 border-keyline bg-surface type-caption text-ink before:content-[attr(data-initials)]" />
+          <span aria-hidden data-initials="PL" className="grid size-10 place-items-center rounded-pill border border-keyline bg-surface type-caption text-ink before:content-[attr(data-initials)]" />
+        </Specimen>
+
+        <Specimen title="Skeleton" caption="Loading blocks are sunk bars with a single hairline sweeping across. The sweep stops under reduced motion.">
           <div aria-hidden className="flex w-full max-w-[420px] flex-col gap-3">
             <div className="skeleton h-7 w-2/3" />
             <div className="skeleton h-4 w-full" />

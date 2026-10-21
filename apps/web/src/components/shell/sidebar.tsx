@@ -103,7 +103,7 @@ export function SectionPanel({ section, onNavigate }: { section: Section; onNavi
   const items = section.groups.flatMap((g) => g.items);
   const current = items.find((item) => isActive(pathname, item.href));
   return (
-    <div className="relative flex h-full w-[228px] flex-col px-3 pb-3 pt-4">
+    <div className="rail-in relative flex h-full w-[228px] flex-col px-3 pb-3 pt-4">
       <h2 className="type-title-2 flex h-9 items-center px-2.5">{section.title}</h2>
       <nav aria-label={section.title} className="relative z-[1] mt-4 flex flex-col gap-5 overflow-y-auto" data-lenis-prevent>
         {section.groups.map((group) => (

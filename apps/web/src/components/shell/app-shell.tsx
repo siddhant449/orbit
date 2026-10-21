@@ -4,7 +4,8 @@ import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Dialog } from "radix-ui";
 import { Menu, X } from "lucide-react";
-import { Button, SmoothScroll, cn } from "@brandloop/ui";
+import { Button, cn } from "@brandloop/ui";
+import { SmoothScroll } from "@brandloop/ui/scroll";
 import type { ShellAccount } from "@/lib/account";
 import { sectionFor } from "@/lib/nav";
 import { AccountProvider } from "./account-context";
@@ -41,14 +42,14 @@ function subscribeCollapsed(onChange: () => void) {
   };
 }
 
-/** Registration crosses at the four corners of the desk (riso-system.md section 5.7). */
-function RegistrationMarks() {
+/** Crosshair marks at the four corners of the desk (system.md section 5.3). */
+function CrosshairMarks() {
   return (
     <div aria-hidden="true" className="hidden md:contents">
-      <span className="reg-cross left-3 top-3" />
-      <span className="reg-cross right-3 top-3" />
-      <span className="reg-cross bottom-3 left-3" />
-      <span className="reg-cross bottom-3 right-3" />
+      <span className="crosshair left-3 top-3" />
+      <span className="crosshair right-3 top-3" />
+      <span className="crosshair bottom-3 left-3" />
+      <span className="crosshair bottom-3 right-3" />
     </div>
   );
 }
@@ -83,8 +84,8 @@ export function AppShell({ account, children }: { account: ShellAccount; childre
 
   return (
     <AccountProvider account={account}>
-      <div className="flex h-svh">
-        <RegistrationMarks />
+      <div className="desk-grid flex h-svh">
+        <CrosshairMarks />
         <aside
           aria-label="Sidebar"
           style={{ width: asideWidth }}

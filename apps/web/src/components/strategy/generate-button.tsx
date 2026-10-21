@@ -64,9 +64,9 @@ export function GenerateButton({ label = "Generate my strategy", variant = "prim
     <AlertDialog.Root>
       <AlertDialog.Trigger asChild>{trigger()}</AlertDialog.Trigger>
       <AlertDialog.Portal>
-        <AlertDialog.Overlay className="fixed inset-0 z-50 bg-ink/30 backdrop-blur-[2px]" />
-        <AlertDialog.Content className="fixed left-1/2 top-1/2 z-50 w-[calc(100%-32px)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-card border border-line bg-surface p-6 shadow-xl">
-          <AlertDialog.Title className="font-display text-lg font-semibold">Replace your strategy?</AlertDialog.Title>
+        <AlertDialog.Overlay className="fixed inset-0 z-50 bg-ink/40 data-[state=closed]:animate-[fade-out_120ms_var(--ease-exit)_both] data-[state=open]:animate-[fade-in_180ms_var(--ease-ink)_both]" />
+        <AlertDialog.Content className="fixed left-1/2 top-1/2 z-50 w-[calc(100%-32px)] max-w-md -translate-x-1/2 -translate-y-1/2 plate plate--overlay p-6 data-[state=closed]:animate-[fade-out_120ms_var(--ease-exit)_both] data-[state=open]:animate-[plate-in_180ms_var(--ease-ink)_both]">
+          <AlertDialog.Title className="type-title-2">Replace your strategy?</AlertDialog.Title>
           <AlertDialog.Description className="mt-1 text-sm text-ink-muted">
             A new strategy will replace the current one, including your edits.
           </AlertDialog.Description>
