@@ -2,3 +2,5 @@ export { prisma } from "./client";
 export * from "./generated/prisma/client";
 export * from "./services/account";
 export * from "./services/memory";
+export * from "./services/jobs";
+export * from "./services/memory-import";
