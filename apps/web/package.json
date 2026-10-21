@@ -14,6 +14,7 @@
   "dependencies": {
     "@brandloop/ai": "workspace:*",
     "@brandloop/db": "workspace:*",
+    "@brandloop/knowledge": "workspace:*",
     "@brandloop/ui": "workspace:*",
     "@clerk/nextjs": "^7.9.17",
     "class-variance-authority": "^0.7.1",

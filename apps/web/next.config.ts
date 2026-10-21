@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   // Every app screen is behind sign-in, so Cache Components' static shell buys little here.
-  transpilePackages: ["@brandloop/ui", "@brandloop/db", "@brandloop/ai"],
+  transpilePackages: ["@brandloop/ui", "@brandloop/db", "@brandloop/ai", "@brandloop/knowledge"],
   serverExternalPackages: ["pg"],
   turbopack: {
     rules: {

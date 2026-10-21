@@ -10,7 +10,6 @@ export type ChunkInput = { ordinal: number; title: string; text: string; embeddi
 
 const vec = (v: number[] | null) => (v ? `[${v.join(",")}]` : null);
 
-/** Replaces all chunks of a source in one transaction. Returns the number stored. */
 let warnedEmbedder = false;
 function warnOnce(err: unknown) {
   if (warnedEmbedder) return;
@@ -18,6 +17,7 @@ function warnOnce(err: unknown) {
   console.warn("hybridSearch: embedder unavailable, using full-text only:", err instanceof Error ? err.message : String(err));
 }
 
+/** Replaces all chunks of a source in one transaction. Returns the number stored. */
 export async function replaceChunks(
   profileId: string,
   sourceType: ChunkSource,
@@ -80,9 +80,9 @@ export async function hybridSearch(
     }
     return tx.$queryRaw<Row[]>`
       WITH vec AS (
-        SELECT id, row_number() OVER (ORDER BY embedding <=> ${qv}::vector, id) r FROM "KnowledgeChunk"
+        SELECT id, row_number() OVER (ORDER BY embedding <=> ${qv}::vector) r FROM "KnowledgeChunk"
         WHERE ${qv}::text IS NOT NULL AND "profileId" = ${profileId} AND "sourceType"::text = ANY(${sources}) AND embedding IS NOT NULL
-        ORDER BY embedding <=> ${qv}::vector, id LIMIT ${CANDIDATES}),
+        ORDER BY embedding <=> ${qv}::vector LIMIT ${CANDIDATES}),
       fts AS (
         SELECT id, row_number() OVER (ORDER BY ts_rank_cd(tsv, q) DESC, id) r
         FROM "KnowledgeChunk", websearch_to_tsquery('english', ${query}) q

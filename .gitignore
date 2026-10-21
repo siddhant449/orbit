@@ -19,3 +19,4 @@ packages/db/src/generated
 
 # Parallel feature worktrees
 .worktrees/
+.data/
