@@ -46,12 +46,16 @@ test.describe("reduced motion", () => {
     await expect(page.locator(".line-reveal__line > span").first()).toHaveCSS("transform", /^(none|matrix\(1, 0, 0, 1, 0, 0\))$/);
     // Lenis does not smooth under reduced motion: one wheel tick moves the sheet within a frame.
     await page.goto("/settings/memories");
-    const moved = await page.evaluate(async () => {
-      const sheet = document.querySelector<HTMLElement>("[data-sheet] .lenis");
-      if (!sheet) return "no-lenis";
-      return sheet.classList.contains("lenis-smooth") ? "smooth" : "native";
-    });
-    expect(moved).toBe("native");
+    // Lenis adds its class after hydration, so wait for it before reading the mode.
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const sheet = document.querySelector<HTMLElement>("[data-sheet] .lenis");
+          if (!sheet) return "no-lenis";
+          return sheet.classList.contains("lenis-smooth") ? "smooth" : "native";
+        }),
+      )
+      .toBe("native");
   });
 });
 
