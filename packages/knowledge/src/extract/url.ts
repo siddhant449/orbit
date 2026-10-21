@@ -131,35 +131,28 @@ async function fetchPage(startUrl: string, doFetch: typeof fetch | undefined): P
   let url = assertPublicUrl(startUrl);
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     const headers = { "user-agent": "Mozilla/5.0 (compatible; BrandloopBot/1.0)", accept: "text/html,application/xhtml+xml" };
-    let res: Response;
-    if (doFetch) {
-      res = await doFetch(url, { signal, redirect: "manual", headers });
-    } else {
-      const agent = new Agent({ connect: { lookup: makePinnedLookup() as never } });
-      try {
-        res = (await undiciFetch(url, { signal, redirect: "manual", headers, dispatcher: agent } as never)) as unknown as Response;
-      } catch (err) {
-        await agent.close().catch(() => undefined);
-        throw err;
+    // One pinned agent per hop; always closed before the next hop or on return/throw.
+    const agent = doFetch ? null : new Agent({ connect: { lookup: makePinnedLookup() as never } });
+    try {
+      const res = doFetch
+        ? await doFetch(url, { signal, redirect: "manual", headers })
+        : ((await undiciFetch(url, { signal, redirect: "manual", headers, dispatcher: agent! } as never)) as unknown as Response);
+      if (res.status >= 300 && res.status < 400) {
+        await res.body?.cancel().catch(() => undefined);
+        const location = res.headers.get("location");
+        if (!location) throw new IngestError(UNREADABLE);
+        url = assertPublicUrl(new URL(location, url).toString());
+        continue;
       }
+      const type = res.headers.get("content-type") ?? "";
+      if (!res.ok || (type && !/html|xml|text\/plain/i.test(type))) {
+        await res.body?.cancel().catch(() => undefined);
+        throw new IngestError(UNREADABLE);
+      }
+      return await readCapped(res);
+    } finally {
+      await agent?.close().catch(() => undefined);
     }
-    if (res.status >= 300 && res.status < 400) {
-      await res.body?.cancel().catch(() => undefined);
-      const location = res.headers.get("location");
-      if (!location) throw new IngestError(UNREADABLE);
-      url = assertPublicUrl(new URL(location, url).toString());
-      continue;
-    }
-    if (!res.ok) {
-      await res.body?.cancel().catch(() => undefined);
-      throw new IngestError(UNREADABLE);
-    }
-    const type = res.headers.get("content-type") ?? "";
-    if (type && !/html|xml|text\/plain/i.test(type)) {
-      await res.body?.cancel().catch(() => undefined);
-      throw new IngestError(UNREADABLE);
-    }
-    return readCapped(res);
   }
   throw new IngestError(UNREADABLE);
 }

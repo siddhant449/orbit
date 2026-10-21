@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { AiUnavailableError, type AiClient } from "@brandloop/ai";
 import JSZip from "jszip";
 import { PDFDocument } from "pdf-lib";
-import { assertPublicUrl, extractText, makePinnedLookup, withTimeout } from "./extract";
+import { assertPublicUrl, extractText, makePinnedLookup } from "./extract";
 import { IngestError } from "./errors";
 import { DOCUMENT_TYPES } from "./limits";
 
@@ -252,15 +252,6 @@ describe("makePinnedLookup (DNS rebinding)", () => {
   });
 });
 
-describe("withTimeout", () => {
-  it("rejects with the readable message when the work hangs", async () => {
-    await expect(withTimeout(new Promise(() => {}), 20)).rejects.toThrow("That file took too long to read");
-  });
-  it("passes results through", async () => {
-    await expect(withTimeout(Promise.resolve(5), 1000)).resolves.toBe(5);
-  });
-});
-
 async function xlsxWith(sheets: string[][][]): Promise<Buffer> {
   const z = new JSZip();
   z.file("[Content_Types].xml", `<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>${sheets.map((_, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join("")}</Types>`);
@@ -335,5 +326,57 @@ describe("zip and pdf limits", () => {
     await expect(extractText({ kind: "document", buf, mime: "application/pdf" }, { ai: noAi })).rejects.toThrow(
       /too many pages/,
     );
+  });
+});
+
+describe("sandboxed parsing", () => {
+  const fixture = (n: string) => new URL(`../test/fixtures/${n}`, import.meta.url).pathname;
+
+  it("rejects a docx whose central directory lies about its size but inflates past the cap", async () => {
+    const z = new JSZip();
+    z.file("word/document.xml", Buffer.alloc(5 * 1024 * 1024, 0x61), { compression: "DEFLATE", createFolders: false });
+    const buf = await z.generateAsync({ type: "nodebuffer", compression: "DEFLATE" });
+    const cd = buf.indexOf(Buffer.from([0x50, 0x4b, 0x01, 0x02]));
+    buf.writeUInt32LE(100, cd + 24); // declared uncompressed size: 100 bytes
+    await expect(
+      extractText({ kind: "document", buf, mime: DOCX_MIME }, { ai: noAi, maxInflateBytes: 1024 * 1024 }),
+    ).rejects.toThrow(/too large to read safely/);
+  });
+
+  it("an honest small docx still parses with the inflate cap in place", async () => {
+    const text = await extractText(
+      { kind: "document", buf: fx("sample.docx"), mime: DOCX_MIME },
+      { ai: noAi, maxInflateBytes: 1024 * 1024 },
+    );
+    expect(text).toContain("Short paragraphs win on mobile");
+  });
+
+  it("terminates a CPU-spinning parser at the timeout", async () => {
+    const started = Date.now();
+    await expect(
+      extractText(
+        { kind: "document", buf: fx("sample.pdf"), mime: "application/pdf" },
+        { ai: noAi, timeoutMs: 300, workerFile: fixture("spin-worker.mjs") },
+      ),
+    ).rejects.toThrow("That file took too long to read");
+    expect(Date.now() - started).toBeLessThan(5000);
+  });
+
+  it("turns a worker out-of-memory crash into a readable error", async () => {
+    await expect(
+      extractText(
+        { kind: "document", buf: fx("sample.pdf"), mime: "application/pdf" },
+        { ai: noAi, workerFile: fixture("oom-worker.mjs"), resourceLimits: { maxOldGenerationSizeMb: 16, maxYoungGenerationSizeMb: 4 } },
+      ),
+    ).rejects.toThrow("That file is too large or complex to read.");
+  });
+
+  it("turns a worker that exits without answering into the same error", async () => {
+    await expect(
+      extractText(
+        { kind: "document", buf: fx("sample.pdf"), mime: "application/pdf" },
+        { ai: noAi, workerFile: fixture("exit-worker.mjs") },
+      ),
+    ).rejects.toThrow("That file is too large or complex to read.");
   });
 });

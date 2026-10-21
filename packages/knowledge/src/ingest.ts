@@ -1,7 +1,6 @@
 import { AiUnavailableError, type AiClient, type Embedder } from "@brandloop/ai";
 import {
   completeIngest,
-  deleteChunks,
   failIngest,
   getKnowledgeItem,
   KNOWLEDGE_EXTRACTED_MAX,
@@ -73,9 +72,7 @@ export async function ingestKnowledge(deps: IngestDeps, itemId: string): Promise
   try {
     text = (await sourceText(deps, item)).slice(0, KNOWLEDGE_EXTRACTED_MAX);
   } catch (err) {
-    if (await failIngest(item.id, safeMessage(err), started)) {
-      await deleteChunks(item.profileId, "KNOWLEDGE", item.id);
-    }
+    await failIngest(item.id, safeMessage(err), started); // also drops the chunks, atomically
     return;
   }
 

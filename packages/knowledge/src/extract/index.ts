@@ -1,12 +1,13 @@
 import type { AiClient } from "@brandloop/ai";
 import { KNOWLEDGE_EXTRACTED_MAX } from "@brandloop/db";
 import { IngestError } from "../errors";
-import { extractDocx } from "./docx";
 import { extractImage } from "./image";
-import { extractPdf } from "./pdf";
 import { extractPlain } from "./plain";
 import { extractUrl } from "./url";
-import { extractXlsx } from "./xlsx";
+import { parseInWorker } from "./run-parser";
+import { assertSafeZip } from "./zip-limits.mjs";
+import { DOCUMENT_TYPES } from "../limits";
+import type { ResourceLimits } from "node:worker_threads";
 
 export { assertPublicUrl, makePinnedLookup } from "./url";
 
@@ -15,33 +16,28 @@ export type ExtractInput =
   | { kind: "url"; url: string }
   | { kind: "image"; buf: Buffer; mime: string };
 
-export type ExtractDeps = { ai: AiClient; fetch?: typeof fetch; maxChars?: number; timeoutMs?: number };
+export type ExtractDeps = { ai: AiClient; fetch?: typeof fetch; maxChars?: number;
+  timeoutMs?: number;
+  maxInflateBytes?: number;
+  resourceLimits?: ResourceLimits;
+  /** Test seam: alternative worker entry file. */
+  workerFile?: string;
+};
 
-export const EXTRACT_TIMEOUT_MS = 60_000;
-
-/** Rejects with a readable message if `work` hasn't settled in `ms` (the work itself cannot be cancelled). */
-export function withTimeout<T>(work: Promise<T>, ms: number): Promise<T> {
-  let timer: ReturnType<typeof setTimeout>;
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new IngestError("That file took too long to read")), ms);
-  });
-  return Promise.race([work, timeout]).finally(() => clearTimeout(timer));
-}
-
-async function extractDocument(buf: Buffer, mime: string, maxChars: number): Promise<string> {
-  switch (mime) {
-    case "application/pdf":
-      return extractPdf(buf, maxChars);
-    case "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-      return extractDocx(buf, maxChars);
-    case "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
-      return extractXlsx(buf, maxChars);
-    case "text/plain":
-    case "text/markdown":
-      return extractPlain(buf).slice(0, maxChars);
-    default:
-      throw new IngestError("That file type isn't supported");
+async function extractDocument(buf: Buffer, mime: string, deps: ExtractDeps, maxChars: number): Promise<string> {
+  if (mime === "text/plain" || mime === "text/markdown") return extractPlain(buf).slice(0, maxChars);
+  if (!(mime in DOCUMENT_TYPES)) throw new IngestError("That file type isn't supported");
+  try {
+    // Cheap pass first, so an obvious zip bomb never costs a worker.
+    if (mime.includes("openxmlformats")) assertSafeZip(buf, { maxBytes: deps.maxInflateBytes });
+  } catch (err) {
+    if (err instanceof Error && err.name === "UserError") throw new IngestError(err.message);
+    throw err;
   }
+  return parseInWorker(
+    { buf, mime, maxChars, maxInflateBytes: deps.maxInflateBytes },
+    { timeoutMs: deps.timeoutMs, resourceLimits: deps.resourceLimits, workerFile: deps.workerFile },
+  );
 }
 
 export async function extractText(input: ExtractInput, deps: ExtractDeps): Promise<string> {
@@ -51,7 +47,7 @@ export async function extractText(input: ExtractInput, deps: ExtractDeps): Promi
 
   let text: string;
   try {
-    text = await withTimeout(extractDocument(input.buf, input.mime, maxChars), deps.timeoutMs ?? EXTRACT_TIMEOUT_MS);
+    text = await extractDocument(input.buf, input.mime, deps, maxChars);
   } catch (err) {
     if (err instanceof IngestError) throw err;
     throw new IngestError("Couldn't read that file");

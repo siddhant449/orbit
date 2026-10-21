@@ -215,3 +215,22 @@ describe("hardening", () => {
     expect(await getKnowledgeItem(item.id)).toBeNull();
   });
 });
+
+describe("failIngest and chunks", () => {
+  it("deletes the item's chunks in the same guarded step", async () => {
+    const p = await profile(30);
+    const item = await createKnowledge(p, { type: "URL", sourceUrl: "https://example.com/x" });
+    await replaceChunks(p, "KNOWLEDGE", item.id, [{ ordinal: 0, title: "t", text: "stale", embedding: null }]);
+    await failIngest(item.id, "boom");
+    expect(await prisma.knowledgeChunk.count({ where: { sourceId: item.id } })).toBe(0);
+  });
+
+  it("keeps the chunks when the compare-and-set skips the failure", async () => {
+    const p = await profile(31);
+    const item = await createKnowledge(p, { type: "URL", sourceUrl: "https://example.com/x" });
+    await replaceChunks(p, "KNOWLEDGE", item.id, [{ ordinal: 0, title: "t", text: "fresh", embedding: null }]);
+    expect(await failIngest(item.id, "boom", { content: "something else" })).toBeNull();
+    expect(await prisma.knowledgeChunk.count({ where: { sourceId: item.id } })).toBe(1);
+    expect((await getKnowledgeItem(item.id))?.status).toBe("PROCESSING");
+  });
+});

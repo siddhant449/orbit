@@ -139,16 +139,25 @@ export async function completeIngest(
   return count === 0 ? null : getKnowledgeItem(id);
 }
 
+/**
+ * Marks the item FAILED and drops its search chunks, atomically. With `expected`, it locks the row and
+ * skips (null) when the content has moved on, so a concurrent successful job is never left READY without chunks.
+ */
 export async function failIngest(
   id: string,
   message: string,
   expected?: { content: string | null },
 ): Promise<KnowledgeItem | null> {
-  const { count } = await prisma.knowledgeItem.updateMany({
-    where: { id, ...startedFrom(expected) },
-    data: { status: "FAILED", error: message },
+  const done = await prisma.$transaction(async (tx) => {
+    const rows = await tx.$queryRaw<{ content: string | null; profileId: string }[]>`
+      SELECT content, "profileId" FROM "KnowledgeItem" WHERE id = ${id} FOR UPDATE`;
+    const row = rows[0];
+    if (!row || (expected && row.content !== expected.content)) return false;
+    await tx.knowledgeItem.update({ where: { id }, data: { status: "FAILED", error: message } });
+    await tx.$executeRaw`DELETE FROM "KnowledgeChunk" WHERE "profileId" = ${row.profileId} AND "sourceType" = 'KNOWLEDGE'::"ChunkSource" AND "sourceId" = ${id}`;
+    return true;
   });
-  return count === 0 ? null : getKnowledgeItem(id);
+  return done ? getKnowledgeItem(id) : null;
 }
 
 /** `contentChanged` tells the caller to start a KNOWLEDGE_INGEST job that re-indexes the item. */
