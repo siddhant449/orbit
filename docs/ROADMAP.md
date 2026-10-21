@@ -38,7 +38,7 @@ Working name: **Brandloop** (packages are `@brandloop/*`). It gets renamed once 
 
 ## 2. AI chat and post editor
 
-- Chat home with streaming Claude
+- Chat home with streaming OpenAI models (via the Vercel AI SDK)
 - Chat history grouped by date, with pinned chats and folders
 - Fork a chat, delete trailing messages, regenerate a single line
 - Tiptap post editor with version history, and a chat for each post

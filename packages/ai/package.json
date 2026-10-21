@@ -9,7 +9,7 @@
   },
   "scripts": {
     "test": "vitest run",
-    "smoke": "tsx --env-file=../../.env scripts/smoke.ts",
+    "smoke": "tsx --env-file-if-exists=../../.env scripts/smoke.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

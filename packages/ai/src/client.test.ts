@@ -1,3 +1,4 @@
+import { APICallError, NoObjectGeneratedError } from "ai";
 import { MockLanguageModelV4 } from "ai/test";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
@@ -48,6 +49,34 @@ function make(text: string, finish: FinishUnified = "stop") {
 
 const schema = z.object({ a: z.number() });
 const base = { system: "sys", prompt: "p" } as const;
+
+/** What OpenAI's Responses API returns for a structured-output refusal. */
+const REFUSAL_BODY = JSON.stringify({
+  id: "resp_1",
+  output: [
+    {
+      type: "message",
+      role: "assistant",
+      content: [{ type: "refusal", refusal: "I'm sorry, I can't help with that." }],
+    },
+  ],
+});
+
+/** A client whose model throws the error the AI SDK raises when a provider call fails. */
+function makeFailing(responseBody: string | undefined, statusCode = 200) {
+  const model = new MockLanguageModelV4({
+    doGenerate: async () => {
+      throw new APICallError({
+        message: "Invalid JSON response",
+        url: "https://api.openai.com/v1/responses",
+        requestBodyValues: {},
+        statusCode,
+        responseBody,
+      });
+    },
+  });
+  return createAiClient("key", { model: () => model });
+}
 
 describe("createAiClient without a key", () => {
   it("constructs without throwing, then throws AiUnavailableError on use", async () => {
@@ -101,19 +130,59 @@ describe("createAiClient json()", () => {
     expect(JSON.stringify(user.content)).toContain("go");
   });
 
-  it("rejects schema-invalid model output", async () => {
+  it("rejects schema-invalid model output with the AI SDK NoObjectGeneratedError", async () => {
     const { client } = make('{"a":"x"}');
-    await expect(client.json({ model: "extract", ...base, schema })).rejects.toThrow();
+    const err = await client.json({ model: "extract", ...base, schema }).catch((e) => e);
+    expect(NoObjectGeneratedError.isInstance(err)).toBe(true);
+    expect(err.message).toContain("did not match schema");
   });
 
-  it("rejects output that is not JSON", async () => {
+  it("rejects output that is not JSON with the AI SDK NoObjectGeneratedError", async () => {
     const { client } = make("not json");
-    await expect(client.json({ model: "extract", ...base, schema })).rejects.toThrow();
+    const err = await client.json({ model: "extract", ...base, schema }).catch((e) => e);
+    expect(NoObjectGeneratedError.isInstance(err)).toBe(true);
+    expect(err).not.toBeInstanceOf(SyntaxError);
   });
 
   it("throws a 'declined' error on a content-filter refusal", async () => {
     const { client } = make("", "content-filter");
     await expect(client.json({ model: "extract", ...base, schema })).rejects.toThrow("declined");
+  });
+
+  it("throws 'declined' on a content-filter stop even when some text came back", async () => {
+    // Unparseable partial text: the parser fails, the real cause is still the filter.
+    const partial = make("I can't", "content-filter");
+    await expect(
+      partial.client.json({ model: "extract", ...base, schema }),
+    ).rejects.toThrow("declined");
+    // Perfectly valid JSON: it parses, but a filtered reply must still not be returned.
+    const valid = make('{"a":1}', "content-filter");
+    await expect(valid.client.json({ model: "extract", ...base, schema })).rejects.toThrow(
+      "declined",
+    );
+  });
+
+  it("maps an OpenAI refusal content part (Invalid JSON response) to 'declined'", async () => {
+    const client = makeFailing(REFUSAL_BODY);
+    const err = await client.json({ model: "extract", ...base, schema }).catch((e) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect(APICallError.isInstance(err)).toBe(false);
+    expect(err.message).toContain("declined");
+    // The original provider error stays reachable for debugging.
+    expect(APICallError.isInstance(err.cause)).toBe(true);
+  });
+
+  it("matches the refusal part regardless of JSON spacing", async () => {
+    const client = makeFailing('{"output":[{"content":[{ "type" :  "refusal", "refusal":"no"}]}]}');
+    await expect(client.json({ model: "extract", ...base, schema })).rejects.toThrow("declined");
+  });
+
+  it("leaves other provider errors untouched", async () => {
+    const client = makeFailing('{"error":{"message":"Incorrect API key provided"}}', 401);
+    const err = await client.json({ model: "extract", ...base, schema }).catch((e) => e);
+    expect(APICallError.isInstance(err)).toBe(true);
+    expect(err.statusCode).toBe(401);
+    expect(err.message).not.toContain("declined");
   });
 
   it("throws a clear output-limit error when truncated, never a SyntaxError", async () => {
@@ -142,6 +211,28 @@ describe("createAiClient text()", () => {
   it("throws a 'declined' error on a content-filter refusal", async () => {
     const { client } = make("", "content-filter");
     await expect(client.text({ model: "extract", ...base })).rejects.toThrow("declined");
+  });
+
+  it("throws 'declined' on a content-filter stop even when some text came back", async () => {
+    const { client } = make("I can't help with", "content-filter");
+    await expect(client.text({ model: "extract", ...base })).rejects.toThrow("declined");
+  });
+
+  it("maps an OpenAI refusal content part (Invalid JSON response) to 'declined'", async () => {
+    const client = makeFailing(REFUSAL_BODY);
+    const err = await client.text({ model: "extract", ...base }).catch((e) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect(APICallError.isInstance(err)).toBe(false);
+    expect(err.message).toContain("declined");
+  });
+
+  it("leaves other provider errors untouched", async () => {
+    // 401 is not retryable, so the SDK surfaces it immediately.
+    const client = makeFailing(undefined, 401);
+    const err = await client.text({ model: "extract", ...base }).catch((e) => e);
+    expect(APICallError.isInstance(err)).toBe(true);
+    expect(err.statusCode).toBe(401);
+    expect(err.message).not.toContain("declined");
   });
 
   it("throws the output-limit error when truncated", async () => {

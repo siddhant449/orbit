@@ -12,7 +12,8 @@ import { createAiClient, resolveModel, type ModelAlias } from "../src/client";
 
 const schema = z.object({ ok: z.boolean(), word: z.string() });
 
-const redact = (text: string) => text.replace(/sk-[A-Za-z0-9_-]+/g, "sk-***");
+// `*` is in the class so masked keys such as "sk-proj-****abcd" are fully redacted.
+const redact = (text: string) => text.replace(/sk-[A-Za-z0-9_*-]+/g, "sk-***");
 
 async function main() {
   if (!process.env.OPENAI_API_KEY) {

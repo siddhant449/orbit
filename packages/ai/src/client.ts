@@ -1,4 +1,4 @@
-import { generateText, NoObjectGeneratedError, Output } from "ai";
+import { APICallError, generateText, NoObjectGeneratedError, Output } from "ai";
 import type { FinishReason, LanguageModel, ModelMessage } from "ai";
 import { z } from "zod";
 import { getModel, type ModelAlias } from "./provider";
@@ -41,14 +41,38 @@ function buildMessages(prompt: string, images?: AiImage[]): ModelMessage[] {
   ];
 }
 
+const DECLINED_MESSAGE = "The model declined this request.";
+
 /** Turns refusals and token-limit truncation into clear errors, before any parsing. */
 function assertCompleted(reason: FinishReason | undefined): void {
   if (reason === "content-filter") {
-    throw new Error("The model declined this request.");
+    throw new Error(DECLINED_MESSAGE);
   }
   if (reason === "length") {
     throw new Error("The model response was cut off (output limit reached) before it finished.");
   }
+}
+
+/**
+ * OpenAI structured-output refusals arrive as a `{ "type": "refusal" }` content
+ * part, which @ai-sdk/openai's Responses schema does not accept. The SDK then
+ * throws APICallError("Invalid JSON response") carrying the raw response body.
+ */
+function isOpenAiRefusal(err: unknown): boolean {
+  return (
+    APICallError.isInstance(err) &&
+    typeof err.responseBody === "string" &&
+    /"type"\s*:\s*"refusal"/.test(err.responseBody)
+  );
+}
+
+/** Rethrows an AI SDK failure as the clearest error we can name; never returns. */
+function rethrowClearly(err: unknown): never {
+  if (isOpenAiRefusal(err)) throw new Error(DECLINED_MESSAGE, { cause: err });
+  // A cut-off or filtered reply can still reach the parser and fail there;
+  // report the real cause instead of a parse error.
+  if (NoObjectGeneratedError.isInstance(err)) assertCompleted(err.finishReason);
+  throw err;
 }
 
 /**
@@ -67,12 +91,17 @@ export function createAiClient(
 
   return {
     async text({ model, system, prompt, images }) {
-      const result = await generateText({
-        model: modelFor(model),
-        instructions: system,
-        messages: buildMessages(prompt, images),
-        maxOutputTokens: MAX_OUTPUT_TOKENS,
-      });
+      let result;
+      try {
+        result = await generateText({
+          model: modelFor(model),
+          instructions: system,
+          messages: buildMessages(prompt, images),
+          maxOutputTokens: MAX_OUTPUT_TOKENS,
+        });
+      } catch (err) {
+        rethrowClearly(err);
+      }
       assertCompleted(result.finishReason);
       return result.text.trim();
     },
@@ -87,10 +116,7 @@ export function createAiClient(
           maxOutputTokens: MAX_OUTPUT_TOKENS,
         });
       } catch (err) {
-        // A cut-off or filtered reply can still reach the parser and fail there;
-        // report the real cause instead of a parse error.
-        if (NoObjectGeneratedError.isInstance(err)) assertCompleted(err.finishReason);
-        throw err;
+        rethrowClearly(err);
       }
       assertCompleted(result.finishReason);
       return result.output;
