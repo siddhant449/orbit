@@ -28,9 +28,8 @@ for (const s of stats) {
 
 // Lazy chunks: identified by a string that only the lazily imported module contains.
 const markers = {
-  // The domAnimation feature bundle is an object literal whose keys survive minification.
-  "motion features (domAnimation)": "inView:",
-  "dither field": "dither__canvas",
+  // The lazily imported features module is a tiny object-literal stub (`renderer`, animation, gestures).
+  "motion features (features.ts stub)": "renderer:",
 };
 const chunkDir = join(dir, ".next/static/chunks");
 const files = readdirSync(chunkDir).filter((f) => f.endsWith(".js"));

@@ -90,3 +90,19 @@ The sign-in route grew more than the app routes (+34 KB vs Task 1) although it r
 imports `MotionProvider` from the `@brandloop/ui` barrel, which now also exports `SmoothScroll` (`lenis/react` and
 `lenis`) and `Reveal`; `lenis` carries no `sideEffects: false`, so it is retained. Suggested follow-up: import the
 provider through a `@brandloop/ui/motion` subpath export so auth pages do not pay for Lenis.
+
+## After the Drafting table rollout (same task, every screen re-themed)
+
+Measured the same way after `pnpm --filter @brandloop/web build` with the riso devices removed (no dither field, no grain,
+no colour plates), `MotionProvider` imported through `@brandloop/ui/motion` and Lenis / `Reveal` through
+`@brandloop/ui/scroll`.
+
+| Route | First Load JS gzip | Change from baseline | Change from the R2 showpiece build |
+|-------|-------------------:|---------------------:|-----------------------------------:|
+| `/` (home) | 320,948 B (313.4 KiB) | **+56,587 B (+55.3 KiB)**, within the 90 KB budget | +558 B |
+| `/strategy` | 351,340 B | +56,640 B | +2,262 B (`CountUp`) |
+| `/settings` | 315,124 B | +56,559 B | +2,181 B |
+| `/sign-in/[[...sign-in]]` | 220,521 B | +22,940 B | **−38,581 B** (the subpath import keeps Lenis and the motion components off the auth pages; now below Task 1's 224,836 B) |
+
+Lazy chunks: only the `features.ts` stub remains (`349d1vbvyhych.js`, 239 B raw / 209 B gzip); the dither chunk is gone
+with the component. The framer-motion feature implementations stay in the eager framer-motion chunk as noted above.

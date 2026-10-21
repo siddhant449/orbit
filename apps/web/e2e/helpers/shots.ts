@@ -37,8 +37,10 @@ export async function captureSet(page: Page, screen: string) {
 }
 
 /** Fails the test on any serious or critical axe violation, listing the rules and the first nodes. */
-export async function axeCheck(page: Page) {
-  const { violations } = await new AxeBuilder({ page }).analyze();
+export async function axeCheck(page: Page, options: { exclude?: string[] } = {}) {
+  let builder = new AxeBuilder({ page });
+  for (const selector of options.exclude ?? []) builder = builder.exclude(selector);
+  const { violations } = await builder.analyze();
   const blocking = violations.filter((v) => v.impact === "serious" || v.impact === "critical");
   const report = blocking
     .map((v) => `${v.id} (${v.impact}): ${v.help}\n${v.nodes.slice(0, 3).map((n) => `  ${n.target.join(" ")}\n  ${n.failureSummary}`).join("\n")}`)

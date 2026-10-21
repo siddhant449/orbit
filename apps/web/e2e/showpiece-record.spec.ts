@@ -31,7 +31,7 @@ test("showpiece walkthrough", async ({ page }) => {
   await page.waitForTimeout(1800);
   await shot(page, "1440-day");
 
-  // 2. Move the cursor across the dither field and over the nav rows.
+  // 2. Move the pointer across the hero and over the nav rows.
   await page.mouse.move(420, 560, { steps: 30 });
   await page.mouse.move(980, 420, { steps: 40 });
   await page.mouse.move(700, 640, { steps: 30 });
