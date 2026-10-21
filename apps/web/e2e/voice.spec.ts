@@ -10,6 +10,19 @@ test("writing style: search, select, persist; add-your-style validation", async 
   await clerk.signIn({ page, emailAddress: email! });
   await page.goto("/");
 
+  // The picker ignores re-selecting the current style, so a previous run that left
+  // Odalys selected would produce no toast. Guarantee Odalys is not the current style.
+  const selectedStyle = page.getByRole("group", { name: "Selected writing style" });
+  await expect(selectedStyle).toBeVisible();
+  if ((await selectedStyle.textContent())?.includes("Odalys Brennan")) {
+    await page.getByRole("button", { name: "Change writing style" }).click();
+    await page.getByRole("combobox", { name: "Search writing styles" }).fill("Callum");
+    await expect(page.getByRole("option", { name: /Callum Strand/ })).toBeVisible();
+    await page.keyboard.press("Enter");
+    await expect(page.getByText("Writing style: Callum Strand")).toBeVisible();
+    await expect(selectedStyle).toContainText("Callum Strand");
+  }
+
   await page.getByRole("button", { name: "Change writing style" }).click();
   await page.getByRole("combobox", { name: "Search writing styles" }).fill("Odalys");
   await expect(page.getByRole("option", { name: /Odalys Brennan/ })).toBeVisible();
