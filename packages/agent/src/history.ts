@@ -16,6 +16,12 @@ const DEFAULTS: WindowOpts = {
 const isReasoning = (p: Part) => p.type === "reasoning" || p.type === "reasoning-file";
 const isToolWithOutput = (p: Part): p is Part & { output: unknown } =>
   (p.type.startsWith("tool-") || p.type === "dynamic-tool") && "output" in p && p.output !== undefined;
+/**
+ * Provider-executed tools (OpenAI's hosted `web_search`) keep their structured output: the provider
+ * rebuilds its own call item from it (`web_search_call` when `store` is off), and a string in its place
+ * makes the search vanish from the request. Their outputs are small (an action and a source list).
+ */
+const isProviderExecuted = (p: Part) => "providerExecuted" in p && p.providerExecuted === true;
 
 function truncateOutput(output: unknown, max: number): unknown {
   const text = typeof output === "string" ? output : JSON.stringify(output);
@@ -34,7 +40,7 @@ function fromFirstUser(messages: ChatUIMessage[]): ChatUIMessage[] {
 /**
  * The history window sent to the orchestrator (design §7.2). Pure: returns new messages and never
  * mutates its input. Reasoning is dropped; old tool outputs are replaced by a note (inputs stay);
- * large outputs are truncated; then the oldest messages go until the window fits the char budget.
+ * large outputs are truncated (provider-executed tool outputs are exempt from both); then the oldest messages go until the window fits the char budget.
  * The window always starts at a user message.
  */
 export function windowHistory(messages: ChatUIMessage[], opts: Partial<WindowOpts> = {}): ChatUIMessage[] {
@@ -44,7 +50,7 @@ export function windowHistory(messages: ChatUIMessage[], opts: Partial<WindowOpt
   window = window.map((m, i) => {
     const old = i < window.length - o.fullToolOutputs;
     const parts = m.parts.filter((p) => !isReasoning(p)).map((p) => {
-      if (!isToolWithOutput(p)) return p;
+      if (!isToolWithOutput(p) || isProviderExecuted(p)) return p;
       return { ...p, output: old ? OMITTED_OUTPUT : truncateOutput(p.output, o.maxToolOutputChars) } as Part;
     });
     return { ...m, parts };

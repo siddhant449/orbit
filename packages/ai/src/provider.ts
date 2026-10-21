@@ -1,5 +1,5 @@
 import { createOpenAI, openai } from "@ai-sdk/openai";
-import type { EmbeddingModel, LanguageModel } from "ai";
+import type { EmbeddingModel, LanguageModel, Tool } from "ai";
 
 export type ModelAlias = "generate" | "extract";
 
@@ -35,4 +35,12 @@ export function resolveEmbeddingModel(): string {
 export function getEmbeddingModel(apiKey?: string): EmbeddingModel {
   const id = resolveEmbeddingModel();
   return apiKey ? createOpenAI({ apiKey }).embedding(id) : openai.embedding(id);
+}
+
+/**
+ * OpenAI's hosted web search for the chat agent (provider-executed: OpenAI runs it and streams the
+ * result back). Registered under the tool key `web_search`. Building it never reads the key.
+ */
+export function webSearchTool(): Tool {
+  return openai.tools.webSearch({}) as Tool;
 }

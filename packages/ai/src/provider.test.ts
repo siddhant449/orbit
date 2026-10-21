@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getModel } from "./provider";
+import { getModel, webSearchTool } from "./provider";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -42,5 +42,14 @@ describe("getModel", () => {
   it("follows the AI_MODEL_* overrides", () => {
     vi.stubEnv("AI_MODEL_EXTRACT", "custom-extract");
     expect((getModel("extract") as { modelId: string }).modelId).toBe("custom-extract");
+  });
+});
+
+describe("webSearchTool", () => {
+  it("is OpenAI's hosted web search, built without a key", () => {
+    vi.stubEnv("OPENAI_API_KEY", "");
+    const t = webSearchTool() as { type: string; id: string };
+    expect(t.type).toBe("provider");
+    expect(t.id).toBe("openai.web_search");
   });
 });
