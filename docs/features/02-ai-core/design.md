@@ -1,6 +1,6 @@
 # Feature 2 design: the AI core (chat agent, memory, retrieval, posts)
 
-Status: **draft for approval, 2026-10-21.** Evidence: `docs/research/kleo-ai-architecture.md` (cited as §n), plus
+Status: **approved 2026-10-21, amended the same day: guided flows are in v1 (§6.6).** Evidence: `docs/research/kleo-ai-architecture.md` (cited as §n), plus
 `kleo-ai-recon-log.md`, `kleo-app-teardown.md` and `kleo-api-map.txt`. Master plan Part C (C1–C7) and the F1 provider layer
 (`packages/ai`, commit `b943717`: `ai` 7.0.146, `@ai-sdk/openai` 4.0.98, `createAiClient`, `getModel(alias)`) are the base.
 
@@ -9,7 +9,7 @@ Status: **draft for approval, 2026-10-21.** Evidence: `docs/research/kleo-ai-arc
 One chat where a person talks to an assistant that knows them. It can recall and save what it knows, search their own
 material, research the web, and draft and edit LinkedIn posts in their voice. Posts open in a side panel as versioned
 documents. Kleo's behaviour is the bar: what the user sees and the server contracts behind it. We build it our own way,
-with our own copy and the Riso Print look. Feature 1's remaining tasks (knowledge ingestion, transcription, the knowledge
+with our own copy and the Drafting table look (`docs/design/system.md`). Feature 1's remaining tasks (knowledge ingestion, transcription, the knowledge
 screen, first-run setup) are folded in, because retrieval and chat depend on them.
 
 ## 2. Copy, simplify or skip
@@ -35,8 +35,11 @@ screen, first-run setup) are folded in, because retrieval and chat depend on the
 | Semantic `updateDocument`, `proposeDocumentEdits`, version history, restore (§4a, §7) | **Copy**, smaller input surface (§6.4) |
 | `context.activeTask` ledger on every assistant message (§8) | **Copy**, a smaller schema (§7.1) |
 | Web research through Perplexity (§1, §4a) | **Replace** with OpenAI's built-in web search (`openai.tools.webSearch`) |
-| Quick-link chips under the post (§8) | **Copy** five fixed chips. Custom quick links come later |
-| 37 guided flows, `presentOptions`, `kleo-hidden` control messages (§8) | **Later** (§14) |
+| Quick-link chips under the post and under the reply (§8, §12c) | **Copy** a fixed catalogue of 9 (6 usable in v1); the panel and the latest reply show the 5 post chips. Custom quick links ("+ Add quick link") come later |
+| 37 guided flows in 6 menu categories, driven by `flowType`/`flowStep` (§8) | **Copy** as a typed catalogue (§6.6) with our own titles, seeds and step guides; flows needing features we don't have yet are listed with `available: false`. Steps advance on the server, not in the client |
+| `presentOptions` and the option picker; `kleo-hidden` control blocks for picks, the chosen hook and edit-proposal accept/reject (§3, §4a, §8) | **Copy** with our own fence (`brandloop-hidden`) and a smaller schema: one question per picker, 2–6 options. The server strips and validates blocks; the model never sees the JSON |
+| `uiAction`, `quickLinkKey` in the body (§2) | **Copy**. `handoffIntent`, `forcedPostTitle` and weekly templates: **Skip** (no features behind them) |
+| Server-fabricated deterministic paths (`swap-hook`, `edit-proposal`, §4d) | **Copy** for control messages: hook swaps, proposal accept/reject, dismissals and leaving a flow need no model call |
 | `writeTodos`/`updateTodo`, `findTools` (§4) | **Skip**. No stored use was ever seen. The ledger carries task state, and ~20 tools fit in every request |
 | `runSkill` (§4e, never observed) | **Copy** the idea: prompt modules loaded on demand (§11) |
 | Server-fabricated "direct" tool paths (§4d) | **Partial**: accepting a proposal is a deterministic route, not a model call |
@@ -79,7 +82,7 @@ for labels, grouping helpers and types.
 - **Message** `(id = UIMessage id, chatId, seq autoincrement, role ChatRole{USER, ASSISTANT}, parts Json,
   metadata Json?, context Json?, runId?, createdAt)`, ordered by `seq`.
   - User `context`: `{selectedKnowledgeBaseIds, selectedWritingStyleId, webSearchEnabled, quickLinkKey?,
-    documentContext?: {id, version}}`.
+    documentContext?: {id, version}, flowType, flowStep, uiAction, control: <control kind>|null}`.
   - Assistant `context`: `{requestMessageId, runId, activeTask, documentId?, modelId, finish: "stop"|"aborted"|"error",
     learningExcluded?}`.
   - Stored parts: `text`, `step-start`, `tool-*`, `source-url`, `file`. Reasoning and transient `data-*` parts are dropped.
@@ -93,7 +96,8 @@ for labels, grouping helpers and types.
 - **ActiveTask** (JSON, version 1, on the assistant `context`):
   `{version:1, taskId, status: active|completed|failed, attempt, artifact:{id,title}|null, latestRequest,
   requestMessageId, handoffs:[{id, specialist, readiness, confidence, parentAction, requestDigest, hasMissingInput}],
-  completedActions:string[], recentDirections:[{text, messageId}], pendingQuestion:string|null, updatedAt}`.
+  completedActions:string[], recentDirections:[{text, messageId}], pendingQuestion:string|null,
+  flow:{id, step}|null, pendingPicker:{id, question}|null, updatedAt}`.
 - **JobKind += MEMORY_LEARN.**
 - **Docker:** the dev database moves from `postgres:16-alpine` to `pgvector/pgvector:pg16`. We dump and restore into a new
   volume, because alpine (musl) and debian (glibc) collations differ. Neon has pgvector in production.
@@ -105,7 +109,7 @@ Chat errors use Kleo's shape, `{code, cause}`. Other routes keep `{error}`, plus
 
 | Route | Contract |
 |---|---|
-| `POST /api/chat` | Body: `{id: uuid, runId: uuid, message: UIMessage(role user; text and file parts; metadata {createdAt, hideInUI?, quickLinkKey?}), selectedKnowledgeBaseIds: string[] ≤5, selectedWritingStyleId: string\|null, webSearchEnabled: boolean (default true), documentContext?: {id, version}, quickLinkKey?: string}`. Returns 200 SSE (UI message stream). Errors: 400 `bad_request`; 413 `message_too_long` (>200,000 chars); 404 `chat_not_found`; 409 `chat_turn_active` with `activeTurn {runId, requestMessageId}`; 503 `ai_unavailable`. `maxDuration = 300` |
+| `POST /api/chat` | Body: `{id: uuid, runId: uuid, message: UIMessage(role user; text and file parts; metadata {createdAt, hideInUI?, quickLinkKey?}), selectedKnowledgeBaseIds: string[] ≤5, selectedWritingStyleId: string\|null, webSearchEnabled: boolean (default true), documentContext?: {id, version}, quickLinkKey?: string (a catalogue key), flowType?: string\|null, flowStep?: string\|null, uiAction?: "start-flow"\|"quick-link"\|"composer-action"\|null}`. A hidden control block may sit at the end of the message text (§6.6). Returns 200 SSE (UI message stream). Errors: 400 `bad_request` (also an unknown or unavailable flow, cause `unknown_flow`/`flow_unavailable`); 413 `message_too_long` (>200,000 chars); 404 `chat_not_found`; 409 `chat_turn_active` with `activeTurn {runId, requestMessageId}`; 503 `ai_unavailable`. `maxDuration = 300` |
 | `GET /api/chat/:id/stream` | Replays and tails the active run's SSE from this instance. 204 when there is none |
 | `POST /api/chat/stop` | `{chatId, runId}`. Aborts the run here if it is local and sets `stopRequestedRunId` for other instances. Always 200 `{stopped: boolean}` |
 | `GET /api/chat/:id/messages` | `{messages, activeTurn: {runId, requestMessageId}\|null, document: {id, title, version, text}\|null}` |
@@ -143,6 +147,8 @@ System prompt, ordered so the stable prefix comes first (OpenAI caches prompt pr
    - Changes to the open post: `updateDocument`, or `proposeDocumentEdits` for a passage.
    - Durable facts and "remember…": `saveMemory`; corrections: `editMemory`. Never save your own words, questions or task requests.
    - Web search only when it's enabled and the answer needs current facts.
+   - In a flow, follow the `<flow>` step guide. To ask the user to choose, call `presentOptions` and stop; never list the options in text too.
+   - `updateContentStrategy` only after the user picked an option that applies the change.
    - At most one call per specialist per request, unless the first one returned `missingInput`.
 4. **Error vocabulary** and the right reaction to each: `EXISTING_POST`, `EDIT_REQUIREMENTS_MISSED`, `STALE_DOCUMENT`,
    `STALE_SELECTED_PASSAGE`, and the `Failed:` and `Refused:` prefixes.
@@ -152,7 +158,8 @@ System prompt, ordered so the stable prefix comes first (OpenAI caches prompt pr
    - `<memory_index>`: the `viewMemory` index, without contents
 7. **Per turn:**
    - `<active_task>`: the ledger
-   - `<composer>`: selected knowledge items (id and title only), web search on or off, quick action
+   - `<composer>`: selected knowledge items (id and title only), web search on or off, quick-link key and `uiAction`
+   - `<flow>`: the active flow's id, step, guide and routes (§6.6), when one is active
    - `<open_document id version>`: the current text, read from the database
    - date, timezone and language
 
@@ -188,6 +195,9 @@ Output formats are the contract the model learns. Memory and knowledge tools ret
 | `generateHooks` | `{topic, draftBody?, count?: 3..8 = 5, excludeHooks?: string[]}` | `{success, hooks: [{text, trigger, charCount}]}` |
 | `analyzePost` | `{postContent?}` (defaults to the open document) | `{success, analysis}` as markdown (what works, what to fix, hook, structure, call to action, score /10) |
 | `runSkill` | `{name}` (enum of skill names) | The skill's markdown |
+| `presentOptions` | `{question, preamble?, options: [{id, label, detail?}] 2..6, multiSelect, allowFreeInput, freeInputPlaceholder?, recommendedOptionId?}` | `{pickerId (= toolCallId), taskId, …input}`. The turn stops after it (`hasToolCall`) |
+| `extractSource` | `{url}` | `{success, kind: article\|video, title, content ≤20,000, sourceUrl}` or `Failed: couldn't read that page (…)`. Saves nothing. Video once transcription lands |
+| `updateContentStrategy` | `{goal?, positioning?, tagline?, expertise?, reason}` | `✓ Strategy updated (<fields>)` or `Failed: …`. Writes through `saveStrategy`, which re-mirrors `strategy/themes` |
 | `web_search` | provider-executed (`openai.tools.webSearch({searchContextSize: "medium"})`) | Sources stream as `source-url` parts (`sendSources: true`). Only present when `webSearchEnabled` |
 
 ### 6.3 Specialists and the handoff envelope
@@ -245,6 +255,80 @@ payloads: post-writing {readiness: ready|needs-user-input, title, hook, draft, c
   - Reject writes to `strategy/*`, which are mirrors.
   - Dedupe against existing lines.
 
+### 6.6 Guided flows, option pickers and hidden control messages (v1, user change 2026-10-21)
+
+**Catalogue.** `packages/agent/src/flows/catalogue.ts` is plain data, safe to import on the client. Each `FlowDef` has: `id`,
+`kleoType` (the Kleo type it stands in for, or null), `category`, `title`, `description`, `seed` (the visible first message),
+`inputs` (`topic`, `notes`, `url`, `video-url`, `document`, each required or optional), `steps` (`{id, guide, advanceOn,
+next}`, first step `start`), `routes` (specialist, tool, skill or plain chat), `needsDocument`, `needsWebSearch`, `surfaces`
+(menu, composer, chip), `available` and `unavailableReason`. All wording is ours. Categories: Find ideas, Write, Sharpen,
+Review, Learn, Get help (Kleo's six). Menus list only available flows.
+
+| Category | Available in v1 (our id ← Kleo type) | `available: false` (reason) |
+|---|---|---|
+| Find ideas | `ideas-for-me` ← post-ideas; `ideas-from-news` ← trending (needs web search on); `post-today` ← suggest-today; `update-strategy` ← update-strategy; `interview-me` (Kleo's "Interview me" action) | `ideas-from-my-posts` ← ideas-from-posts (post history, Feature 3); `develop-saved-idea` ← develop-saved-idea (saved ideas) |
+| Write | `draft-from-topic` ← write-from-topic; `draft-from-notes` ← write-from-draft; `plan-a-post` ← plan-post-idea; `blank-page` ← build-from-scratch; `article-to-post` ← article-to-post; `rework-text` ← repurpose-post; `video-to-post` (ours; turns on with plan Task 16) | `post-from-image` ← write-from-visual (chat attachments) |
+| Sharpen | `sharpen-hook` ← improve-hook; `hook-options` ← hook-variations (chip); `writing-rules` ← writing-styles | `image-ideas` ← suggest-images (Visuals); `format-check` ← preview-format-post (post preview, Feature 3); `profile-copy` ← improve-profile-copy (LinkedIn profile) |
+| Review | `analyze-post` (ours; Kleo's analyze quick link); `post-feedback` ← feedback-post (chip) | `my-performance` ← analyze-performance; `profile-review` ← review-profile; `study-a-voice` ← study-creator; `top-patterns` ← top-post-patterns; `niche-topics` ← top-topics-hooks (LinkedIn data or Inspiration) |
+| Learn | `linkedin-basics` ← learn-linkedin; `grow-audience` ← grow-faster; `win-clients` ← get-clients; `newsletter-plan` ← email-strategy; `video-posts` ← linkedin-video; `coach-me` ← content-coach; `hook-workshop` ← write-better-hooks | — |
+| Get help | `help-start` ← help-get-started; `help-tips` ← help-get-most; `help-feature` ← help-feature (answered from `HELP_FACTS`) | `help-connections` ← help-integrations (connected apps); `help-person` ← help-human (no support contact yet) |
+
+40 entries: all 37 Kleo types mapped once, plus three of ours. 26 are available when Task 12 lands and 27 after Task 16; 13 stay
+unavailable. Example step machines:
+- `ideas-for-me`: `start` (offer 3–5 themes from the strategy with `presentOptions`) → on `picked` → `theme-picked`
+  (`delegateStrategy` for that theme, then up to 5 ideas as options) → on `picked` → `idea-picked` (`delegateWriting`, then
+  `createDocument`) → on `document-created` → done.
+- `plan-a-post`: `start` (ask for the idea, free input) → `idea-given` (angles as options) → `angle-picked` (formats as options)
+  → `format-picked` (`generateHooks`; the user picks one through the hooks card) → on `hook-picked` → `hook-picked`
+  (`delegateWriting` with that hook word for word, `createDocument`) → done.
+- `article-to-post`: `start` (needs `url`; `extractSource`) → on `source-read` → `source-read` (directions as options) → on
+  `picked` → `direction-picked` (`delegateWriting` grounded on the article text, `createDocument`) → done.
+
+**Turn plumbing.** The body carries `flowType`, `flowStep`, `uiAction` and `quickLinkKey` (§5). They are stored on the user
+message's `context`. Steps are **server-authoritative**: `startFlow` validates a flow start (unknown or unavailable → 400);
+otherwise the flow comes from the previous ledger while its task is active. After the turn, `advanceFlow` moves at most one
+step on the turn's events (`picked`, `hook-picked`, `document-created`, `document-updated`, `source-read`, `reply`). The result
+is saved as `activeTask.flow` and rendered into the next prompt as `<flow id step title>` with that step's guide and routes.
+The block is per turn, so the cached static prefix doesn't change.
+
+**`presentOptions` and the picker.** The agent offers 2–6 options for one question (§6.2). `stopWhen` includes
+`hasToolCall("presentOptions")`, so the turn ends there and the ledger stays `active` with `pendingPicker`. The picker renders
+under the reply: question, options (the recommended one tagged "Suggested"), optional free text, Continue for multi-select,
+and Skip. After an answer it collapses to "You picked: …". Only the newest unanswered picker is interactive.
+
+**Hidden control messages.** A click sends a user message with `metadata.hideInUI: true` whose text is a short summary plus a
+fenced block:
+
+````
+Picked: Contrarian take
+
+```brandloop-hidden
+{"v":1,"kind":"options","pickerId":"call_p","picked":["contrarian"],"freeText":null}
+```
+````
+
+Kinds: `options` {pickerId, picked[], freeText?}, `options-dismissed` {pickerId}, `hook` {hookText, toolCallId?},
+`edit-proposal` {toolCallId, decision: accept|reject, documentVersion}, `exit-flow`. The server stores the text as sent,
+then `parseControl` strips every block and validates the last one with zod. A malformed block is dropped. A pick whose ids
+don't belong to the stored picker becomes a "didn't match, ask again" note. Before windowing, `renderControlMessages` turns
+every control message in history into a plain sentence (`Picked "Contrarian take" for "Which angle?".`), so **the model never
+sees the JSON**. The client sanitiser strips stray blocks from assistant text.
+
+Resolution:
+- **Continue with the model:** a valid pick (event `picked`), a hook with no open post (note: use this exact opening line).
+- **Handled with a fixed reply and no model call:** a hook with an open post (deterministic swap of the first paragraph,
+  saved as `AI_EDIT`, `data-document` streamed), edit-proposal accept (`applyProposal`, the same function as the route) or
+  reject, a dismissed picker, and leaving a flow. The assistant message and the ledger are still saved, and the lock released.
+
+**Chips and quick actions.** `QUICK_LINKS` holds 9 entries (hook options, another angle, rework the ending, review it,
+analyze it, image ideas, summarize sources, carousel, trends in my niche). 6 work in v1; the 5 that need a post show in the
+panel and under the latest finished reply. Without a post, the reply chips offer three flow starters. There are no chips
+while streaming, while a picker is pending, or inside a flow. The home composer's five starters ("Find ideas", "Draft a
+post", "Improve a draft", "Review my posts", "Learn the basics") start `ideas-for-me`, `draft-from-topic`, `draft-from-notes`,
+`analyze-post` and `linkedin-basics`. A "Guided flows" menu in the composer lists the six categories. A thin flow strip above
+the composer shows the step and has "Leave". Visual detail belongs to the UI track; the chat track builds these in
+`components/chat/` with `@brandloop/ui` primitives and radix.
+
 ## 7. Context management
 
 ### 7.1 Active task ledger
@@ -255,7 +339,9 @@ rendered into the next prompt's `<active_task>`.
 - **Status:**
   - `failed` on abort or error.
   - `active` when a handoff has `missingInput`, or readiness is `needs-user-input`, or the reply ends in a question.
+  - `active` while a picker is pending (`pendingPicker`); `pendingQuestion` is its question.
   - `completed` otherwise.
+- **Flow:** the turn's resolved flow state (§6.6) is stored as given; it is null once the flow ends or the user leaves it.
 - **Kept across turns:** `artifact` always carries over. Lists keep their last 5 entries (`completedActions` keeps 10).
 
 The ledger replaces Kleo's `writeTodos`. It is the only state besides the document that crosses turns once older
@@ -268,7 +354,7 @@ messages fall out of the window.
 - In messages older than the last 6, tool outputs become `[output omitted; call the tool again if you need it]`. Tool inputs stay.
 - Any tool output over 4,000 chars is truncated with a marker.
 - Reasoning parts are dropped.
-- `hideInUI` messages are kept, because the model needs them.
+- `hideInUI` messages are kept, because the model needs them. Control blocks in them are first rewritten to plain sentences (§6.6).
 - The window is converted with `convertToModelMessages(…, {tools})`.
 
 There is no summarisation in v1. Kleo shows none either (§9). The ledger, the memory index and the open document carry
@@ -312,11 +398,12 @@ The panel opens on `data-document`, or when the chat already has a document. It 
 - Edit, then Save (`PATCH` with `expectedVersion`)
 - a version list with Restore
 - Copy
-- five quick-link chips: "Hook options", "Change the angle", "Change the closing", "Review it", "Analyze it". Each sends a
-  hidden user message (`metadata.hideInUI`, `quickLinkKey`) with a fixed prompt in our own wording.
+- five quick-link chips: "Hook options", "Try another angle", "Rework the ending", "Review it", "Analyze it". Each sends a
+  hidden user message (`metadata.hideInUI`, `quickLinkKey`) with a fixed prompt in our own wording. The same five show under
+  the latest reply (§6.6).
 
-A `proposeDocumentEdits` result renders as a card (passage → replacement) with Apply and Dismiss. Apply calls the route,
-and the panel refreshes. Before each send, the composer saves any pending panel edit. If a save is still running, it won't
+A `proposeDocumentEdits` result renders as a card (passage → replacement) with Apply and Dismiss. From plan Task 13 both send a
+hidden control message that the server resolves without a model call (§6.6); the apply route stays as the API. Before each send, the composer saves any pending panel edit. If a save is still running, it won't
 send: "Saving your edit first." Rich text (Tiptap), images, scheduling and publishing come with Feature 3 and later.
 
 ## 10. Learning loop
@@ -370,8 +457,10 @@ with no real creators named.
 
 ## 14. Out of scope (later, evidence kept in the research doc)
 
-- Guided flows (37), `presentOptions` and hidden control messages (§8)
-- Custom quick links
+- Custom quick links ("+ Add quick link") and `GET /api/quick-links`
+- Multi-question pickers (`steps[]`), `buildWithMeChoice`, `postUnderstandingConfirmation`, editor selection scoping (`editSelection`, `conversationScope`)
+- The 13 flows marked `available: false` in §6.6, until their features exist
+- `handoffIntent`, `forcedPostTitle`, weekly templates
 - Regenerate-line, fork, delete trailing messages, chat folders, sharing and visibility
 - Chat file and PDF attachments
 - Templates, swipes, inspiration, audiences, offers and their tools
@@ -400,14 +489,25 @@ with no real creators named.
    caps: 12 steps, output caps, one specialist call per request by policy. There is no per-user rate limit yet.
 5. **Prompt injection** from knowledge or web text. It's tagged as data. Memory writes come only from tool calls the model
    makes on the user's words, plus a learning job that sees only user text.
-6. **The redesign track owns** `components/home/composer.tsx`, `components/shell/sidebar.tsx` and `app/(app)/page.tsx`.
-   The chat UI touches each in one place, after merging `feature/ui-redesign` into `feature/ai-core`.
-7. **The Docker image switch** risks the local dev data. A dump and restore is mandatory before switching.
+6. **The redesign track owns** `components/home/composer.tsx`, `components/shell/sidebar.tsx`, `app/(app)/page.tsx` and
+   `packages/ui`. `feature/ui-redesign` is merged into `feature/ai-core` (`b425316`). The chat UI touches the three app files
+   additively (an `onSend` and an `onStarter` prop, the Chats placeholder); nothing is added to `packages/ui`.
+8. **Flow quality.** 27 flows share one orchestrator; each relies on its step guide. Only `ideas-for-me` and one pick are
+   covered by the mock e2e and the live smoke. Weak guides show up as the model skipping `presentOptions`; the guides are data
+   and cheap to tune.
+7. **The Docker image switch** risks the local dev data. A dump and restore is mandatory before switching. The container
+   belongs to compose project `kleo-clone` (main checkout), so the worktree's compose file pins `name: kleo-clone`, and the
+   main checkout's compose file must get the same image change, or a `pnpm db:up` there brings back the alpine container.
 
 ## 16. Decisions to confirm with the user
 
 1. The orchestrator gets the memory index only, and specialists get injected grounding (§6.1). This changes master plan C3.
 2. Resumable streams stay in process until the Inngest/Redis work. Single-instance only.
-3. v1 tool scope per §6.2. Flows, `presentOptions`, todos, `writeMemory` and attachments are deferred.
+3. v1 tool scope per §6.2. Todos, `writeMemory` and attachments are deferred. **Amended:** guided flows, `presentOptions`
+   and hidden control messages are in v1 (§6.6), as plan Tasks 12–14.
 4. Dev database switch by dump and restore into a new volume.
-5. The chat UI starts only after `feature/ui-redesign` is merged into `feature/ai-core`.
+5. The chat UI starts only after `feature/ui-redesign` is merged into `feature/ai-core`. **Done** at `b425316`.
+6. Flow steps are server-authoritative: the client sends `flowType` (and optionally a start `flowStep`) only when it starts
+   a flow; picks and events advance it on the server.
+7. Control messages that only record a decision (hook swap, proposal accept/reject, dismiss, leave flow) get a fixed reply
+   and no model call.

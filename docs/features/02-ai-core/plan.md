@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** A Kleo-grade chat agent that knows the user (versioned markdown memory), searches their material (hybrid FTS + pgvector), researches the web, and drafts and edits LinkedIn posts as versioned side-panel documents through specialists. Feature 1's remaining tasks (knowledge ingestion, transcription, knowledge screen, setup) are folded in.
+**Goal:** A Kleo-grade chat agent that knows the user (versioned markdown memory), searches their material (hybrid FTS + pgvector), researches the web, and drafts and edits LinkedIn posts as versioned side-panel documents through specialists. Guided flows (a typed catalogue), option pickers and hidden control messages are in v1. Feature 1's remaining tasks (knowledge ingestion, transcription, knowledge screen, setup) are folded in.
 
 **Architecture:**
 - **Orchestrator:** one `streamText` agent in a new `@brandloop/agent` package pulls context through tools.
@@ -51,7 +51,7 @@
 - **Shared processes:**
   - Feature agents never run the dev server or e2e (the UI agent owns :3000). They write e2e specs; the controller runs them at the gates.
   - `kleo-clone-db-1` is the only database.
-- **UI files:** files under `apps/web/src/components/{shell,home}`, `packages/ui` and `apps/web/src/app/(app)/page.tsx` are owned by the UI track. Edit them only at the touch points a task names. New chat UI lives in `apps/web/src/components/chat/` and uses `@brandloop/ui` primitives. Visual polish belongs to the UI track.
+- **UI files:** files under `apps/web/src/components/{shell,home}`, `packages/ui` and `apps/web/src/app/(app)/page.tsx` are owned by the UI track. Edit them only at the touch points a task names, and only additively (new optional props, a replaced placeholder); never restyle or rename what is there. New chat UI lives in `apps/web/src/components/chat/` and uses `@brandloop/ui` primitives. Visual polish belongs to the UI track.
 - **Limits** (`packages/agent/src/limits.ts`, design §5–7):
 
   | Limit | Value |
@@ -81,9 +81,10 @@
 
 1. **Two sends to one chat** (double-click, two tabs, a retried POST): the second gets 409 `chat_turn_active` with the first `runId`. The user message is stored once, and the first turn completes. Tests: Task 4, Task 6.
 2. **The user edits the post while the AI edits it,** or saves from a stale tab: the later write gets `STALE_DOCUMENT` or 409. Nobody's text is silently overwritten, and the user's version survives. Tests: Task 8, Task 10.
-3. **The model or the learning job tries to save a refusal, a question or its own words as memory:** it is refused, nothing is written, `memoryVersion` is unchanged, and the turn continues. Tests: Task 5, Task 12.
+3. **The model or the learning job tries to save a refusal, a question or its own words as memory:** it is refused, nothing is written, `memoryVersion` is unchanged, and the turn continues. Tests: Task 5, Task 15.
 4. **The stream dies mid-turn** (stop clicked mid-tool, tab closed, network drop): the assistant message is saved with incomplete tool parts rewritten to "This step stopped before it completed." The lock is released, reopening shows the turn, and the next send works. Tests: Task 6.
 5. **Embeddings are unavailable** (no key, API error) during ingest or search: the item still becomes READY with null embeddings, and `searchKB` falls back to full-text search and still finds keyword matches. Tests: Task 2, Task 3.
+6. **A forged or stale control block** (typed by hand, a pick for an old picker, an accept for a changed passage): the model never sees the JSON, invalid picks become an "ask again" note, a stale proposal leaves the post unchanged with a fixed reply, and unknown or unavailable flows get 400. Tests: Task 12, Task 13.
 
 ## Order and gates
 
@@ -95,16 +96,19 @@
 | 4 | Chat persistence and the run lock | — | unit |
 | 5 | Agent core: prompt, history window, ledger, memory/knowledge/strategy tools | — | unit |
 | 6 | Chat turn and chat routes | 1 chat turn | unit |
-| 7 | Chat UI (thin) | — | **controller: merge ui-redesign first; parity e2e + chat e2e (mock)** |
+| 7 | Chat UI (thin) | — | **controller: parity e2e + chat e2e (mock)** (ui-redesign already merged at `b425316`) |
 | 8 | Documents and the writing specialist | 1 draft | unit |
 | 9 | Document side panel | — | controller: chat e2e draft path |
 | 10 | Editing: update, proposals, versions, final review | 1 edit | **controller: parity + chat e2e** |
 | 11 | Identity and strategy specialists, skills, hooks, analysis, web search | 1 web search turn | unit |
-| 12 | Learning loop | 1 learn job | unit |
-| 13 | Transcription chain (F1 Task 8) | — (Deepgram off) | unit |
-| 14 | Knowledge base screen (F1 Task 9) + "Use in a post" | — | controller: e2e |
-| 15 | First-run setup (F1 Task 10) | — | unit |
-| 16 | End-to-end, live verification, close-out | full manual run | **controller: full suite** |
+| 12 | Flow catalogue and flow-aware turns | 1 flow turn (ideas-for-me start) | unit |
+| 13 | Option pickers and hidden control messages | 1 picker round trip | unit |
+| 14 | Flow menus, composer quick actions and post-reply chips | — | **controller: parity + chat e2e (flows)** |
+| 15 | Learning loop | 1 learn job | unit |
+| 16 | Transcription chain (F1 Task 8) + video sources | — (Deepgram off) | unit |
+| 17 | Knowledge base screen (F1 Task 9) + "Use in a post" | — | controller: e2e |
+| 18 | First-run setup (F1 Task 10) | — | unit |
+| 19 | End-to-end, live verification, close-out | full manual run | **controller: full suite** |
 
 ---
 
@@ -243,10 +247,10 @@ it("replaceInSection replaces exactly one occurrence", async () => { /* ok → c
 - [ ] **Step 1: Verify the SDK names.** Read `embedMany`, `EmbeddingModel` and `MockEmbeddingModelV4` in `node_modules/ai/dist{,/test}/index.d.ts`, and `embedding()` in `@ai-sdk/openai`. Record any difference.
 - [ ] **Step 2: Switch the database image with a dump first.**
   1. `docker exec kleo-clone-db-1 pg_dump -U brandloop -Fc brandloop > /tmp/brandloop-pre-pgvector.dump`
-  2. Change the compose image and volume name, then `pnpm db:up`.
+  2. Change the compose image and volume name, and add top-level `name: kleo-clone` so the worktree's compose file targets the same project as the main checkout (without it, compose from the worktree starts a second project `ai-core` that fails on port 5433). Then `pnpm db:up`.
   3. `docker exec -i kleo-clone-db-1 pg_restore -U brandloop -d brandloop --no-owner < /tmp/brandloop-pre-pgvector.dump`
 
-  Expected: `select count(*) from "User"` matches the pre-dump count. Tell the controller before you start: the UI agent's dev server loses its database for about a minute.
+  Expected: `select count(*) from "User"` matches the pre-dump count. Tell the controller before you start: the dev server in the main checkout loses its database for about a minute, and the controller must copy the same `docker-compose.yml` change into the main checkout (or nobody runs `pnpm db:up` there) until `feature/ai-core` merges; otherwise compose recreates the alpine container on the old volume. Never run `prisma migrate dev` from the main checkout while it lacks this branch's migrations: Prisma would offer to reset the shared database.
 - [ ] **Step 3: Add the schema and migrate with create-only.**
   1. Add the model, then run `prisma migrate dev --create-only --name knowledge_chunks`.
   2. Prepend `CREATE EXTENSION IF NOT EXISTS vector;` to the generated SQL.
@@ -309,7 +313,7 @@ WHERE vec.id IS NOT NULL OR fts.id IS NOT NULL ORDER BY score DESC LIMIT 80
 ### Task 3: Knowledge ingestion and indexing (F1 Task 7)
 
 **Files:**
-- Everything in `docs/features/01-voice-knowledge/plan.md` Task 7 (`packages/knowledge/*`, `packages/db/src/services/knowledge.ts` + test, the three routes). Restore the parked scaffold with `git checkout stash@{0}^3 -- packages/knowledge/package.json packages/knowledge/tsconfig.json`, then `pnpm install` (don't apply the stash's lockfile hunk).
+- Everything in `docs/features/01-voice-knowledge/plan.md` Task 7 (`packages/knowledge/*`, `packages/db/src/services/knowledge.ts` + test, the three routes). Restore the parked scaffold with `git checkout 2f7a321^3 -- packages/knowledge/package.json packages/knowledge/tsconfig.json`, then `pnpm install` (don't apply the stash's lockfile hunk).
 - Create: `packages/knowledge/src/chunk.ts`, `packages/knowledge/src/chunk.test.ts`, `packages/knowledge/src/index-knowledge.ts`, `packages/knowledge/src/index-knowledge.test.ts`, `packages/knowledge/scripts/smoke-ingest.ts`
 - Modify: `apps/web/next.config.ts` (add `@brandloop/knowledge` to `transpilePackages`)
 
@@ -323,7 +327,7 @@ WHERE vec.id IS NOT NULL OR fts.id IS NOT NULL ORDER BY score DESC LIMIT 80
     - `AiUnavailableError` during summarising gives READY with `summary` null.
     - IMAGE creation returns 503 without a key.
     - TEXT items are READY synchronously, and their ingest job only summarises and indexes.
-  - VIDEO items fail with "Video support arrives shortly" until Task 13.
+  - VIDEO items fail with "Video support arrives shortly" until Task 16.
   - `updateKnowledge` with changed content starts a `KNOWLEDGE_INGEST` job that re-indexes. `deleteKnowledge` calls `deleteChunks`.
 - **Produces:**
   - `chunkText(text: string, opts?: { targetChars?: number /*3200*/; overlapChars?: number /*400*/ }): string[]`
@@ -438,7 +442,7 @@ it("requestStop flags only the active run", async () => { /* claim run-1; reques
     - `ChatRequestSchema` (zod, design §5 body) and `type ChatRequestBody`
     - `type MessageMetadata = { createdAt: string; hideInUI?: boolean; quickLinkKey?: string; modelId?: string }`
     - `type ChatDataParts = { textDelta: { id: string; text: string }; creating: boolean; updating: boolean; document: { id: string; title: string; version: number; text: string } }`
-    - `ActiveTaskSchema` and `type ActiveTask` (design §4)
+    - `ActiveTaskSchema` and `type ActiveTask` (design §4), including `flow: { id: string; step: string } | null` and `pendingPicker: { id: string; question: string } | null`. Both stay null until Tasks 12 and 13 fill them.
   - **`context.ts`:**
     - `type TurnContext = { profileId: string; userId: string; chatId: string; runId: string; requestMessageId: string; taskId: string; ai: AiClient; embedder: Embedder | null; selections: { knowledgeIds: string[]; writingStyleId: string | null; webSearchEnabled: boolean; quickLinkKey: string | null }; writer: UIMessageStreamWriter | null; handoffs: Map<string, unknown>; documentRef: { current: { id: string; title: string; version: number; text: string } | null }; now: () => Date }`. Task 8 narrows `handoffs`.
   - **`guard.ts`:** `checkMemoryFact(text: string): { ok: true; text: string } | { ok: false; reason: "refusal" | "too_short" | "too_long" }`. Rules: trim; under 8 chars is too short; over 500 is too long; `looksLikeRefusal` is a refusal.
@@ -461,7 +465,7 @@ it("requestStop flags only the active run", async () => { /* claim run-1; reques
     - `STATIC_PREFIX` (exported for the cache test)
   - **`history.ts`:** `windowHistory(messages: ChatUIMessage[], opts?: Partial<{ maxMessages: number; maxChars: number; fullToolOutputs: number; maxToolOutputChars: number }>): ChatUIMessage[]`
   - **`ledger.ts`:**
-    - `type TurnOutcome = { requestMessageId: string; requestText: string; assistantText: string; status: "finished" | "aborted" | "error"; toolResults: { toolName: string; ok: boolean }[]; handoffs: ActiveTask["handoffs"]; artifact: { id: string; title: string } | null; now: Date }`
+    - `type TurnOutcome = { requestMessageId: string; requestText: string; assistantText: string; status: "finished" | "aborted" | "error"; toolResults: { toolName: string; ok: boolean }[]; handoffs: ActiveTask["handoffs"]; artifact: { id: string; title: string } | null; flow: { id: string; step: string } | null; picker: { id: string; question: string } | null; now: Date }`. Task 6 passes `flow: null, picker: null`.
     - `nextActiveTask(prev: ActiveTask | null, turn: TurnOutcome, newId: () => string): ActiveTask`
     - `renderActiveTask(task: ActiveTask | null): string`
   - **`test/fixtures.ts`:**
@@ -506,6 +510,7 @@ it("stays active when a handoff is missing input, then continues the same task",
 });
 it("starts a new task after a completed one but keeps the artifact", () => { /* new taskId, artifact carried */ });
 it("fails on abort", () => { /* status "failed" */ });
+it("stays active with a pending picker and stores the flow it was given", () => { /* picker {id:"call_p"} → status active, pendingPicker set, pendingQuestion === question; flow copied from the outcome */ });
 it("caps recentDirections at 5 and completedActions at 10", () => { /* … */ });
 // guard.test.ts
 it("refuses refusal-like or out-of-range facts", () => {
@@ -687,13 +692,13 @@ it("drops reasoning and data parts and finalizes unfinished tool parts", () => {
 **Interfaces:**
 - **Consumes:** the Task 6 routes, `ChatUIMessage` and `ChatDataParts` (types only), `VoicePicker` (existing).
 - **Produces, `@brandloop/agent/client`** (no server imports):
-  - `TOOL_LABELS: Record<string, { active: string; done: string; error: string }>`, covering every tool name in Tasks 5, 8, 10 and 11 and `web_search`. Examples: saveMemory "Saving that" / "Saved to memory" / "Couldn't save that"; searchKB "Searching your knowledge"; createDocument "Creating your post".
+  - `TOOL_LABELS: Record<string, { active: string; done: string; error: string }>`, covering every tool name in Tasks 5, 8, 10 and 11 and `web_search` (Tasks 12 and 13 add theirs). Examples: saveMemory "Saving that" / "Saved to memory" / "Couldn't save that"; searchKB "Searching your knowledge"; createDocument "Creating your post".
   - `toolLabel(name: string, state: "active" | "done" | "error"): string`
   - `isToolError(output: unknown): boolean` is true for a string starting `Failed`, `Refused` or `⚠`, and for an object with `error` or `success === false`.
   - `HIDDEN_OUTPUT_TOOLS: ReadonlySet<string>` (memory and knowledge tools)
   - `groupChatsByDate<T extends { lastActivityAt: string | Date; pinned: boolean }>(chats: T[], now: Date): { label: "Pinned" | "Today" | "Yesterday" | "Previous 7 days" | "Previous 30 days" | "Older"; chats: T[] }[]`
   - `collapseToolRuns<P extends { type: string }>(parts: P[]): (P | { type: "tool-group"; parts: P[] })[]` collapses 3 or more consecutive `tool-*` parts.
-  - `QUICK_LINKS: readonly { key: string; label: string; prompt: string }[]`, 5 entries per design §9.
+  - `QUICK_LINKS: readonly { key: string; label: string; prompt: string }[]`, 5 entries per design §9. Task 12 moves it into the flow catalogue (9 entries) and keeps this module as a re-export.
 - **Produces, UI behaviour:**
   - `useChatSession({ chatId, initialMessages, selections })` wraps `useChat`:
     - `DefaultChatTransport({ api: "/api/chat", fetch: chatFetch, prepareSendMessagesRequest: ({ id, messages, body }) => ({ body: { id, runId: crypto.randomUUID(), message: messages.at(-1), ...selections, ...body } }) })`
@@ -707,7 +712,7 @@ it("drops reasoning and data parts and finalizes unfinished tool parts", () => {
   - `ChatHistory`: SWR `GET /api/history`, grouped, with rename, pin and delete in a row menu. The active chat is highlighted.
   - `HomeChat`: shows the landing Composer until the first send, then mounts `ChatView` (via `next/dynamic`) with a new `crypto.randomUUID()` id and sends the text.
 
-- [ ] **Step 1: Gate.** Confirm that `git merge-base --is-ancestor feature/ui-redesign HEAD` succeeds (the controller merges before dispatch). If it doesn't, stop and report.
+- [ ] **Step 1: Gate.** `feature/ui-redesign` is already merged (`b425316`). Confirm `git merge-base --is-ancestor 1d063e2 HEAD` succeeds; if it doesn't, stop and report.
 - [ ] **Step 2: Verify the client names.** Check `useChat` options and returns (`resumeStream`, `stop`, `status`, `experimental_throttle`, `resume`), plus `DefaultChatTransport` options (`prepareSendMessagesRequest`, `fetch`), in `@ai-sdk/react` and `ai`. Record any difference.
 - [ ] **Step 3: Write the failing tests** (`packages/agent/src/client/client.test.ts`).
 
@@ -878,7 +883,7 @@ it("draft flow: delegateWriting → createDocument → reply links the chat to t
     - Anything else is ignored.
   - `charCount(text: string): { count: number; over: boolean }` (limit 3,000)
   - UI behaviour:
-    - The panel uses the design-system Sheet, with title, text, `n/3000`, Edit, Save (PATCH with `expectedVersion`; on 409 the toast "This post changed. Reloaded the latest version." and refetch), the version list with Restore, and Copy.
+    - The panel is a right-hand panel built in `components/chat/` from radix `Dialog` (non-modal on desktop, modal on mobile) and the drafting tokens; `@brandloop/ui` has no Sheet export, so none is added to `packages/ui`. It shows with title, text, `n/3000`, Edit, Save (PATCH with `expectedVersion`; on 409 the toast "This post changed. Reloaded the latest version." and refetch), the version list with Restore, and Copy.
     - `QuickLinkChips` sends `{ role: "user", parts: [{ type: "text", text: prompt }], metadata: { hideInUI: true, quickLinkKey: key } }`.
     - Sends carry `documentContext: { id, version }`. Send is blocked while an edit save is pending ("Saving your edit first.").
 
@@ -1024,7 +1029,217 @@ it("lists every skill in the prompt's skills index", () => { /* buildSystemPromp
 - [ ] **Step 6: Live smoke.** `pnpm --filter @brandloop/agent smoke:web` runs one real turn with web search on: "What changed in LinkedIn's feed this month? One paragraph." It prints whether `web_search` ran and the source count.
 - [ ] **Step 7: Commit.** `feat(agent): identity and strategy specialists, skills, hooks, analysis, web search`
 
-### Task 12: Learning loop
+### Task 12: Flow catalogue and flow-aware turns
+
+**Files:**
+- Create: `packages/agent/src/flows/{catalogue.ts, advance.ts, render.ts}` and `packages/agent/src/flows/flows.test.ts`
+- Create: `packages/agent/src/tools/{source.ts, strategy-update.ts}` and `packages/agent/src/tools/source.test.ts`
+- Modify: `packages/agent/src/{types.ts, context.ts, prompt.ts, turn.ts, mock.ts, tools/index.ts, client/index.ts, client/labels.ts, client/quick-links.ts, client/client.test.ts, turn.test.ts, prompt.test.ts, test/fixtures.ts}` (`testContext` supplies `fetch`)
+- Modify: `packages/agent/package.json` (dependency `@brandloop/knowledge`)
+- Modify: `apps/web/src/lib/chat-deps.ts` (pass `fetch`)
+
+**Interfaces:**
+- **Consumes:** Task 3 `extractText` (`kind: "url"`), Task 5 `ActiveTask.flow`, `TurnOutcome.flow`, `buildTools`, `PromptInput`; Task 6 `runChatTurn`, `ChatDeps`; Tasks 8, 10, 11 tool names; Feature 1 `getStrategy`, `saveStrategy`, `StrategySchema`.
+- **Produces, `flows/catalogue.ts`** (pure data, no server imports; re-exported from `@brandloop/agent/client`):
+  - `FLOW_CATEGORIES = [{ id: "ideas", title: "Find ideas" }, { id: "write", title: "Write" }, { id: "improve", title: "Sharpen" }, { id: "review", title: "Review" }, { id: "learn", title: "Learn" }, { id: "help", title: "Get help" }] as const` and `type FlowCategory`
+  - `type FlowInputKey = "topic" | "notes" | "url" | "video-url" | "document"`
+  - `type FlowRoute = { kind: "specialist"; specialist: SpecialistKind } | { kind: "tool"; tool: string } | { kind: "skill"; skill: SkillName } | { kind: "chat" }`
+  - `type FlowStep = { id: string; guide: string; advanceOn: FlowEvent | null; next: string | null }` (first step id is always `"start"`)
+  - `type FlowEvent = "picked" | "hook-picked" | "document-created" | "document-updated" | "source-read" | "reply"`
+  - `type FlowDef = { id: string; kleoType: string | null; category: FlowCategory; title: string; description: string; seed: string; inputs: { key: FlowInputKey; label: string; required: boolean }[]; steps: FlowStep[]; routes: FlowRoute[]; needsDocument: boolean; needsWebSearch: boolean; surfaces: ("menu" | "composer" | "chip")[]; available: boolean; unavailableReason: string | null }`
+  - `FLOWS: readonly FlowDef[]`: the 40 entries in design §6.6 (every Kleo type mapped once, plus `interview-me`, `analyze-post`, `video-to-post`). Titles, descriptions, seeds and guides are our own wording.
+  - `getFlow(id: string): FlowDef | null`, `availableFlows(category?: FlowCategory): FlowDef[]`, `COMPOSER_FLOW_IDS` (the five composer quick actions, design §6.6), `HELP_FACTS: string` (what Brandloop v1 can and can't do; rendered only for help flows)
+  - `QUICK_LINKS`: moves here from `client/quick-links.ts` (which re-exports it) and becomes 9 entries `{ key, label, prompt, flowId: string | null, available: boolean }`; `PANEL_QUICK_LINKS` = the available ones that need a document (exactly the 5 in design §9).
+- **Produces, `flows/advance.ts`** (pure):
+  - `type FlowState = { id: string; step: string }`
+  - `startFlow(body: { flowType: string | null; flowStep: string | null }): FlowState | { error: "unknown_flow" | "flow_unavailable" | "unknown_step" } | null`
+  - `advanceFlow(state: FlowState | null, events: FlowEvent[]): FlowState | null` moves at most one step per turn (the first matching `advanceOn`), and returns null after a step whose `next` is null fires.
+  - `flowEventsFromTurn(turn: { toolResults: { toolName: string; ok: boolean }[]; controlKind: string | null }): FlowEvent[]`
+- **Produces, `flows/render.ts`:** `renderFlowBlock(state: FlowState | null): string`. Empty for null. Otherwise `<flow id="…" step="…" title="…">`, the step guide, the routes, "Use presentOptions when the step asks the user to choose, then stop.", and `HELP_FACTS` for `help` flows.
+- **Produces, request and context:**
+  - `ChatRequestSchema` gains `flowType: string | null`, `flowStep: string | null`, `uiAction: z.enum(["start-flow", "quick-link", "composer-action"]).nullable()`; all default null. `quickLinkKey` must be a `QUICK_LINKS` key or the request is 400 `bad_request`.
+  - User `context` gains `{flowType, flowStep, uiAction}`. Assistant `context.activeTask.flow` holds the resolved `FlowState`.
+  - `PromptInput` gains `flow: FlowState | null`; `buildSystemPrompt` renders `renderFlowBlock` after `<active_task>` (per-turn section, so `STATIC_PREFIX` is unchanged).
+  - `TurnContext` gains `fetch: typeof fetch`; `ChatDeps` gains `fetch?: typeof fetch` (default `globalThis.fetch`).
+  - Turn order: `startFlow(body)` wins when present (an unavailable or unknown flow returns 400 `bad_request` with cause `flow_unavailable`/`unknown_flow`); otherwise the flow comes from the previous ledger when its task is still `active`. In `onEnd`, `advanceFlow(state, flowEventsFromTurn(...))` goes into `TurnOutcome.flow`.
+- **Produces, tools:**
+  - `extractSource {url}` → `{ success: true, kind: "article", title: string, content: string /* ≤20,000 */, sourceUrl: string }` or `Failed: couldn't read that page (<reason>).`. It reads through `extractText({ kind: "url", url }, { ai: ctx.ai, fetch: ctx.fetch })`, saves nothing, and its output is not hidden in the UI. YouTube URLs return `Failed: video links arrive with transcription.` until Task 16.
+  - `updateContentStrategy {goal: Goal | null, positioning: string | null, tagline: string | null, expertise: string | null, reason: string}` merges the non-null fields into `getStrategy` and saves through `saveStrategy` (which re-mirrors `strategy/themes`). No strategy yet: `Failed: there's no strategy to update yet. Suggest the Strategy screen.` The tool policy allows it only after the user picked an "apply" option in this task.
+  - Both added to `buildTools`, `TOOL_LABELS` ("Reading the page" / "Read the page" / "Couldn't read that page"; "Updating your strategy" / "Strategy updated" / "Couldn't update the strategy").
+- `createScriptedChatModel()` gains the keyword "ideas" → `delegateStrategy` then text, so e2e can run a flow.
+
+- [ ] **Step 1: Write the failing tests.**
+
+```ts
+// flows.test.ts
+it("maps every Kleo flow type exactly once and keeps ids unique", () => {
+  const kleo = FLOWS.map((f) => f.kleoType).filter(Boolean);
+  expect(new Set(kleo).size).toBe(37); expect(new Set(FLOWS.map((f) => f.id)).size).toBe(FLOWS.length);
+});
+it("covers all six categories with at least one available flow each", () => { /* availableFlows(c).length > 0 for each */ });
+it("gives every unavailable flow a reason and every available flow a start step, a seed and routes", () => { /* … */ });
+it("only routes to tools that exist", async () => {
+  const names = new Set(Object.keys(buildTools(await testContext(), { webSearchTool: fakeTool })).concat("presentOptions"));
+  for (const f of availableFlows()) for (const r of f.routes) if (r.kind === "tool") expect(names.has(r.tool), `${f.id} → ${r.tool}`).toBe(true);
+});
+it("advances ideas-for-me on picks and ends after the draft", () => {
+  let s = startFlow({ flowType: "ideas-for-me", flowStep: null }) as FlowState;
+  s = advanceFlow(s, ["picked"])!; expect(s.step).toBe("theme-picked");
+  s = advanceFlow(s, ["picked"])!; expect(s.step).toBe("idea-picked");
+  expect(advanceFlow(s, ["document-created"])).toBeNull();
+});
+it("moves at most one step per turn and ignores unrelated events", () => { /* … */ });
+it("refuses unknown flows, unavailable flows and unknown steps", () => {
+  expect(startFlow({ flowType: "nope", flowStep: null })).toEqual({ error: "unknown_flow" });
+  expect(startFlow({ flowType: "image-ideas", flowStep: null })).toEqual({ error: "flow_unavailable" });
+});
+it("has 9 quick links and 5 panel links with unique keys", () => { /* … */ });
+// prompt.test.ts (addition)
+it("renders the flow block after the static prefix and only for an active flow", () => { /* contains '<flow id="ideas-for-me" step="start"'; startsWith(STATIC_PREFIX) */ });
+// source.test.ts (fake fetch serving test/fixtures/article.html)
+it("extractSource returns the readable article and saves nothing", async () => { /* success, kind article; knowledge item count unchanged */ });
+it("extractSource fails cleanly for a 404 and a private host", async () => { /* /^Failed: couldn't read that page/ */ });
+it("updateContentStrategy merges fields and re-mirrors themes", async () => { /* positioning changed; strategy/themes memory contains it; memoryVersion +1 */ });
+// turn.test.ts (additions)
+it("persists flowType, flowStep and uiAction on the user context and the flow on the ledger", async () => {
+  await (await runChatTurn(deps(scriptedModel([{ text: "Which theme?" }])), caller, body("Give me ideas", { flowType: "ideas-for-me", uiAction: "start-flow" }))).text();
+  const [u, a] = await listMessages(p, chatId);
+  expect(u!.context).toMatchObject({ flowType: "ideas-for-me", uiAction: "start-flow" });
+  expect((a!.context as any).activeTask.flow).toEqual({ id: "ideas-for-me", step: "start" });
+});
+it("keeps the flow on the next turn without flowType and puts it in the instructions", async () => { /* second turn's system contains '<flow id="ideas-for-me"' */ });
+it("returns 400 for an unavailable flow", async () => { /* flowType "image-ideas" → 400 bad_request, cause flow_unavailable; no messages stored */ });
+```
+
+- [ ] **Step 2: Run the tests.** `pnpm --filter @brandloop/agent test`. Expected: FAIL.
+- [ ] **Step 3: Implement.** Write the 40 entries (design §6.6 table), the reducer and the prompt block. Update Task 7's quick-link test to the new counts in the same commit (named in Files).
+- [ ] **Step 4: Run the tests and checks.** Agent test and typecheck; web typecheck and lint. Expected: PASS.
+- [ ] **Step 5: Commit.** `feat(agent): flow catalogue, flow-aware turns, extractSource and strategy updates`
+
+### Task 13: Option pickers and hidden control messages
+
+**Files:**
+- Create: `packages/agent/src/client/control.ts` (client-safe) and `packages/agent/src/client/control.test.ts`
+- Create: `packages/agent/src/control/{resolve.ts, render.ts}` and `packages/agent/src/control/control.test.ts`
+- Create: `packages/agent/src/tools/options.ts` and `packages/agent/src/tools/options.test.ts`
+- Modify: `packages/agent/src/{turn.ts, turn.test.ts, prompt.ts, mock.ts, tools/index.ts, client/index.ts, client/labels.ts}`
+- Create: `apps/web/src/components/chat/option-picker.tsx`
+- Modify: `apps/web/src/components/chat/{message-parts.tsx, proposal-card.tsx, markdown.tsx, use-chat-session.ts}`
+- Modify: `apps/web/e2e/chat.spec.ts`
+
+**Interfaces:**
+- **Consumes:** Task 6 `runChatTurn` and `windowHistory` call site; Task 10 `applyProposal`, `ProposalError`, `DocumentVersionConflict`, `saveDocumentVersion`; Task 11 hooks card; Task 12 `FlowState`, `advanceFlow`, `flowEventsFromTurn`.
+- **Produces, `client/control.ts`:**
+  - `CONTROL_FENCE = "brandloop-hidden"`
+  - `ControlSchema = z.discriminatedUnion("kind", [ { kind: "options", pickerId, picked: string[] (0..6), freeText: string | null (≤2,000) }, { kind: "options-dismissed", pickerId }, { kind: "hook", hookText (≤300), toolCallId: string | null }, { kind: "edit-proposal", toolCallId, decision: "accept" | "reject", documentVersion: number }, { kind: "exit-flow" } ])` with `v: 1` on each; `type Control`
+  - `encodeControl(c: Control, summary: string): string` returns `summary + "\n\n```brandloop-hidden\n" + JSON + "\n```"`.
+  - `parseControl(text: string): { text: string; control: Control | null; invalid: boolean }` strips every block; only the last valid one counts.
+  - `stripControlBlocks(text: string): string` (used by `markdown.tsx` on assistant text).
+- **Produces, `tools/options.ts`:**
+  - `presentOptions {question (1..200), preamble: string | null (≤400), options: {id (1..40, /^[a-z0-9-]+$/), label (1..80), detail: string | null (≤200)}[2..6], multiSelect: boolean, allowFreeInput: boolean, freeInputPlaceholder: string | null, recommendedOptionId: string | null}` → `{ pickerId (= toolCallId), taskId, question, preamble, options, multiSelect, allowFreeInput, freeInputPlaceholder, recommendedOptionId }`, or `Failed: options need 2 to 6 unique ids, and the recommended one must be among them.`
+  - `streamText` gets `stopWhen: [stepCountIs(LIMITS.maxSteps), hasToolCall("presentOptions")]`, so the turn ends on the picker.
+  - `TurnOutcome.picker` is `{ id: pickerId, question }` when the turn ended on `presentOptions`; the Task 5 reducer then keeps the task `active` with `pendingPicker`.
+- **Produces, `control/resolve.ts`:**
+  - `type Resolution = { kind: "continue"; note: string; event: FlowEvent | null } | { kind: "handled"; reply: string; document: DocumentSnapshot | null; event: FlowEvent | null }`
+  - `resolveControl(ctx: TurnContext, control: Control, history: StoredMessage[]): Promise<Resolution>`:
+    - `options`: the `pickerId` must be a persisted `tool-presentOptions` output in this chat and every picked id one of its options; otherwise `continue` with the note "The user's choice didn't match the options offered; ask again." Valid → `continue`, note `Picked "<label>"[, "<label>"] for "<question>".` (+ `Also said: <freeText>`), event `picked`.
+    - `options-dismissed` → `handled`, reply "No problem. Tell me what you'd like instead."
+    - `hook` with an open document → `swapHook`: replaces the first paragraph with `hookText`, saves `AI_EDIT` (changeSummary "Swapped in the hook you picked") with `expectedVersion`; reply "Swapped in that hook. The post is now version N."; event `hook-picked`. Without a document → `continue`, note `Use this exact opening line: "<hookText>".`, event `hook-picked`.
+    - `edit-proposal` accept → `applyProposal(...)`; reply "Applied. The post is now version N." `stale_passage` → "That passage has changed since I suggested this, so the post stays as it is." Version conflict → "The post changed while you were deciding. Nothing was applied." Reject → "Okay, I left the post as it was." All `handled`, event `document-updated` on success.
+    - `exit-flow` → `handled`, reply "Okay, we've left that. What next?"; the ledger's flow becomes null.
+  - `swapHook(profileId: string, documentId: string, hookText: string, expectedVersion: number): Promise<DocumentSnapshot>`
+- **Produces, `control/render.ts`:** `renderControlMessages(messages: ChatUIMessage[]): ChatUIMessage[]` replaces each user text that carries a block with its canonical sentence (the same wording as the notes), using the picker parts found in `messages`. `runChatTurn` applies it before `windowHistory`, so **the model never sees the JSON**.
+- **Turn changes (`turn.ts`):** after `saveUserMessage` (the stored text keeps the block), `parseControl` the request text. `handled` → no model call: stream `start`, the reply as one text part, an optional `data-document`, then `finish`; persist the assistant message and ledger as usual. `continue` → the note replaces the request text in the model window. User `context` gains `control: Control["kind"] | null` and `learningExcluded: true` for every control message, so Task 15 never learns from picks.
+- **Produces, UI:**
+  - `OptionPicker` renders a `tool-presentOptions` output: question as the `legend` of a `fieldset`, preamble, 2–6 option buttons (single select sends at once; multi-select and free input use a Continue button), a "Suggested" tag on the recommended option, and Skip. It is answered when a later user message carries a control with its `pickerId`: it then collapses to "You picked: <labels>". Only the newest unanswered picker is interactive; all are disabled while a turn streams.
+  - `useChatSession` gains `sendControl(control: Control, summary: string)`, which sends `{ role: "user", parts: [{ type: "text", text: encodeControl(control, summary) }], metadata: { createdAt, hideInUI: true } }`.
+  - `ProposalCard` Apply/Dismiss and the Task 11 hooks card "Use this hook" now call `sendControl` (`edit-proposal` and `hook`). The Task 10 apply route stays as the documented API.
+  - `markdown.tsx` runs `stripControlBlocks` on assistant text.
+
+- [ ] **Step 1: Verify the SDK names.** `hasToolCall` and the array form of `stopWhen` in `node_modules/ai/dist/index.d.ts`. Record any difference.
+- [ ] **Step 2: Write the failing tests.**
+
+```ts
+// client/control.test.ts
+it("round-trips a control block and strips it from the text", () => {
+  const t = encodeControl({ v: 1, kind: "options", pickerId: "call_p", picked: ["b"], freeText: null }, "Picked B");
+  expect(parseControl(t)).toEqual({ text: "Picked B", control: { v: 1, kind: "options", pickerId: "call_p", picked: ["b"], freeText: null }, invalid: false });
+});
+it("drops a malformed block, marks it invalid and keeps the visible text", () => { /* … */ });
+it("strips blocks from assistant text", () => { /* … */ });
+// tools/options.test.ts
+it("rejects 1 or 7 options, duplicate ids and an unknown recommended id", async () => { /* /^Failed: options need/ */ });
+it("returns the picker with the tool call id as pickerId", async () => { /* … */ });
+// control.test.ts (DB)
+it("renders a pick as a sentence using the stored picker labels", () => {
+  /* renderControlMessages([assistant with tool-presentOptions {options:[{id:"b",label:"Contrarian take"}]}, user with block]) → user text === 'Picked "Contrarian take" for "Which angle?".' and no "brandloop-hidden" */
+});
+it("refuses picks that don't belong to the picker", async () => { /* note mentions "didn't match" */ });
+it("swaps the hook into the open post as a new version", async () => { /* v2 starts with hookText; rest unchanged */ });
+it("applies or rejects a proposal deterministically", async () => { /* accept → version+1 PROPOSAL; reject → unchanged; stale → reply "That passage has changed…" */ });
+// turn.test.ts (additions)
+it("ends the turn on presentOptions and records the pending picker", async () => {
+  const model = scriptedModel([{ toolCalls: [{ toolCallId: "call_p", toolName: "presentOptions", input: opts }] }, { text: "never" }]);
+  await (await runChatTurn(deps(model), caller, body("Give me ideas", { flowType: "ideas-for-me" }))).text();
+  expect(model.doStreamCalls).toHaveLength(1);
+  expect((last().context as any).activeTask).toMatchObject({ status: "active", pendingPicker: { id: "call_p" } });
+});
+it("a pick never reaches the model as JSON and advances the flow", async () => {
+  /* second turn body(encodeControl(options b)) → doStreamCalls[0].prompt has no "brandloop-hidden" and contains 'Picked "'; ledger flow.step === "theme-picked" */
+});
+it("a handled control makes no model call and replies with fixed text", async () => {
+  /* edit-proposal reject → model.doStreamCalls.length === 0; assistant text "Okay, I left the post as it was."; lock released */
+});
+```
+
+- [ ] **Step 3: Run the tests.** `pnpm --filter @brandloop/agent test`. Expected: FAIL.
+- [ ] **Step 4: Implement** the parser, resolver, renderer, tool, turn branch and UI. `createScriptedChatModel()`: "ideas" now calls `presentOptions` (three fixed options) when the turn has no control, and replies "Mock ideas." after a pick.
+- [ ] **Step 5: Add the e2e case** "picks an option": send "Give me ideas" → the picker shows three options → click one → the picker collapses to "You picked: …", no JSON is visible anywhere on the page, and "Mock ideas." appears.
+- [ ] **Step 6: Run the checks.** Agent test; web test, typecheck and lint. Expected: PASS.
+- [ ] **Step 7: Commit.** `feat: presentOptions pickers and hidden control messages (picks, hooks, proposals)`
+
+### Task 14: Flow menus, composer quick actions and post-reply chips
+
+**Files:**
+- Create: `packages/agent/src/client/chips.ts` (tests in `client/client.test.ts`)
+- Create: `apps/web/src/components/chat/{flow-menu.tsx, flow-strip.tsx, reply-chips.tsx}`
+- Modify: `apps/web/src/components/chat/{chat-view.tsx, chat-composer.tsx, home-chat.tsx, message-list.tsx, quick-link-chips.tsx, use-chat-session.ts}`
+- Touch point (UI-owned, additive): `apps/web/src/components/home/composer.tsx`: add the optional prop `onStarter?: (flowId: string) => void` and give each `starters` entry a `flowId` (`ideas-for-me`, `draft-from-topic`, `draft-from-notes`, `analyze-post`, `linkedin-basics`). With the prop set, a starter click calls it instead of filling the textarea; labels, icons, classes and motion stay as they are.
+- Modify: `apps/web/e2e/chat.spec.ts`
+
+**Interfaces:**
+- **Consumes:** Task 12 `FLOWS`, `FLOW_CATEGORIES`, `availableFlows`, `COMPOSER_FLOW_IDS`, `QUICK_LINKS`, `PANEL_QUICK_LINKS`; Task 13 `sendControl`; Task 9 panel state.
+- **Produces, `client/chips.ts`:**
+  - `type Chip = { key: string; label: string; send: { text: string; hideInUI: boolean; quickLinkKey: string | null; flowType: string | null; uiAction: "quick-link" | "start-flow" } }`
+  - `chipsFor(state: { hasDocument: boolean; streaming: boolean; pendingPicker: boolean; flow: { id: string; step: string } | null; lastAssistantIsLatest: boolean }): Chip[]`: none while streaming, while a picker is pending or under older replies. With a document: the 5 `PANEL_QUICK_LINKS`. Without one and no flow: `ideas-for-me`, `draft-from-topic`, `plan-a-post`. Inside a flow: none.
+  - `flowStartMessage(flowId: string, input: Partial<Record<FlowInputKey, string>>): { text: string; body: { flowType: string; flowStep: null; uiAction: "start-flow" } } | { error: "missing_input"; key: FlowInputKey }`: text is the flow's `seed`, plus the required inputs as labelled lines.
+- **Produces, UI:**
+  - `FlowMenu`: a button in `ChatComposer` and `HomeChat` ("Guided flows") opening a radix `DropdownMenu` (from `radix-ui`, built in `components/chat/`, not in `packages/ui`) with the six categories and their available flows; unavailable ones are not listed. A flow with required inputs opens a small inline form (`Input`, `Label` from `@brandloop/ui`); others send at once.
+  - `FlowStrip`: above the composer while `activeTask.flow` is set: "<flow title> · step n of m" and "Leave", which sends `sendControl({ v: 1, kind: "exit-flow" }, "Leave this flow")`.
+  - `ReplyChips`: under the latest finished assistant message, from `chipsFor`. Quick-link chips send hidden messages with `quickLinkKey` and `uiAction: "quick-link"`; flow chips send visible seed messages with `flowType`.
+  - `QuickLinkChips` (Task 9, the panel) reads `PANEL_QUICK_LINKS` instead of `QUICK_LINKS`.
+  - `HomeChat` passes `onStarter` to `Composer`: the starter's flow starts in a new chat (same path as the first send).
+
+- [ ] **Step 1: Write the failing tests** (`client.test.ts`).
+
+```ts
+it("shows panel quick links under the latest reply when a post exists", () => { expect(chipsFor(s({ hasDocument: true })).map((c) => c.key)).toEqual(PANEL_QUICK_LINKS.map((q) => q.key)); });
+it("shows no chips while streaming, with a pending picker, inside a flow or under older replies", () => { /* each → [] */ });
+it("offers flow starters without a post", () => { /* keys ideas-for-me, draft-from-topic, plan-a-post; send.flowType set */ });
+it("builds a flow start message and requires its inputs", () => {
+  expect(flowStartMessage("article-to-post", {})).toEqual({ error: "missing_input", key: "url" });
+  expect(flowStartMessage("article-to-post", { url: "https://example.com/a" })).toMatchObject({ body: { flowType: "article-to-post", uiAction: "start-flow" } });
+});
+it("maps every composer starter to an available flow", () => { for (const id of COMPOSER_FLOW_IDS) expect(getFlow(id)?.available).toBe(true); });
+```
+
+- [ ] **Step 2: Run the tests.** `pnpm --filter @brandloop/agent test`. Expected: FAIL.
+- [ ] **Step 3: Implement** the helpers, the three components, the wiring and the Composer touch point.
+- [ ] **Step 4: Add the e2e cases** (mock): "starts a flow from home": click the "Find ideas" starter on `/` → the URL becomes `/chat/<uuid>`, the flow strip shows "step 1", the picker appears; "Leave" removes the strip. "post-reply chips": after the draft case, the chips show under the reply and "Review it" sends a hidden message (no new user bubble). The parity specs `shell`, `memories`, `strategy`, `voice`, `drafting` and `design` must stay green.
+- [ ] **Step 5: Run the checks.** Agent test; web test, typecheck and lint. Expected: PASS.
+- [ ] **Step 6: Commit.** `feat(web): guided flow menu, flow strip, composer quick actions and post-reply chips`
+
+### Task 15: Learning loop
 
 **Files:**
 - Modify: `packages/db/prisma/schema.prisma` (`JobKind` += `MEMORY_LEARN`), then migrate with `--name memory_learn`
@@ -1074,13 +1289,14 @@ it("does not schedule learning when the turn already saved memory", async () => 
 - [ ] **Step 5: Live smoke.** `pnpm --filter @brandloop/agent smoke:learn` runs `learnFromTurn` once with "I've been running a small bakery for 9 years and I hate corporate jargon." It prints the saved keys.
 - [ ] **Step 6: Commit.** `feat(agent): post-turn memory learning with guard and dedupe`
 
-### Task 13: Transcription chain (F1 Task 8)
+### Task 16: Transcription chain (F1 Task 8)
 
 **Files:** as in `docs/features/01-voice-knowledge/plan.md` Task 8 (`packages/knowledge/src/transcribe/{deepgram,youtube,chain}.ts` and `chain.test.ts`, `apps/web/src/app/api/status/transcription/route.ts`, the VIDEO branch in `ingest.ts`).
 
 **Interfaces:**
 - **Consumes:** F1 Task 8's Interfaces block, verbatim (`Transcriber`, `VideoSource`, `deepgramTranscriber(apiKey?, fetch?, enabled = process.env.DEEPGRAM_ENABLED === "true")`, `youtubeCaptions()`, `transcribeVideo`, `getTranscriptionStatus`, `TRANSCRIPTION_UNAVAILABLE`).
 - **Delta:** the VIDEO branch ends like every other branch: `completeIngest`, then `indexKnowledge` (Task 3). It replaces the Task 3 placeholder "Video support arrives shortly".
+- **Flows delta:** `extractSource` (Task 12) gains the YouTube branch through `transcribeVideo({ kind: "url", url }, [deepgramTranscriber(), youtubeCaptions()])` returning `kind: "video"`, and the `video-to-post` flow becomes `available: true`. Files: also modify `packages/agent/src/tools/{source.ts, source.test.ts}` and `packages/agent/src/flows/catalogue.ts`; test: a faked-captions YouTube URL returns `kind: "video"`, and `getFlow("video-to-post").available` is true.
 
 - [ ] **Step 1: Write the failing tests** in F1 Task 8 Step 1 (Review Focus 4 there; `enabled=false` never calls fetch), plus: a YouTube video item with faked captions ends READY with chunks in `KnowledgeChunk`.
 - [ ] **Step 2: Run the tests.** `pnpm --filter @brandloop/knowledge test`. Expected: FAIL.
@@ -1088,16 +1304,16 @@ it("does not schedule learning when the turn already saved memory", async () => 
 - [ ] **Step 4: Run the tests and checks.** Expected: PASS. No live smoke: Deepgram stays off, and captions have no AI cost.
 - [ ] **Step 5: Commit.** `feat: video transcription chain with captions fallback (Deepgram disabled)`
 
-### Task 14: Knowledge base screen (F1 Task 9) and "Use in a post"
+### Task 17: Knowledge base screen (F1 Task 9) and "Use in a post"
 
 **Files:**
-- As F1 Task 9: `apps/web/src/app/(app)/knowledge-base/page.tsx`, `apps/web/src/components/knowledge/{toolbar,item-card,add-dialog,item-drawer}.tsx`, and the `apps/web/src/lib/nav.ts` "Knowledge base" entry (a UI-owned touch point).
+- As F1 Task 9: modify the existing placeholder `apps/web/src/app/(app)/knowledge-base/page.tsx`, create `apps/web/src/components/knowledge/{toolbar,item-card,add-dialog,item-drawer}.tsx`, and the `apps/web/src/lib/nav.ts` "Knowledge base" entry (a UI-owned touch point).
 - Create: `packages/agent/src/client/knowledge-param.ts` (tests go in `client.test.ts`)
 - Modify: `apps/web/src/components/chat/home-chat.tsx`, `apps/web/src/components/chat/knowledge-picker.tsx`
 - Create: `apps/web/e2e/knowledge.spec.ts`
 
 **Interfaces:**
-- **Consumes:** F1 Task 9's spec, verbatim (toolbar, list, add dialog, drawer, the Deepgram notice copy). The Task 3 routes. Task 13 `/api/status/transcription`.
+- **Consumes:** F1 Task 9's spec, verbatim (toolbar, list, add dialog, drawer, the Deepgram notice copy). The Task 3 routes. Task 16 `/api/status/transcription`.
 - **Changes vs F1 Task 9:**
   - The menu item "Use in a post" is enabled. It navigates to `/?knowledgeBaseItemIds=<id>`.
   - Build with `@brandloop/ui` primitives. Visual polish is the UI track's.
@@ -1114,7 +1330,7 @@ it("does not schedule learning when the turn already saved memory", async () => 
 - [ ] **Step 5: Run the checks.** Agent test, web test/typecheck/lint. Expected: PASS.
 - [ ] **Step 6: Commit.** `feat(web): knowledge base screen with "Use in a post"`
 
-### Task 15: First-run setup (F1 Task 10)
+### Task 18: First-run setup (F1 Task 10)
 
 **Files:** as in `docs/features/01-voice-knowledge/plan.md` Task 10 (`apps/web/src/app/(setup)/setup/page.tsx`, `apps/web/src/components/setup/*`, the `(app)/layout.tsx` redirect as a UI-owned touch point, `packages/db/src/services/setup.ts` and `setup.test.ts`).
 
@@ -1128,7 +1344,7 @@ it("does not schedule learning when the turn already saved memory", async () => 
 - [ ] **Step 4: Run the tests and checks.** Expected: PASS.
 - [ ] **Step 5: Commit.** `feat: first-run setup`
 
-### Task 16: End-to-end, live verification and close-out
+### Task 19: End-to-end, live verification and close-out
 
 **Files:**
 - Modify: `apps/web/e2e/chat.spec.ts`, `apps/web/e2e/knowledge.spec.ts`
@@ -1136,7 +1352,7 @@ it("does not schedule learning when the turn already saved memory", async () => 
 - Modify: `docs/ROADMAP.md`
 
 - [ ] **Step 1: Complete the e2e specs.**
-  - `chat.spec.ts` must cover: remember, search knowledge (seeded via API), draft, edit and save, apply proposal, stop mid-stream (the stop button ends the turn and the next send works), and reload resume.
+  - `chat.spec.ts` must cover: remember, search knowledge (seeded via API), draft, edit and save, apply proposal (through the hidden control message), a guided flow with a pick, post-reply chips, stop mid-stream (the stop button ends the turn and the next send works), and reload resume.
   - Add F1 Task 11's `feature1.spec.ts` checks.
 - [ ] **Step 2: Run the unit suite.** `pnpm turbo lint typecheck test`. Expected: all green.
 - [ ] **Step 3: Controller only.** Restart the dev server with `AI_MOCK_MODEL=1`, then run `pnpm --filter @brandloop/web e2e`. Expected: the parity specs and the new specs all pass, run serially.
@@ -1145,11 +1361,12 @@ it("does not schedule learning when the turn already saved memory", async () => 
   2. "Search my knowledge base for X" calls `searchKB` and cites the item.
   3. "Draft a post about X" opens the panel.
   4. Applying a proposal updates it.
+  5. "Find ideas" on home runs the ideas flow: a picker appears, a pick advances it, and no control JSON is visible.
 
   Check there is no horizontal scroll and no console errors. Record each smoke's result in the SDD ledger, not in a docs file.
 - [ ] **Step 5: Update `docs/ROADMAP.md`.**
   - Tick Feature 1, which now includes knowledge, transcription and setup.
-  - Add Feature 2 "AI core" as done, with the deferred list from design §14.
+  - Add Feature 2 "AI core" as done (including guided flows), with the deferred list from design §14.
 - [ ] **Step 6: Commit.** `test: AI core and feature 1 e2e; docs: roadmap`
 
 ---
@@ -1160,19 +1377,20 @@ it("does not schedule learning when the turn already saved memory", async () => 
 
   | Design section | Task |
   |---|---|
-  | §4 data | 1, 2, 4, 8, 12 |
-  | §5 routes | 1, 3, 6, 8, 10 |
-  | §6.1 prompt | 5 |
-  | §6.2 tools | 5, 8, 10, 11 |
+  | §4 data | 1, 2, 4, 5, 8, 12, 15 |
+  | §5 routes | 1, 3, 6, 8, 10, 12 |
+  | §6.1 prompt | 5, 12 |
+  | §6.2 tools | 5, 8, 10, 11, 12, 13 |
+  | §6.6 guided flows, pickers, control messages | 12, 13, 14, 16 |
   | §6.3 envelope and specialists | 8, 10, 11 |
   | §6.5 stop, errors, guard | 5, 6 |
-  | §7 ledger, window, budget | 5 |
+  | §7 ledger, window, budget | 5, 12, 13 |
   | §8 retrieval | 2, 3 |
-  | §9 panel | 9, 10 |
-  | §10 learning | 12 |
+  | §9 panel and chips | 9, 10, 14 |
+  | §10 learning | 15 |
   | §11 skills | 11 |
   | §12 resume, stop, 409 | 4, 6, 7 |
-  | §13 testing | every task, plus 16 |
-  | F1 Tasks 7–11 | 3, 13, 14, 15, 16 |
-- **Type consistency:** these names are used identically across tasks: `TurnContext.handoffs`, `documentRef`, `buildTools(ctx, opts?)` (from Task 5), `fakeAi`, `DocumentSnapshot`, `HandoffEnvelope`, `runSpecialist`, `findHandoff`, `applyDataPart`, `LIMITS`, `SCRIPTED_DRAFT`, `scriptedModel`/`scriptedAi`, `checkMemoryFact` and `isAgentWritable`.
-- **Review Focus:** each line has a test in its owning task: 1 → Tasks 4 and 6; 2 → Tasks 8 and 10; 3 → Tasks 5 and 12; 4 → Task 6; 5 → Tasks 2 and 3.
+  | §13 testing | every task, plus 19 |
+  | F1 Tasks 7–11 | 3, 16, 17, 18, 19 |
+- **Type consistency:** these names are used identically across tasks: `TurnContext.handoffs`, `documentRef`, `buildTools(ctx, opts?)` (from Task 5), `fakeAi`, `DocumentSnapshot`, `HandoffEnvelope`, `runSpecialist`, `findHandoff`, `applyDataPart`, `LIMITS`, `SCRIPTED_DRAFT`, `scriptedModel`/`scriptedAi`, `checkMemoryFact`, `isAgentWritable`, `FlowState`, `Control`, `encodeControl`/`parseControl`, `QUICK_LINKS`/`PANEL_QUICK_LINKS` and `ActiveTask.flow`/`pendingPicker`.
+- **Review Focus:** each line has a test in its owning task: 1 → Tasks 4 and 6; 2 → Tasks 8 and 10; 3 → Tasks 5 and 15; 4 → Task 6; 5 → Tasks 2 and 3; 6 → Tasks 12 and 13.
