@@ -78,6 +78,7 @@ model Profile {
   knowledgeItems      KnowledgeItem[]
   knowledgeChunks     KnowledgeChunk[]
   backgroundJobs      BackgroundJob[]
+  chats               Chat[]
   currentFor          User[]          @relation("CurrentProfile")
   deletedAt           DateTime?
   createdAt           DateTime        @default(now())
@@ -237,4 +238,46 @@ model BackgroundJob {
   updatedAt DateTime  @updatedAt
 
   @@index([profileId, createdAt])
+}
+
+enum ChatRole {
+  USER
+  ASSISTANT
+}
+
+model Chat {
+  id                     String    @id
+  profile                Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  profileId              String
+  userId                 String
+  title                  String    @default("New chat")
+  pinned                 Boolean   @default(false)
+  /// No foreign key yet; the documents task adds it.
+  documentId             String?   @unique
+  activeRunId            String?
+  activeRunStartedAt     DateTime?
+  activeRequestMessageId String?
+  stopRequestedRunId     String?
+  lastActivityAt         DateTime  @default(now())
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+  deletedAt              DateTime?
+  messages               Message[]
+
+  @@index([profileId, deletedAt, lastActivityAt])
+}
+
+model Message {
+  id        String   @id
+  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  chatId    String
+  seq       Int      @default(autoincrement())
+  role      ChatRole
+  parts     Json
+  metadata  Json?
+  context   Json?
+  runId     String?
+  createdAt DateTime @default(now())
+
+  @@index([chatId, seq])
 }
