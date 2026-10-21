@@ -14,7 +14,7 @@ values must come from there, not from screenshots). Preflight and open decisions
 
 **Tech stack:** Next.js 16.4.2 (Turbopack), React 19.3, Tailwind v4 (`@theme inline`), `motion` 14.4 via `MotionProvider`
 (`m.*`, `LazyMotion` strict), `next-themes` 0.4, `next/font/google` (Bricolage Grotesque, Geist), Radix, Clerk 7, Vitest 5,
-Playwright + `@axe-core/playwright`. Marketing: static HTML/CSS/vanilla JS served by `python3 -m http.server`.
+Playwright + `@axe-core/playwright`. Marketing: a Next.js 16 app (`apps/marketing`, same stack as apps/web, no Clerk), ruling A16.
 
 ## Global Constraints
 
@@ -287,16 +287,23 @@ reduced motion; the final grep.
 
 ---
 
-### Task O5: Marketing rebuild (`apps/marketing`)
+### Task O5: Marketing rebuild (`apps/marketing`) as a Next.js app
 
-**Files:** rewrite `apps/marketing/index.html`, `styles.css`, `main.js`; replace `assets/*` (remove Kleo logos/icons; add
-`assets/fonts/{bricolage-grotesque-var-latin.woff2, geist-var-latin.woff2}` and `assets/logo.svg` Orbit mark);
-`apps/marketing/package.json` unchanged (static server). Optional `assets/vendor/lenis.min.js` copied from the workspace's pinned
-`lenis` 1.3.27 `dist` (decision D3).
+**Ruling A16 (user, 2026-10-22: "make sure we are using next js"):** `apps/marketing` becomes a Next.js app on the same
+versions as `apps/web` (next 16.4.2, React 19.3, Tailwind v4, TypeScript 5.9.3; App Router, Turbopack, `proxy.ts` not needed,
+no Clerk). The old static `index.html`/`styles.css`/`main.js`/`assets/*` (Kleo clone) are deleted.
 
-**Interfaces:** sections C1-C13 of screens.md with ids `#product #loop #sprint #proof #journal #pricing #team #faq`; config
-`window.ORBIT_APP_URL` (default `http://localhost:3000`) for Sign in / Get started links; every placeholder claim wrapped in an
-element with `data-placeholder` (decision D9).
+**Files:** replace `apps/marketing/*` with a Next app: `package.json` (`@brandloop/marketing`, scripts `dev` = `next dev -p 4321`,
+`build`, `start`, `lint`, `typecheck`), `next.config.ts` (`transpilePackages: ["@brandloop/ui"]`), `tsconfig.json`,
+`src/app/{layout.tsx, page.tsx, globals.css, opengraph-image or static OG}`, `src/components/marketing/*` (one component per
+section C1–C13), `src/lib/config.ts` (`NEXT_PUBLIC_APP_URL`, default `http://localhost:3000`, for Sign in / Get started), fonts via
+`next/font` (Bricolage Grotesque variable + Geist, same setup as apps/web), Orbit tokens imported from `@brandloop/ui` (marketing
+alternates ink and paper sections per system §2), `public/logo.svg` (Orbit mark). Add the app to turbo pipelines and the root
+lint/typecheck. Lenis via the workspace's pinned `lenis` 1.3.27 package (decision D3), motion via `motion` (ruling A12).
+
+**Interfaces:** sections C1–C13 of screens.md with ids `#product #loop #sprint #proof #journal #pricing #team #faq`; every
+placeholder claim wrapped in an element with `data-placeholder` (decision D9 / ruling A14). Static rendering (`export const
+dynamic = "force-static"`); client components only where motion/interaction needs them.
 
 **Steps:**
 - [ ] 1. Unpack p00, p02, p04, p06 (and p30/p31); extract exact markup values per section.
@@ -304,7 +311,7 @@ element with `data-placeholder` (decision D9).
   swap`, `font-weight 200 800`, `font-stretch 75% 100%` for Bricolage).
 - [ ] 3. Build C1-C12 at 1440 with semantic landmarks (header/nav "Primary", main, sections with `aria-labelledby`, footer
   navs "Product"/"Learn"/"Company").
-- [ ] 4. Motion in `main.js` (vanilla): first-paint hero sequence; one IntersectionObserver for reveals (900 ms, 18 px,
+- [ ] 4. Motion in client components (`motion` + Lenis): first-paint hero sequence; one IntersectionObserver for reveals (900 ms, 18 px,
   120 ms stagger, once); pinned loop (`position: sticky` container 600 vh + rAF progress → stage index; crossfade; 0.6 s
   smoothing), hover/keyboard also select a stage (buttons with `aria-pressed`, `aria-live="polite"` stage label); marquees
   (CSS, pause on hover and when off-screen); count-ups; orb pointer drift (60 ms lerp); footer wordmark weight/highlight;

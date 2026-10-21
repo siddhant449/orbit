@@ -121,8 +121,8 @@ Rules: fonts are CSS (not counted) but Bricolage with `opsz`+`wdth` axes is ~130
 hand-rolled SVG, no chart library, and load per route. Each O-task that touches eager code records the four numbers above in
 `bundle-baseline.md` under a new "Orbit" heading.
 
-Marketing (`apps/marketing`, static): total transfer budget on first view ≤ 350 KB compressed including fonts (two variable
-woff2, latin) and ≤ 40 KB JS (vanilla). No third-party CDN requests (fonts and Lenis vendored).
+Marketing (`apps/marketing`, Next.js app, statically rendered — ruling A16): total transfer budget on first view ≤ 350 KB compressed
+including fonts (next/font, two variable woff2, latin), first-load JS ≤ 120 KB gz. No third-party CDN requests.
 
 ## 6. Order of removal (summary)
 

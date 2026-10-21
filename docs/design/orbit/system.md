@@ -407,7 +407,7 @@ Mobile [p16]: stacked rows `radius 16; padding 16`, with an inline "Open" primar
 
 Stack. Orbit p31: Framer Motion (components), GSAP ScrollTrigger (pins), Lenis (scroll), SplitType (lines), one R3F canvas
 (orb). Brandloop ruling: **app** uses `motion` (already, via `MotionProvider` with `LazyMotion` + `m.*`) and CSS keyframes;
-no GSAP, no SplitType (headline lines are authored as spans), no R3F in the app. **Marketing** is static HTML: vanilla JS
+no GSAP, no SplitType (headline lines are authored as spans), no R3F in the app. **Marketing** is a Next.js app (ruling A16): `motion` + Lenis in client components, otherwise static rendering; was: vanilla JS
 (IntersectionObserver + one rAF scroll loop) and CSS; Lenis optional (vendored from the workspace's pinned `lenis` dist);
 the orb is the SVG version (section 8). GSAP/R3F are open decisions (preflight).
 
