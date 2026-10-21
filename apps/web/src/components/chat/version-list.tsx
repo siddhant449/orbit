@@ -34,14 +34,24 @@ export function VersionList({
   error,
   busy,
   onRestore,
+  onRetry,
 }: {
   versions: VersionRow[] | null;
   current: number;
   error: boolean;
   busy: boolean;
   onRestore: (version: number) => void;
+  onRetry: () => void;
 }) {
-  if (error) return <p className="type-ui text-danger">The versions couldn&apos;t be loaded. Close the panel and open it again.</p>;
+  if (error)
+    return (
+      <div role="alert" className="flex flex-wrap items-center gap-3">
+        <p className="type-ui text-danger">The versions couldn&apos;t be loaded.</p>
+        <Button variant="secondary" size="sm" onClick={onRetry}>
+          Retry
+        </Button>
+      </div>
+    );
   if (!versions) return <p className="type-ui text-text-2">Loading versions…</p>;
   return (
     <ol aria-label="Versions" className="flex flex-col">

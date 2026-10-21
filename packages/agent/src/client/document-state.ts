@@ -11,8 +11,10 @@ export type PanelState = {
   creating: boolean;
   updating: boolean;
   doc: PanelDoc | null;
-  /** Set by `data-updating`: the next delta replaces the text instead of appending to the old version. */
+  /** Set when a stream starts: its first delta replaces the text (an update, or a replay after resume). */
   restart?: boolean;
+  /** The user closed the panel: snapshots and refetches keep it closed; only a new stream reopens it. */
+  dismissed?: boolean;
 };
 
 /** LinkedIn's post length. Longer posts can be saved; the panel flags them. */
@@ -36,34 +38,75 @@ export function applyDataPart(state: PanelState, part: { type: string; data: unk
     case "data-updating": {
       if (typeof part.data !== "boolean") return state;
       const key = part.type === "data-creating" ? "creating" : "updating";
-      if (part.data) return { ...state, open: true, [key]: true, restart: key === "updating" ? true : state.restart };
-      return { ...state, [key]: false, ...(key === "updating" ? { restart: false } : {}) };
+      // A stream start is a new request: it opens the panel and its first delta starts the text over.
+      if (part.data) return { ...state, open: true, dismissed: false, [key]: true, restart: true };
+      return { ...state, [key]: false, restart: false };
     }
     case "data-textDelta": {
       if (!isObj(part.data) || typeof part.data.id !== "string" || typeof part.data.text !== "string") return state;
+      // Deltas belong to a running stream; one that arrives after the snapshot (or a duplicate tail) is dropped.
+      if (!state.creating && !state.updating) return state;
       const { id, text } = part.data;
+      const open = state.open || !state.dismissed;
       if (state.doc?.id === id) {
         const base = state.restart ? "" : state.doc.text;
-        return { ...state, restart: false, doc: { ...state.doc, text: base + text } };
+        return { ...state, open, restart: false, doc: { ...state.doc, text: base + text } };
       }
-      // A new post starts streaming before its snapshot exists; the title arrives with `data-document`.
-      if (state.creating) return { ...state, open: true, doc: { id, title: "", version: 0, text } };
+      // A new post streams before its snapshot exists; the title and version arrive with `data-document`.
+      if (state.creating) return { ...state, open, restart: false, doc: { id, title: "", version: 0, text } };
       return state;
     }
     case "data-document": {
       const doc = asDoc(part.data);
       if (!doc) return state;
-      return { open: true, creating: false, updating: false, restart: false, doc };
+      const settled = { ...state, creating: false, updating: false, restart: false };
+      if (state.doc?.id === doc.id && state.doc.version > doc.version) return settled;
+      return { ...settled, open: state.open || !state.dismissed, doc };
     }
     default:
       return state;
   }
 }
 
-/** The panel for a loaded post (page load, refetch, restore). No post closes it. */
+/** The stream ended (finished, failed or stopped) without saying so: no flag stays on. */
+export function endStream(state: PanelState): PanelState {
+  if (!state.creating && !state.updating && !state.restart) return state;
+  return { ...state, creating: false, updating: false, restart: false };
+}
+
+/** The user closed the panel. */
+export function closePanel(state: PanelState): PanelState {
+  return { ...state, open: false, dismissed: true };
+}
+
+/** The user opened the panel. */
+export function openPanel(state: PanelState): PanelState {
+  return state.doc || state.creating || state.updating ? { ...state, open: true, dismissed: false } : state;
+}
+
+/**
+ * The panel for a loaded post (page load, refetch, restore, recovery). It also ends any stream that died, so the
+ * stored post is never shown as still being written. No post closes it; a closed panel stays closed.
+ */
 export function withDocument(state: PanelState, doc: PanelDoc | null): PanelState {
-  if (!doc) return { ...state, open: false, doc: null };
-  return { ...state, open: true, doc };
+  const settled = { ...state, creating: false, updating: false, restart: false };
+  if (!doc) return { ...settled, open: false, doc: null };
+  return { ...settled, open: state.open || !state.dismissed, doc };
+}
+
+/**
+ * What a screen reader hears when the panel changes (polite, state changes only, never per delta). "Ready" keys
+ * on the post going from none (or an unsaved stream) to a saved version, so a burst that lands in one render,
+ * with the flags never seen on, still announces it.
+ */
+export function panelCue(prev: PanelState, next: PanelState): string | null {
+  if (next.creating && !prev.creating) return "Creating your post…";
+  if (next.updating && !prev.updating) return "Updating your post…";
+  const before = prev.doc;
+  const after = next.doc;
+  if (after && after.version >= 1 && (!before || before.version < 1)) return "Your post is ready.";
+  if (after && before && after.id === before.id && after.version > before.version) return `Updated. Version ${after.version}.`;
+  return null;
 }
 
 export function charCount(text: string): { count: number; over: boolean } {

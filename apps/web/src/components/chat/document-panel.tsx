@@ -140,7 +140,6 @@ export function DocumentPanel({ ctl, busy }: { ctl: DocumentController; busy: bo
   const [editing, setEditing] = useState(false);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const editRef = useRef<HTMLButtonElement>(null);
-  const returnTo = useRef<HTMLElement | null>(null);
   const { shown, revealing } = useReveal(doc?.text ?? "", streaming, ctl.streamSeq);
   const height = useScrollerHeight(desktop);
 
@@ -149,11 +148,29 @@ export function DocumentPanel({ ctl, busy }: { ctl: DocumentController; busy: bo
   // A stream that starts mid-edit leaves the editor alone; the save catches the conflict.
   const isEditing = editing && visible;
 
+  // The turn ended however it ended (finished, failed, stopped, dropped): no stream flag outlives it.
+  const wasBusy = useRef(busy);
+  const settle = ctl.settle;
   useEffect(() => {
-    if (visible && openedBy === "user" && document.activeElement instanceof HTMLElement && !returnTo.current) {
-      returnTo.current = document.activeElement;
-    }
+    if (wasBusy.current && !busy) void settle();
+    wasBusy.current = busy;
+  }, [busy, settle]);
+
+  // Opened by a click: focus moves to the heading. Done here rather than in Radix's mount autofocus, because a
+  // panel reopened during its exit animation is reused, not remounted.
+  const wasVisible = useRef(visible);
+  useEffect(() => {
+    if (visible && !wasVisible.current && openedBy === "user") requestAnimationFrame(() => headingRef.current?.focus());
+    wasVisible.current = visible;
   }, [visible, openedBy]);
+
+  // An edit closed without saving (Close, tab switch, overlay tap) is kept and resumed.
+  const kept = ctl.draft && doc && ctl.draft.id === doc.id && ctl.draft.text !== ctl.draft.baseText ? ctl.draft : null;
+
+  function focusBack() {
+    const back = ctl.takeReturnTo();
+    (back?.isConnected ? back : document.getElementById("chat-composer"))?.focus({ preventScroll: true });
+  }
 
   const title = doc?.title || (streaming ? "Writing your post…" : "Post");
   const version = doc && doc.version > 0 ? doc.version : null;
@@ -237,7 +254,14 @@ export function DocumentPanel({ ctl, busy }: { ctl: DocumentController; busy: bo
     <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-6" data-lenis-prevent>
       {tab === "versions" && version ? (
         <div className="pl-3">
-          <VersionList versions={ctl.versions} current={version} error={ctl.versionsError} busy={ctl.saving || busy} onRestore={(v) => void restore(v)} />
+          <VersionList
+            versions={ctl.versions}
+            current={version}
+            error={ctl.versionsError}
+            busy={ctl.saving || busy}
+            onRestore={(v) => void restore(v)}
+            onRetry={ctl.retryVersions}
+          />
         </div>
       ) : (
         <div className="flex flex-col gap-4">
@@ -247,6 +271,8 @@ export function DocumentPanel({ ctl, busy }: { ctl: DocumentController; busy: bo
                 doc={doc}
                 saving={ctl.saving}
                 onSave={ctl.save}
+                draft={ctl.draft}
+                onDraft={ctl.setDraft}
                 onDone={() => {
                   setEditing(false);
                   requestAnimationFrame(() => editRef.current?.focus());
@@ -257,11 +283,16 @@ export function DocumentPanel({ ctl, busy }: { ctl: DocumentController; busy: bo
             )}
           </PostSheet>
           {!isEditing && version && (
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-3">
               <Button ref={editRef} variant="secondary" size="sm" onClick={() => setEditing(true)} disabled={streaming}>
                 <PencilIcon />
-                Edit
+                {kept ? "Resume edit" : "Edit"}
               </Button>
+              {kept && (
+                <p data-kept-edit className="text-[13px] text-text-2">
+                  You have an unsaved edit to this post.
+                </p>
+              )}
             </div>
           )}
         </div>
@@ -274,6 +305,8 @@ export function DocumentPanel({ ctl, busy }: { ctl: DocumentController; busy: bo
         if (o) return;
         setEditing(false);
         ctl.close();
+        // Non-modal: nothing traps focus, so it goes back now. The phone sheet's trap hands it back on unmount.
+        if (desktop) focusBack();
       }} modal={!desktop}>
       <AnimatePresence initial={false}>
         {visible &&
@@ -282,16 +315,9 @@ export function DocumentPanel({ ctl, busy }: { ctl: DocumentController; busy: bo
               key="panel"
               forceMount
               asChild
-              onOpenAutoFocus={(e) => {
-                e.preventDefault();
-                if (openedBy === "user") headingRef.current?.focus();
-              }}
-              onCloseAutoFocus={(e) => {
-                e.preventDefault();
-                const back = returnTo.current;
-                returnTo.current = null;
-                (back?.isConnected ? back : document.getElementById("chat-composer"))?.focus({ preventScroll: true });
-              }}
+              onOpenAutoFocus={(e) => e.preventDefault()}
+              // Desktop gives focus back at once (see onOpenChange); the exit animation shouldn't hold it.
+              onCloseAutoFocus={(e) => e.preventDefault()}
               onEscapeKeyDown={(e) => {
                 // Escape belongs to the panel only while focus is in it, and never discards an edit.
                 const inside = document.querySelector("[data-document-panel]")?.contains(document.activeElement);
@@ -337,15 +363,10 @@ export function DocumentPanel({ ctl, busy }: { ctl: DocumentController; busy: bo
               <Dialog.Content
                 forceMount
                 asChild
-                onOpenAutoFocus={(e) => {
-                  e.preventDefault();
-                  headingRef.current?.focus();
-                }}
+                onOpenAutoFocus={(e) => e.preventDefault()}
                 onCloseAutoFocus={(e) => {
                   e.preventDefault();
-                  const back = returnTo.current;
-                  returnTo.current = null;
-                  back?.focus({ preventScroll: true });
+                  focusBack();
                 }}
                 onEscapeKeyDown={(e) => {
                   if (isEditing) e.preventDefault();

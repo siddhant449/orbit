@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   applyDataPart,
   charCount,
+  closePanel,
   emptyPanel,
+  endStream,
+  panelCue,
   POST_CHAR_LIMIT,
   withDocument,
   type PanelState,
@@ -63,8 +66,65 @@ describe("applyDataPart", () => {
 
 describe("withDocument", () => {
   it("opens on a document and closes with none", () => {
-    expect(withDocument(empty, doc)).toEqual({ open: true, creating: false, updating: false, doc });
-    expect(withDocument(empty, null)).toEqual(empty);
+    expect(withDocument(empty, doc)).toMatchObject({ open: true, creating: false, updating: false, doc });
+    expect(withDocument(empty, null)).toMatchObject({ open: false, creating: false, updating: false, doc: null });
+  });
+
+  it("clears stream flags: an adopted stored post ends any stream that died", () => {
+    let s = applyDataPart(empty, { type: "data-creating", data: true });
+    s = applyDataPart(s, { type: "data-textDelta", data: { id: "d1", text: "Hel" } });
+    s = withDocument(s, doc);
+    expect(s).toMatchObject({ creating: false, updating: false, restart: false, doc });
+  });
+
+  it("doesn't reopen a panel the user closed", () => {
+    const closed = closePanel(withDocument(empty, doc));
+    expect(withDocument(closed, { ...doc, version: 2 }).open).toBe(false);
+  });
+});
+
+describe("endStream", () => {
+  it("clears creating, updating and restart and keeps the text", () => {
+    let s = applyDataPart(withDocument(empty, doc), { type: "data-updating", data: true });
+    s = applyDataPart(s, { type: "data-textDelta", data: { id: "d1", text: "Par" } });
+    s = endStream(s);
+    expect(s).toMatchObject({ creating: false, updating: false, restart: false, doc: { text: "Par" } });
+  });
+});
+
+describe("stream guards", () => {
+  it("ignores deltas after the snapshot for the same document", () => {
+    let s = applyDataPart(empty, { type: "data-creating", data: true });
+    s = applyDataPart(s, { type: "data-textDelta", data: { id: "d1", text: "Hello!" } });
+    s = applyDataPart(s, { type: "data-document", data: doc });
+    s = applyDataPart(s, { type: "data-textDelta", data: { id: "d1", text: "Hello!" } });
+    expect(s.doc!.text).toBe("Hello!");
+  });
+
+  it("a replayed stream (resume) types from the start instead of doubling the text", () => {
+    let s = applyDataPart(empty, { type: "data-creating", data: true });
+    s = applyDataPart(s, { type: "data-textDelta", data: { id: "d1", text: "Hel" } });
+    s = applyDataPart(s, { type: "data-creating", data: true });
+    s = applyDataPart(s, { type: "data-textDelta", data: { id: "d1", text: "Hel" } });
+    s = applyDataPart(s, { type: "data-textDelta", data: { id: "d1", text: "lo" } });
+    expect(s.doc!.text).toBe("Hello");
+  });
+
+  it("never rolls back to an older snapshot of the same document", () => {
+    const s = withDocument(empty, { ...doc, version: 3, text: "v3" });
+    const next = applyDataPart(s, { type: "data-document", data: { ...doc, version: 2, text: "v2" } });
+    expect(next.doc).toMatchObject({ version: 3, text: "v3" });
+  });
+
+  it("a snapshot doesn't reopen a panel the user closed; a new stream does", () => {
+    let s = applyDataPart(empty, { type: "data-creating", data: true });
+    s = applyDataPart(s, { type: "data-textDelta", data: { id: "d1", text: "Hel" } });
+    s = closePanel(s);
+    s = applyDataPart(s, { type: "data-textDelta", data: { id: "d1", text: "lo" } });
+    s = applyDataPart(s, { type: "data-document", data: doc });
+    expect(s.open).toBe(false);
+    s = applyDataPart(s, { type: "data-updating", data: true });
+    expect(s.open).toBe(true);
   });
 });
 
@@ -74,5 +134,29 @@ describe("charCount", () => {
     expect(charCount("a".repeat(3001))).toEqual({ count: 3001, over: true });
     expect(charCount("a".repeat(3000))).toEqual({ count: 3000, over: false });
     expect(charCount("")).toEqual({ count: 0, over: false });
+  });
+});
+
+describe("panelCue", () => {
+  it("says the post is ready when one first settles, even if the whole burst landed at once", () => {
+    // The flags were never seen as on: one render went from no post straight to version 1.
+    expect(panelCue(empty, withDocument(empty, doc))).toBe("Your post is ready.");
+    const partial = { ...empty, open: true, doc: { ...doc, version: 0, text: "Hel" } };
+    expect(panelCue(partial, withDocument(partial, doc))).toBe("Your post is ready.");
+  });
+
+  it("announces a stream starting, and a newer version of the same post", () => {
+    expect(panelCue(empty, applyDataPart(empty, { type: "data-creating", data: true }))).toBe("Creating your post…");
+    const s = withDocument(empty, doc);
+    expect(panelCue(s, applyDataPart(s, { type: "data-updating", data: true }))).toBe("Updating your post…");
+    expect(panelCue(s, withDocument(s, { ...doc, version: 2 }))).toBe("Updated. Version 2.");
+  });
+
+  it("stays quiet otherwise", () => {
+    const s = withDocument(empty, doc);
+    expect(panelCue(s, s)).toBeNull();
+    expect(panelCue(s, closePanel(s))).toBeNull();
+    const c = applyDataPart(empty, { type: "data-creating", data: true });
+    expect(panelCue(c, applyDataPart(c, { type: "data-textDelta", data: { id: "d1", text: "x" } }))).toBeNull();
   });
 });

@@ -9,7 +9,11 @@ export { QUICK_LINKS, type QuickLinkKey } from "./quick-links";
 export {
   applyDataPart,
   charCount,
+  closePanel,
   emptyPanel,
+  endStream,
+  openPanel,
+  panelCue,
   POST_CHAR_LIMIT,
   withDocument,
   type PanelDoc,
