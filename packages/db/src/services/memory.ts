@@ -75,12 +75,15 @@ export async function appendMemoryLines(
   return upsertMemory(profileId, key, next, existing?.source ?? source);
 }
 
-async function bulletLines(profileId: string, key: string, lineIndex: number) {
+async function bulletLines(profileId: string, key: string, lineIndex: number, expectedText?: string) {
   const doc = await currentContent(profileId, key);
   if (!doc) throw new AccountError("Memory document not found");
   const lines = doc.content.split("\n");
   if (!Number.isInteger(lineIndex) || !lines[lineIndex] || !BULLET.test(lines[lineIndex]!)) {
     throw new AccountError("Not an editable line");
+  }
+  if (expectedText !== undefined && BULLET.exec(lines[lineIndex]!)![3]!.trim() !== expectedText.trim()) {
+    throw new AccountError("This memory changed. Refresh and try again.");
   }
   return { doc, lines };
 }
@@ -90,17 +93,23 @@ export async function editMemoryLine(
   key: string,
   lineIndex: number,
   text: string,
+  expectedText?: string,
 ): Promise<MemoryDoc> {
   const clean = text.trim();
   if (!clean) throw new AccountError("Line text is required");
-  const { doc, lines } = await bulletLines(profileId, key, lineIndex);
+  const { doc, lines } = await bulletLines(profileId, key, lineIndex, expectedText);
   const m = BULLET.exec(lines[lineIndex]!)!;
   lines[lineIndex] = `${m[1]}${m[2]}${clean}`;
   return prisma.memoryDoc.update({ where: { id: doc.id }, data: { content: lines.join("\n") } });
 }
 
-export async function deleteMemoryLine(profileId: string, key: string, lineIndex: number): Promise<MemoryDoc> {
-  const { doc, lines } = await bulletLines(profileId, key, lineIndex);
+export async function deleteMemoryLine(
+  profileId: string,
+  key: string,
+  lineIndex: number,
+  expectedText?: string,
+): Promise<MemoryDoc> {
+  const { doc, lines } = await bulletLines(profileId, key, lineIndex, expectedText);
   lines.splice(lineIndex, 1);
   return prisma.memoryDoc.update({ where: { id: doc.id }, data: { content: lines.join("\n") } });
 }

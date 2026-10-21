@@ -88,6 +88,21 @@ describe("line editing", () => {
   });
 });
 
+describe("expectedText guard", () => {
+  it("throws on mismatch and leaves content unchanged; succeeds on match", async () => {
+    const { profileId } = await setup();
+    const key = "identity/about";
+    await upsertMemory(profileId, key, "- A\n- B", "USER");
+    const msg = "This memory changed. Refresh and try again.";
+    await expect(editMemoryLine(profileId, key, 1, "Z", "A")).rejects.toThrow(msg);
+    await expect(deleteMemoryLine(profileId, key, 1, "A")).rejects.toThrow(msg);
+    expect((await listMemory(profileId))[0]!.content).toBe("- A\n- B");
+    await editMemoryLine(profileId, key, 1, "B2", " B ");
+    await deleteMemoryLine(profileId, key, 0, "A");
+    expect((await listMemory(profileId))[0]!.content).toBe("- B2");
+  });
+});
+
 describe("profile access", () => {
   it("hides another team's profile", async () => {
     const mine = await setup();

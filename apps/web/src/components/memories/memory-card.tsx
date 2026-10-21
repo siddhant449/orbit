@@ -28,7 +28,7 @@ function LineRow({ line }: { line: MemoryLineView }) {
     }
     busy.current = true;
     startTransition(async () => {
-      const result = await editMemoryLineAction(line.key, line.index, next);
+      const result = await editMemoryLineAction(line.key, line.index, next, line.text);
       busy.current = false;
       if (!result.ok) {
         toast.error(result.error);
@@ -49,7 +49,7 @@ function LineRow({ line }: { line: MemoryLineView }) {
 
   function remove() {
     startTransition(async () => {
-      const result = await deleteMemoryLineAction(line.key, line.index);
+      const result = await deleteMemoryLineAction(line.key, line.index, line.text);
       setConfirming(false);
       if (!result.ok) toast.error(result.error);
       else toast.success("Memory deleted");
@@ -83,7 +83,10 @@ function LineRow({ line }: { line: MemoryLineView }) {
         <button
           ref={editBtn}
           type="button"
-          onClick={() => setEditing(true)}
+          onClick={() => {
+            setDraft(line.text);
+            setEditing(true);
+          }}
           aria-label={`Edit: ${line.text}`}
           className="min-w-0 flex-1 rounded-row px-2.5 py-1.5 text-left text-[15px] leading-relaxed text-ink hover:bg-surface-sunk"
         >
@@ -135,7 +138,7 @@ function Group({ group, nested }: { group: MemoryGroupView; nested: boolean }) {
       {group.lines.length > 0 ? (
         <ul className="mt-1">
           {group.lines.map((line) => (
-            <LineRow key={`${line.key}:${line.index}`} line={line} />
+            <LineRow key={`${line.key}:${line.index}:${line.text}`} line={line} />
           ))}
         </ul>
       ) : (

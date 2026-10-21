@@ -45,17 +45,23 @@ function checkKey(key: string) {
   if (!MEMORY_KEY.test(key)) throw new AccountError("Unknown memory section");
 }
 
-export async function editMemoryLineAction(key: string, lineIndex: number, text: string) {
+function checkIndex(i: number) {
+  if (!Number.isInteger(i) || i < 0) throw new AccountError("Not an editable line");
+}
+
+export async function editMemoryLineAction(key: string, lineIndex: number, text: string, expectedText: string) {
   return runMemory((profileId) => {
     checkKey(key);
-    return editMemoryLine(profileId, key, lineIndex, text);
+    checkIndex(lineIndex);
+    return editMemoryLine(profileId, key, lineIndex, text, expectedText);
   });
 }
 
-export async function deleteMemoryLineAction(key: string, lineIndex: number) {
+export async function deleteMemoryLineAction(key: string, lineIndex: number, expectedText: string) {
   return runMemory((profileId) => {
     checkKey(key);
-    return deleteMemoryLine(profileId, key, lineIndex);
+    checkIndex(lineIndex);
+    return deleteMemoryLine(profileId, key, lineIndex, expectedText);
   });
 }
 

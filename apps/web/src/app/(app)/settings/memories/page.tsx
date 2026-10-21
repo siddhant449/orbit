@@ -49,7 +49,6 @@ export default async function Page() {
             <p className="font-display text-xl font-semibold leading-snug tracking-[-0.01em]">
               Memories are the facts we use to make every post sound like you and talk about what you actually know.
             </p>
-            <p className="mt-2 text-sm text-ink-muted">Bring them from another assistant, or write the first one yourself.</p>
             <div className="mt-5 flex flex-wrap items-center gap-2">
               <ImportDialog variant="primary" />
               <AddMemory memoryKey={MEMORY_KEYS.personal} variant="secondary" />
