@@ -1,3 +1,5 @@
+> Superseded by docs/design/orbit/ on 2026-10-22.
+
 # Component provenance
 
 Version 2, 2026-10-21 (Drafting table). Riso-era adaptations that were removed with the direction change are listed at the end so the licence trail stays complete. One row per component in `packages/ui` (and the shell pieces that are built on them).

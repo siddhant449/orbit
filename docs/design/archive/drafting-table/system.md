@@ -1,3 +1,5 @@
+> Superseded by docs/design/orbit/ on 2026-10-22.
+
 # Drafting table: the Brandloop design system
 
 Version 2, 2026-10-21. Replaces the Riso Print system (`riso-system.md`, rewritten in place and renamed to this file).

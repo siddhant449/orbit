@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { domAnimation } from "motion/react";
+import { domMax } from "motion/react";
 import { describe, expect, it } from "vitest";
 import { MotionProvider, loadMotionFeatures } from "./provider";
 
@@ -12,6 +12,6 @@ describe("MotionProvider (ruling U7)", () => {
     );
     expect(screen.getByText("ready")).toBeInTheDocument();
     expect(typeof loadMotionFeatures).toBe("function");
-    await expect(loadMotionFeatures()).resolves.toBe(domAnimation);
+    await expect(loadMotionFeatures()).resolves.toBe(domMax);
   });
 });

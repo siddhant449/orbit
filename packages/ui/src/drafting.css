@@ -1,5 +1,6 @@
 /*
- * Brandloop drafting-table recipes (docs/design/system.md sections 5 and 10, micro-interactions.md section 9).
+ * Drafting-table recipes still used by un-migrated screens (archived spec: docs/design/archive/drafting-table/).
+ * Orbit O1 removed the plated buttons; O2-O4 retire the rest and O4 deletes this file.
  * Imported after tokens.css. Every first-paint sequence is a CSS animation so it starts with first paint and
  * renders its final frame under prefers-reduced-motion. Springs are CSS linear() curves (landing 320 / 26, press
  * 500 / 30). No colour plates, no grain, no blur: hairlines, graphite and measured motion.
@@ -276,152 +277,6 @@
     animation-delay: calc(var(--rise-delay, 820ms) + var(--i, 0) * 50ms);
   }
 
-  /* ------------------------------------------------------------------ Buttons (B1 press, B3 flat) */
-  .btn {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    border: 0;
-    border-radius: var(--radius-control);
-    background: transparent;
-    color: var(--ink);
-    font-family: var(--font-sans);
-    font-size: 14px;
-    font-weight: 500;
-    line-height: 1;
-    white-space: nowrap;
-    cursor: pointer;
-  }
-  .btn svg {
-    width: 16px;
-    height: 16px;
-    flex-shrink: 0;
-  }
-  .btn:disabled {
-    pointer-events: none;
-  }
-  .btn--sm {
-    height: 32px;
-    font-size: 13px;
-  }
-  .btn--md {
-    height: 36px;
-  }
-  .btn--icon {
-    width: 32px;
-    height: 32px;
-  }
-  .btn--icon-lg {
-    width: 40px;
-    height: 40px;
-  }
-  .btn--sm.btn--flat,
-  .btn--sm > .btn__face {
-    padding: 0 12px;
-  }
-  .btn--md.btn--flat,
-  .btn--md > .btn__face {
-    padding: 0 16px;
-  }
-  .btn--icon.btn--flat,
-  .btn--icon > .btn__face,
-  .btn--icon-lg.btn--flat,
-  .btn--icon-lg > .btn__face {
-    padding: 0;
-  }
-  /* Plated: the button is the static plate (a 2 px graphite-grey offset), the face lands on it when pressed. */
-  .btn--plated {
-    isolation: isolate;
-    padding: 0 2px 2px 0;
-    background: var(--line-strong);
-    transition: background-color 160ms var(--ease-ink);
-  }
-  .btn--plated:hover,
-  .btn--plated:focus-visible {
-    background: var(--keyline);
-  }
-  .btn__face {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    width: 100%;
-    height: 100%;
-    border-radius: inherit;
-    background: var(--ink);
-    color: var(--on-ink);
-    translate: 0 0;
-    transition: translate 300ms
-      linear(0, 0.072, 0.237, 0.431, 0.618, 0.774, 0.894, 0.976, 1.026, 1.051, 1.058, 1.055, 1.046, 1.034, 1.023, 1.014, 1);
-  }
-  .btn--plated:active > .btn__face,
-  .btn--plated[data-pressed] > .btn__face {
-    translate: 2px 2px;
-    transition-duration: 120ms;
-  }
-  .btn--plated:disabled {
-    background: transparent;
-  }
-  .btn--plated:disabled > .btn__face {
-    background: var(--surface-sunk);
-    color: var(--ink-faint);
-    box-shadow: inset 0 0 0 1px var(--line);
-  }
-  /* Flat variants: hairline frames. */
-  .btn--flat {
-    border: 1px solid transparent;
-    transition:
-      background-color 160ms var(--ease-ink),
-      border-color 160ms var(--ease-ink),
-      color 160ms var(--ease-ink);
-  }
-  .btn--secondary {
-    border-color: var(--keyline);
-  }
-  .btn--secondary:hover,
-  .btn--secondary:focus-visible {
-    background: var(--surface-sunk);
-  }
-  .btn--secondary:active {
-    translate: 1px 1px;
-  }
-  .btn--secondary:disabled {
-    border-color: var(--line);
-    color: var(--ink-faint);
-  }
-  .btn--danger {
-    border-color: var(--signal);
-    color: var(--signal-ink);
-  }
-  .btn--danger:hover,
-  .btn--danger:focus-visible {
-    background: var(--signal-soft);
-  }
-  .btn--danger:active {
-    translate: 1px 1px;
-  }
-  .btn--danger:disabled {
-    border-color: var(--line);
-    color: var(--ink-faint);
-  }
-  .btn--ghost {
-    color: var(--ink-muted);
-  }
-  .btn--ghost:hover,
-  .btn--ghost:focus-visible {
-    background: var(--surface-sunk);
-    color: var(--ink);
-  }
-  .btn--ghost:active {
-    translate: 1px 1px;
-  }
-  .btn--ghost:disabled {
-    color: var(--ink-faint);
-  }
-
   /* ------------------------------------------------------------------ Index: nav rows and the clipped label */
   .nav-row {
     position: relative;
@@ -555,10 +410,7 @@
     .nav-row__text,
     .tab__plate,
     .tab__face,
-    .tab__text,
-    .btn__face,
-    .btn--plated,
-    .btn--flat {
+    .tab__text {
       transition: none;
     }
   }

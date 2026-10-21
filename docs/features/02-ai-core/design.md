@@ -9,7 +9,7 @@ Status: **approved 2026-10-21, amended the same day: guided flows are in v1 (§6
 One chat where a person talks to an assistant that knows them. It can recall and save what it knows, search their own
 material, research the web, and draft and edit LinkedIn posts in their voice. Posts open in a side panel as versioned
 documents. Kleo's behaviour is the bar: what the user sees and the server contracts behind it. We build it our own way,
-with our own copy and the Drafting table look (`docs/design/system.md`). Feature 1's remaining tasks (knowledge ingestion, transcription, the knowledge
+with our own copy and the Drafting table look (`docs/design/archive/drafting-table/system.md`, superseded by `docs/design/orbit/system.md`). Feature 1's remaining tasks (knowledge ingestion, transcription, the knowledge
 screen, first-run setup) are folded in, because retrieval and chat depend on them.
 
 ## 2. Copy, simplify or skip

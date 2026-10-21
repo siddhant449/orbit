@@ -1,3 +1,5 @@
+> Superseded by docs/design/orbit/ on 2026-10-22.
+
 # UI redesign (Riso Print) — D2–D4 implementation plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to carry out this plan task by task. Steps use checkbox (`- [ ]`) syntax for tracking.

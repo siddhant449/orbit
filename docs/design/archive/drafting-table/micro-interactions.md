@@ -1,3 +1,5 @@
+> Superseded by docs/design/orbit/ on 2026-10-22.
+
 # Micro-interactions catalogue (Drafting table)
 
 Version 2, 2026-10-21. Replaces the Riso Print catalogue. Tokens and devices refer to `system.md`; recipes live in

@@ -5,8 +5,9 @@ import path from "node:path";
 import { axeCheck, expectNoHorizontalScroll } from "./helpers/shots";
 
 /**
- * Drafting-table rollout gate: every route passes axe (serious / critical) in day and night, has no horizontal scroll
- * at 390 px, and (with SHOTS=1) is captured at 1440 and 390 in both themes as `drafting-<route>-<w>-<theme>.png`.
+ * Rollout gate: every route passes axe (serious / critical) in dark and light, has no horizontal scroll at 390 px, and
+ * (with SHOTS=1) is captured at 1440 and 390 in both themes as `routes-<route>-<w>-<theme>.png`. Contexts start on the
+ * "Auto" theme (playwright.config.ts), so `emulateMedia` picks the theme.
  */
 const email = process.env.E2E_CLERK_USER_EMAIL;
 test.skip(!email, "Set E2E_CLERK_USER_EMAIL to a Clerk dev-instance test user");
@@ -36,7 +37,7 @@ const appRoutes = [
 ];
 const slug = (route: string) => (route === "/" ? "home" : route.replace(/^\//, "").replace(/\//g, "-"));
 
-test("every route: axe day and night, 390 px, screenshots", async ({ page }) => {
+test("every route: axe dark and light, 390 px, screenshots", async ({ page }) => {
   const shots = process.env.SHOTS === "1";
   const dir = process.env.SHOTS_DIR;
   if (shots && !dir) throw new Error("SHOTS=1 needs SHOTS_DIR");
@@ -58,11 +59,11 @@ test("every route: axe day and night, 390 px, screenshots", async ({ page }) => 
       await expect(page.locator("html")).toHaveClass(colorScheme === "dark" ? /(^|\s)dark(\s|$)/ : /^((?!\bdark\b).)*$/);
       await page.waitForTimeout(route === "/" ? 1500 : 700);
       await axeCheck(page);
-      if (shots) await page.screenshot({ path: path.join(dir!, `drafting-${slug(route)}-1440-${theme}.png`), fullPage: true, animations: "disabled" });
+      if (shots) await page.screenshot({ path: path.join(dir!, `routes-${slug(route)}-1440-${theme}.png`), fullPage: true, animations: "disabled" });
       await page.setViewportSize({ width: 390, height: 844 });
       await page.waitForTimeout(300);
       await expectNoHorizontalScroll(page);
-      if (shots) await page.screenshot({ path: path.join(dir!, `drafting-${slug(route)}-390-${theme}.png`), fullPage: true, animations: "disabled" });
+      if (shots) await page.screenshot({ path: path.join(dir!, `routes-${slug(route)}-390-${theme}.png`), fullPage: true, animations: "disabled" });
     }
   }
 });
@@ -83,11 +84,11 @@ test("sign-in: axe day and night, 390 px, screenshots", async ({ browser }) => {
     await page.waitForTimeout(800);
     // Clerk's development-instance footer badge ("Secured by", "Development mode") is Clerk's UI and absent in production.
     await axeCheck(page, { exclude: [".cl-footer"] });
-    if (shots) await page.screenshot({ path: path.join(dir!, `drafting-sign-in-1440-${theme}.png`), fullPage: true, animations: "disabled" });
+    if (shots) await page.screenshot({ path: path.join(dir!, `routes-sign-in-1440-${theme}.png`), fullPage: true, animations: "disabled" });
     await page.setViewportSize({ width: 390, height: 844 });
     await page.waitForTimeout(300);
     await expectNoHorizontalScroll(page);
-    if (shots) await page.screenshot({ path: path.join(dir!, `drafting-sign-in-390-${theme}.png`), fullPage: true, animations: "disabled" });
+    if (shots) await page.screenshot({ path: path.join(dir!, `routes-sign-in-390-${theme}.png`), fullPage: true, animations: "disabled" });
   }
   await context.close();
 });

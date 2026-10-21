@@ -1,3 +1,5 @@
+> Superseded by docs/design/orbit/ on 2026-10-22.
+
 # Design-critic rubric (Drafting table)
 
 Version 2, 2026-10-21. Applied to every screen before its task is accepted. The reference documents are

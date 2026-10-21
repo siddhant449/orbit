@@ -1,3 +1,5 @@
+> Superseded by docs/design/orbit/ on 2026-10-22.
+
 # Brandloop reference board (Riso Print direction)
 
 Researched 2026-10-21 with a read-only Playwright browser at 1440x900. Each screenshot is the above-the-fold view

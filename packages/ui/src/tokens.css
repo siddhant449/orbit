@@ -1,77 +1,236 @@
 /*
- * Brandloop design tokens: Drafting table (docs/design/system.md).
- * Imported by apps after `@import "tailwindcss"`. Hex values are written upper case as in the system doc; Tailwind's
- * pipeline lowercases them in the served CSS.
+ * Orbit design tokens (docs/design/orbit/system.md). Imported by apps after `@import "tailwindcss"`.
+ * Dark is the app default: `:root` carries the dark values so a no-JS paint is dark; `.light` (set by next-themes on
+ * <html>, or on a wrapper to force a theme locally) carries the light values. Hex is written upper case as in the doc;
+ * Tailwind lowercases it in the served CSS.
  */
 @source "./";
 
-/* Day: paper desk, graphite ink (system.md section 2.2). */
-:root {
-  --paper: #F3F1EC;
-  --surface: #FBFAF7;
-  --surface-sunk: #EAE8E2;
-  --ink: #1C1C1C;
-  --ink-muted: #5B5A56;
-  --ink-faint: #66655F;
-  --line: #C9C6BF;
-  --line-strong: #807D76;
-  --keyline: #1C1C1C;
-  --plate: #1C1C1C;
-  --signal: #E5482A;
-  --signal-ink: #B2351C;
-  --signal-soft: #F8E0D9;
-  --ghost: #E2DFD8;
-  --on-ink: #F3F1EC;
-  --on-signal: #1C1C1C;
+/* ---------------------------------------------------------------- Dark (system §2, [p30], [p01]) */
+:root,
+.dark {
+  color-scheme: dark;
 
-  /* Role aliases: primary actions, links and focus are graphite; danger is the signal text tone. */
-  --accent: var(--ink);
-  --on-accent: var(--on-ink);
-  --accent-soft: var(--surface-sunk);
-  --focus: var(--ink);
-  --danger: var(--signal-ink);
-  --on-danger: var(--on-ink);
+  /* 2.1 Surfaces and text */
+  --ground: #0E0E10;
+  --ground-hero: #0A0A0B;
+  --panel: #151517;
+  --panel-hover: #1A1A1D;
+  --inverse: #F5F4F0;
+  --on-inverse: #0A0A0B;
+  --inverse-hover: #C9CEFF;
+  --on-inverse-hover: #0A0A0B;
+  --text: #F5F4F0;
+  --text-soft: #C9C8C4;
+  --text-2: #9A9A9E;
+  --text-3: #828288; /* Orbit #7A7A80, AA substitution (system §2.4) */
+  --icon: #8A8A8E;
+  --faint: #5B5B5E;
 
-  --grid-line: color-mix(in oklab, var(--line) 55%, transparent);
-  --radius-control: 2px;
-  --radius-pill: 999px;
-  --shadow-sm: 1px 1px 0 0 var(--plate);
-  --shadow-raised: 1px 1px 0 0 var(--plate);
-  --shadow-overlay: 1px 1px 0 0 var(--plate);
-  --ease-ink: cubic-bezier(0.2, 0.7, 0.2, 1);
+  /* 2.2 Lines: paper at fixed alphas */
+  --line-faint: rgba(245, 244, 240, 0.05);
+  --line-soft: rgba(245, 244, 240, 0.06);
+  --line-row: rgba(245, 244, 240, 0.07);
+  --line: rgba(245, 244, 240, 0.08);
+  --line-2: rgba(245, 244, 240, 0.1);
+  --line-3: rgba(245, 244, 240, 0.12);
+  --line-4: rgba(245, 244, 240, 0.14);
+  --line-strong: rgba(245, 244, 240, 0.18);
+  --line-hover: rgba(245, 244, 240, 0.2);
+  --line-input: rgba(245, 244, 240, 0.1);
+  --line-paper: #ECEBE6;
+  --panel-highlight: inset 0 1px 0 rgba(245, 244, 240, 0.055);
+  /* Component roles that differ by theme (so a forced-theme wrapper works without ancestor selectors) */
+  --panel-border: rgba(245, 244, 240, 0.08);
+  --panel-hover-fill: #1A1A1D;
+  --panel-hover-border: rgba(245, 244, 240, 0.2);
+  --segmented-fill: #151517;
+  --aura-edge: #7C8AFF;
+
+  /* 2.3 Accent */
+  --accent: #4F5FF5;
+  --accent-hover: #5566F7; /* Orbit #6B7BFF, AA substitution (system §2.4) */
+  --accent-text: #7C8AFF;
+  --accent-text-2: #8A93FF;
+  --accent-tint: #C9CEFF;
+  --accent-wash: rgba(124, 138, 255, 0.12);
+  --accent-wash-line: rgba(124, 138, 255, 0.45);
+  --cobalt: #2A3BFF;
+  --on-accent: #FFFFFF;
+  --selection-mark: rgba(124, 138, 255, 0.45);
+  --glow-accent: 0 10px 28px rgba(79, 95, 245, 0.28);
+
+  /* Not specified in Orbit: errors and destructive confirmation only (system §2.3). */
+  --danger: #FF6B5E;
+  --danger-fill: #C8321F;
+  --on-danger: #FFFFFF;
+  --toggle-off: #2A2A2D;
+
+  /* 2.5 Ambient */
+  --ambient-glow:
+    radial-gradient(640px 360px at 58% 0%, rgba(124, 138, 255, 0.1), transparent 60%),
+    radial-gradient(700px 420px at 100% 100%, rgba(42, 59, 255, 0.16), transparent 60%);
+  --grain-opacity: 0.07;
+  --grain-blend: screen;
+
+  /* 5 Elevation: dark has no drop shadows except overlays */
+  --shadow-card: none;
+  --shadow-composer: 0 30px 90px rgba(0, 0, 0, 0.45);
+  --shadow-draft: 0 24px 70px rgba(0, 0, 0, 0.45);
+  --shadow-hover: none;
+
+  /* 7.1 Motion */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-hover-color: 150ms;
+  --dur-hover: 400ms;
+  --dur-reveal: 900ms;
+  --dur-line: 1200ms;
+}
+
+/* ---------------------------------------------------------------- Light (system §2, [p30], [p17]) */
+:root.light,
+.light {
+  color-scheme: light;
+
+  --ground: #F5F4F0;
+  --ground-hero: #0A0A0B;
+  --panel: #FFFFFF;
+  --panel-hover: #EFEEE9;
+  --inverse: #0A0A0B;
+  --on-inverse: #F5F4F0;
+  --inverse-hover: #2E3FE6;
+  --on-inverse-hover: #F5F4F0;
+  --text: #0A0A0B;
+  --text-soft: #3A3A3E;
+  --text-2: #5B5B5E;
+  --text-3: #6C6C70; /* Orbit #8A8A8E, AA substitution (system §2.4) */
+  --icon: #9A9A9E;
+  --faint: #8A8A8E;
+
+  --line-faint: rgba(10, 10, 11, 0.05);
+  --line-soft: rgba(10, 10, 11, 0.06);
+  --line-row: rgba(10, 10, 11, 0.07);
+  --line: rgba(10, 10, 11, 0.08);
+  --line-2: rgba(10, 10, 11, 0.1);
+  --line-3: rgba(10, 10, 11, 0.12);
+  --line-4: rgba(10, 10, 11, 0.14);
+  --line-strong: rgba(10, 10, 11, 0.18);
+  --line-hover: rgba(10, 10, 11, 0.2);
+  --line-input: #E3E2DC;
+  --line-paper: #ECEBE6;
+  --panel-highlight: inset 0 1px 0 rgba(10, 10, 11, 0.055);
+  --panel-border: transparent;
+  --panel-hover-fill: #FFFFFF;
+  --panel-hover-border: transparent;
+  --segmented-fill: #F5F4F0;
+  --aura-edge: #2E3FE6;
+
+  --accent: #4F5FF5;
+  --accent-hover: #5566F7;
+  --accent-text: #2E3FE6;
+  --accent-text-2: #3B4CF0;
+  --accent-tint: #C9CEFF;
+  --accent-wash: rgba(46, 63, 230, 0.1);
+  --accent-wash-line: rgba(46, 63, 230, 0.45);
+  --cobalt: #2A3BFF;
+  --on-accent: #FFFFFF;
+  --selection-mark: rgba(124, 138, 255, 0.45);
+  --glow-accent: 0 10px 28px rgba(79, 95, 245, 0.28);
+
+  --danger: #C8321F;
+  --danger-fill: #C8321F;
+  --on-danger: #FFFFFF;
+  --toggle-off: #D9D8D2;
+
+  --ambient-glow:
+    radial-gradient(640px 360px at 58% 0%, rgba(46, 63, 230, 0.1), transparent 60%),
+    radial-gradient(700px 420px at 100% 100%, rgba(42, 59, 255, 0.16), transparent 60%);
+  --grain-opacity: 0.05;
+  --grain-blend: multiply;
+
+  --shadow-card: 0 20px 60px rgba(10, 10, 11, 0.06);
+  --shadow-composer: 0 30px 90px rgba(10, 10, 11, 0.12);
+  --shadow-draft: 0 24px 70px rgba(10, 10, 11, 0.1);
+  --shadow-hover: 0 24px 60px rgba(10, 10, 11, 0.12);
+}
+
+/*
+ * Drafting-table aliases (migration §1.1): un-migrated screens and Task 7's chat files still use these names.
+ * They point at Orbit tokens and are deleted in O4. Repeated on `.dark` / `.light` so a forced-theme wrapper
+ * re-resolves them. `--line` and `--line-strong` are Orbit names now (0.08 / 0.18), so they are not aliased.
+ */
+:root,
+.dark,
+.light {
+  --paper: var(--ground);
+  --surface: var(--panel);
+  --surface-sunk: var(--panel-hover);
+  --ink: var(--text);
+  --ink-muted: var(--text-2);
+  --ink-faint: var(--text-3);
+  --keyline: var(--line-3);
+  --plate: var(--line-2);
+  --signal: var(--danger);
+  --signal-ink: var(--danger);
+  --signal-soft: color-mix(in oklab, var(--danger) 14%, transparent);
+  --ghost: var(--line-row);
+  --on-ink: var(--on-inverse);
+  --on-signal: var(--ground);
+  --accent-soft: var(--accent-wash);
+  --focus: var(--accent-text);
+  --grid-line: var(--line-faint);
+  --ease-ink: var(--ease-out);
   --ease-exit: cubic-bezier(0.4, 0, 0.8, 0.4);
 }
 
-/* Night: drafting at night, light ink on dark paper (section 2.3). */
-:root[data-theme="dark"],
-.dark {
-  --paper: #15161A;
-  --surface: #1B1C21;
-  --surface-sunk: #0F1013;
-  --ink: #E8E6E1;
-  --ink-muted: #A8A6A0;
-  --ink-faint: #8E8C86;
-  --line: #34363C;
-  --line-strong: #6B6E77;
-  --keyline: #B9B7B1;
-  --plate: #B9B7B1;
-  --signal: #E5482A;
-  --signal-ink: #F0674D;
-  --signal-soft: #3A1F1A;
-  --ghost: #232429;
-  --on-ink: #15161A;
-  --on-signal: #15161A;
-}
-
 @theme inline {
+  /* Orbit colours: `bg-panel`, `text-text-2`, `border-line-3` ... */
+  --color-ground: var(--ground);
+  --color-ground-hero: var(--ground-hero);
+  --color-panel: var(--panel);
+  --color-panel-hover: var(--panel-hover);
+  --color-inverse: var(--inverse);
+  --color-on-inverse: var(--on-inverse);
+  --color-inverse-hover: var(--inverse-hover);
+  --color-on-inverse-hover: var(--on-inverse-hover);
+  --color-text: var(--text);
+  --color-text-soft: var(--text-soft);
+  --color-text-2: var(--text-2);
+  --color-text-3: var(--text-3);
+  --color-icon: var(--icon);
+  --color-faint: var(--faint);
+  --color-line-faint: var(--line-faint);
+  --color-line-soft: var(--line-soft);
+  --color-line-row: var(--line-row);
+  --color-line: var(--line);
+  --color-line-2: var(--line-2);
+  --color-line-3: var(--line-3);
+  --color-line-4: var(--line-4);
+  --color-line-strong: var(--line-strong);
+  --color-line-hover: var(--line-hover);
+  --color-line-input: var(--line-input);
+  --color-line-paper: var(--line-paper);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-text: var(--accent-text);
+  --color-accent-text-2: var(--accent-text-2);
+  --color-accent-tint: var(--accent-tint);
+  --color-accent-wash: var(--accent-wash);
+  --color-cobalt: var(--cobalt);
+  --color-on-accent: var(--on-accent);
+  --color-danger: var(--danger);
+  --color-danger-fill: var(--danger-fill);
+  --color-on-danger: var(--on-danger);
+  --color-selection-mark: var(--selection-mark);
+  --color-segmented-fill: var(--segmented-fill);
+
+  /* Drafting aliases (removed in O4) */
   --color-paper: var(--paper);
   --color-surface: var(--surface);
   --color-surface-sunk: var(--surface-sunk);
   --color-ink: var(--ink);
   --color-ink-muted: var(--ink-muted);
   --color-ink-faint: var(--ink-faint);
-  --color-line: var(--line);
-  --color-line-strong: var(--line-strong);
   --color-keyline: var(--keyline);
   --color-plate: var(--plate);
   --color-signal: var(--signal);
@@ -80,81 +239,144 @@
   --color-ghost: var(--ghost);
   --color-on-ink: var(--on-ink);
   --color-on-signal: var(--on-signal);
-  --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
-  --color-on-accent: var(--on-accent);
   --color-focus: var(--focus);
-  --color-danger: var(--danger);
-  --color-on-danger: var(--on-danger);
 
-  /* No monospace anywhere: `font-mono` and the preflight default for code resolve to the UI face. */
+  /* Faces (system §4): Bricolage Grotesque display, Geist UI, system monospace for the data register only. */
+  --font-display: var(--font-display-face), var(--font-ui), system-ui, sans-serif;
   --font-sans: var(--font-ui), system-ui, sans-serif;
-  --font-mono: var(--font-ui), system-ui, sans-serif;
-  --font-display: var(--font-display-face), var(--font-ui), sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 
-  --radius-control: 2px;
+  /* Radii (system §5) */
   --radius-pill: 999px;
-  --radius-row: var(--radius-control);
-  --radius-card: var(--radius-control);
+  --radius-card-sm: 14px;
+  --radius-card: 18px;
+  --radius-card-lg: 24px;
+  --radius-shot: 28px;
+  /* Drafting radius names, re-pointed until O4 */
+  --radius-control: 12px;
+  --radius-row: 10px;
 
-  --shadow-sm: 1px 1px 0 0 var(--plate);
-  --shadow-raised: 1px 1px 0 0 var(--plate);
-  --shadow-overlay: 1px 1px 0 0 var(--plate);
+  /* Elevation */
+  --shadow-card: var(--shadow-card);
+  --shadow-composer: var(--shadow-composer);
+  --shadow-draft: var(--shadow-draft);
+  --shadow-hover: var(--shadow-hover);
+  --shadow-glow: var(--glow-accent);
+  --shadow-highlight: var(--panel-highlight);
+  /* Drafting shadow names, re-pointed until O4 */
+  --shadow-sm: var(--shadow-card);
+  --shadow-raised: var(--shadow-card);
+  --shadow-overlay: var(--shadow-draft);
 
-  --ease-ink: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-ink: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-exit: cubic-bezier(0.4, 0, 0.8, 0.4);
 }
 
 /*
- * Type scale (section 3.2). A tight grotesk display register in Archivo (width 92-100, tight tracking) and a text
- * register in Hanken Grotesk. Display steps carry their 390 px clamp. Hanken steps read the weight that a
- * `font-medium` / `font-semibold` class sets, so a utility can still override the default weight.
+ * Type scale (system §4.1). `font-variation-settings` and weights are written exactly as Orbit sets them. Display steps
+ * carry a clamp so they fit 390 px.
  */
-@utility type-display-1 {
+@utility type-display {
   font-family: var(--font-display);
-  font-weight: 700;
-  font-stretch: 92%;
-  font-size: clamp(36px, 6.4vw, 80px);
-  line-height: 0.98;
-  letter-spacing: -0.035em;
+  font-variation-settings: "opsz" 96, "wdth" 88;
+  font-weight: 460;
+  font-size: clamp(56px, 8vw, 112px);
+  line-height: 0.9;
+  letter-spacing: -0.05em;
   text-wrap: balance;
 }
 
-@utility type-display-2 {
+@utility type-section {
   font-family: var(--font-display);
-  font-weight: 700;
-  font-stretch: 92%;
-  font-size: clamp(30px, 5vw, 48px);
-  line-height: 1.02;
+  font-variation-settings: "opsz" 96, "wdth" 88;
+  font-weight: 460;
+  font-size: clamp(40px, 5.2vw, 72px);
+  line-height: 0.92;
+  letter-spacing: -0.045em;
+  text-wrap: balance;
+}
+
+@utility type-greeting {
+  font-family: var(--font-display);
+  font-variation-settings: "opsz" 72, "wdth" 90;
+  font-weight: 460;
+  font-size: 36px;
+  line-height: 0.98;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+  @media (min-width: 640px) {
+    font-variation-settings: "opsz" 96, "wdth" 90;
+    font-size: clamp(36px, 4.4vw, 56px);
+    letter-spacing: -0.04em;
+  }
+}
+
+@utility type-page-title {
+  font-family: var(--font-display);
+  font-variation-settings: "opsz" 72, "wdth" 90;
+  font-weight: 460;
+  font-size: 40px;
+  line-height: 1;
   letter-spacing: -0.03em;
   text-wrap: balance;
 }
 
-@utility type-title-1 {
+@utility type-panel-title {
   font-family: var(--font-display);
-  font-weight: 600;
-  font-stretch: 96%;
-  font-size: clamp(24px, 6vw, 28px);
-  line-height: 1.1;
-  letter-spacing: -0.025em;
+  font-variation-settings: "opsz" 48, "wdth" 90;
+  font-weight: 500;
+  font-size: 28px;
+  line-height: 1.08;
+  letter-spacing: -0.03em;
   text-wrap: balance;
 }
 
-@utility type-title-2 {
+@utility type-card-title {
   font-family: var(--font-display);
-  font-weight: 600;
-  font-stretch: 100%;
-  font-size: clamp(18px, 4.6vw, 20px);
-  line-height: 1.2;
-  letter-spacing: -0.015em;
+  font-variation-settings: "opsz" 48, "wdth" 90;
+  font-weight: 500;
+  font-size: 22px;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
   text-wrap: balance;
 }
 
-@utility type-title-3 {
+@utility type-stat-xl {
+  font-family: var(--font-display);
+  font-variation-settings: "opsz" 96, "wdth" 85;
+  font-weight: 500;
+  font-size: 64px;
+  line-height: 0.85;
+  letter-spacing: -0.045em;
+  font-variant-numeric: tabular-nums;
+}
+
+@utility type-stat {
+  font-family: var(--font-display);
+  font-variation-settings: "opsz" 96, "wdth" 85;
+  font-weight: 500;
+  font-size: 40px;
+  line-height: 0.9;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+@utility type-wordmark {
+  font-family: var(--font-display);
+  font-variation-settings: "opsz" 32, "wdth" 90;
+  font-weight: 600;
+  font-size: 20px;
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+@utility type-lead {
   font-family: var(--font-sans);
-  font-weight: var(--tw-font-weight, 600);
-  font-size: 16px;
-  line-height: 1.3;
+  font-weight: var(--tw-font-weight, 400);
+  font-size: 19px;
+  line-height: 1.5;
   letter-spacing: 0;
 }
 
@@ -162,7 +384,7 @@
   font-family: var(--font-sans);
   font-weight: var(--tw-font-weight, 400);
   font-size: 15px;
-  line-height: 1.6;
+  line-height: 1.55;
   letter-spacing: 0;
 }
 
@@ -174,50 +396,119 @@
   letter-spacing: 0;
 }
 
-@utility type-caption {
+@utility type-meta {
+  font-family: var(--font-sans);
+  font-weight: var(--tw-font-weight, 400);
+  font-size: 12px;
+  line-height: 1.4;
+  letter-spacing: 0;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+@utility type-mono-data {
+  font-family: var(--font-mono);
+  font-weight: 400;
+  font-size: 12px;
+  line-height: 1.4;
+  letter-spacing: 0.04em;
+}
+
+/* Drafting type names, re-pointed to the nearest Orbit step until O4 (migration §1.1). */
+@utility type-display-1 {
+  font-family: var(--font-display);
+  font-variation-settings: "opsz" 96, "wdth" 90;
+  font-weight: 460;
+  font-size: clamp(36px, 4.4vw, 56px);
+  line-height: 0.98;
+  letter-spacing: -0.04em;
+  text-wrap: balance;
+}
+
+@utility type-display-2 {
+  font-family: var(--font-display);
+  font-variation-settings: "opsz" 72, "wdth" 90;
+  font-weight: 460;
+  font-size: clamp(32px, 5vw, 40px);
+  line-height: 1;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+@utility type-title-1 {
+  font-family: var(--font-display);
+  font-variation-settings: "opsz" 48, "wdth" 90;
+  font-weight: 500;
+  font-size: clamp(24px, 6vw, 28px);
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+@utility type-title-2 {
+  font-family: var(--font-display);
+  font-variation-settings: "opsz" 48, "wdth" 90;
+  font-weight: 500;
+  font-size: 20px;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+@utility type-title-3 {
   font-family: var(--font-sans);
   font-weight: var(--tw-font-weight, 500);
+  font-size: 16px;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+
+@utility type-caption {
+  font-family: var(--font-sans);
+  font-weight: var(--tw-font-weight, 400);
   font-size: 13px;
   line-height: 1.4;
-  letter-spacing: 0.01em;
+  letter-spacing: 0;
   font-variant-numeric: tabular-nums;
 }
 
 @utility type-micro {
   font-family: var(--font-sans);
-  font-weight: var(--tw-font-weight, 600);
+  font-weight: var(--tw-font-weight, 500);
   font-size: 11px;
   line-height: 1.3;
-  letter-spacing: 0.02em;
+  letter-spacing: 0;
   font-variant-numeric: tabular-nums;
 }
 
-/* Icons (section 7): lucide only. 16 px at stroke 1.75 in rows, buttons and inputs; 20 px at stroke 1.5 in headers. */
+/* Hover timing (system §7.1): colour answers in 150 ms, transforms settle over 400 ms, one easing. */
+@utility orbit-transition {
+  transition-property: background-color, border-color, color, box-shadow, opacity, translate, scale;
+  transition-timing-function: var(--ease-out);
+  transition-duration:
+    var(--dur-hover-color), var(--dur-hover-color), var(--dur-hover-color), var(--dur-hover-color),
+    var(--dur-hover-color), var(--dur-hover), var(--dur-hover);
+}
+
+/* Icons: lucide sizes kept until the chrome moves to the Orbit set in O2. */
 @utility icon-sm {
   width: 16px;
   height: 16px;
   flex-shrink: 0;
-  stroke-width: 1.75;
+  stroke-width: 1.6;
 }
 
 @utility icon-md {
   width: 20px;
   height: 20px;
   flex-shrink: 0;
-  stroke-width: 1.5;
+  stroke-width: 1.6;
 }
 
 @layer base {
-  html {
-    color-scheme: light;
-  }
-  html.dark {
-    color-scheme: dark;
-  }
-
   body {
-    background: var(--paper);
-    color: var(--ink);
+    background: var(--ground);
+    color: var(--text);
     font-family: var(--font-sans);
     font-size: 14px;
     line-height: 1.45;
@@ -228,66 +519,60 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* Focus ring (section 6): graphite; on graphite plates the paper halo keeps it visible. */
+  /* Focus ring (system §5): not specified in Orbit; accent text, 6:1+ on ground in both themes. */
   :focus-visible {
-    outline: 2px solid var(--focus);
+    outline: 2px solid var(--accent-text);
     outline-offset: 2px;
-  }
-  .on-plate:focus-visible {
-    box-shadow: 0 0 0 2px var(--paper);
   }
 
   ::selection {
-    background: var(--surface-sunk);
-    color: var(--ink);
+    background: var(--selection-mark);
+    color: var(--text);
   }
 
-  /* No monospace anywhere: the UA defaults for these elements are monospace. */
-  code,
-  kbd,
-  samp,
-  pre {
-    font-family: var(--font-sans);
-    font-size: inherit;
-  }
-
-  /* lucide draws at stroke 2 by default; the system default is 1.75. Icons that pass another stroke keep it. */
+  /* lucide draws at stroke 2 by default; Orbit strokes 1.6 (until O2 retires lucide in the chrome). */
   svg.lucide[stroke-width="2"] {
-    stroke-width: 1.75;
+    stroke-width: 1.6;
   }
 
+  /*
+   * Reduced motion (system §7.4): transforms and loops stop at their final or a static frame; colour and opacity still
+   * answer, over 150 ms. Hover lifts are written `motion-safe:` so they do not jump either.
+   */
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
     *::after {
       animation-duration: 0.01ms !important;
+      animation-delay: 0s !important;
       animation-iteration-count: 1 !important;
-      transition-duration: 0.01ms !important;
+      transition-property: opacity, color, background-color, border-color, box-shadow !important;
+      transition-duration: 150ms !important;
       scroll-behavior: auto !important;
     }
   }
 }
 
-/* Drafting devices, static recipes from section 5 (decorative layers are aria-hidden in markup). */
 @layer components {
-  /* 5.1 Hairline plate; raised and overlay plates add the 1 px graphite offset. */
+  /* Overlay surface for menus and dialogs (Drafting `.plate`, restyled until O2/O3 move them to Orbit panels). */
   .plate {
-    background: var(--surface);
-    border: 1px solid var(--keyline);
-    border-radius: var(--radius-control);
+    background: var(--panel);
+    border: 1px solid var(--line-3);
+    border-radius: 14px;
+    box-shadow: var(--panel-highlight);
   }
   .plate--sm,
   .plate--raised,
   .plate--overlay {
-    box-shadow: var(--shadow-raised);
+    box-shadow: var(--panel-highlight), var(--shadow-draft);
   }
 
-  /* 5.5 Skeleton: a sunk bar with a hairline band sweeping across; still under reduced motion. */
+  /* Skeleton: a panel-hover bar with one hairline sweeping across; still under reduced motion. */
   .skeleton {
     position: relative;
     overflow: hidden;
-    border-radius: var(--radius-control);
-    background-color: var(--surface-sunk);
+    border-radius: 8px;
+    background-color: var(--panel-hover);
   }
   .skeleton::after {
     content: "";
@@ -302,9 +587,149 @@
   }
   @media (prefers-reduced-motion: reduce) {
     .skeleton::after {
-      animation: none;
       display: none;
     }
+  }
+
+  /* ---------------------------------------------------------- Orbit pieces (packages/ui/src/orbit) */
+
+  /* 2.5 Grain: static film grain, absolutely positioned over its parent. */
+  .orbit-grain {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: var(--grain-opacity);
+    mix-blend-mode: var(--grain-blend);
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.5 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  }
+
+  /* 6.6 Panel: inset top highlight in both themes; dark border, light shadow. */
+  .orbit-panel {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 18px;
+    box-shadow: var(--panel-highlight), var(--shadow-card);
+  }
+  .orbit-panel--interactive {
+    transition:
+      translate var(--dur-hover) var(--ease-out),
+      background-color var(--dur-hover-color) var(--ease-out),
+      border-color var(--dur-hover-color) var(--ease-out),
+      box-shadow var(--dur-hover) var(--ease-out);
+  }
+  .orbit-panel--interactive:hover {
+    background: var(--panel-hover-fill);
+    border-color: var(--panel-hover-border);
+    box-shadow: var(--panel-highlight), var(--shadow-hover);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .orbit-panel--interactive:hover {
+      translate: 0 -3px;
+    }
+  }
+
+  /* 6.7 Ring: the arc draws from empty to its value on first view. */
+  .orbit-ring__bar {
+    animation: orbit-ring-draw 1.6s var(--ease-out) 0.5s both;
+  }
+
+  /* 7 Line reveal: each line rises 112 % through a clip mask, 80 ms apart. */
+  .line-reveal__line {
+    display: block;
+    overflow: hidden;
+    /* room for descenders inside the mask */
+    padding-bottom: 0.08em;
+    margin-bottom: -0.08em;
+  }
+  .line-reveal__line > span {
+    display: block;
+    animation: line-rise var(--dur-line) var(--ease-out) both;
+    animation-delay: calc(var(--line-delay, 0ms) + var(--i, 0) * var(--line-stagger, 80ms));
+  }
+  /* First paint only (system §7.3): once the app marks a client navigation, headings render in place. */
+  :root[data-navigated] .line-reveal__line > span {
+    animation: none;
+  }
+
+  /* 6.5 Composer box and focus aura. The spin runs only while focused. */
+  .orbit-composer {
+    position: relative;
+    isolation: isolate;
+    background: var(--panel);
+    border: 1px solid var(--line-2);
+    border-radius: 22px;
+    box-shadow: var(--panel-highlight), var(--shadow-composer);
+    transition:
+      border-color var(--dur-hover) var(--ease-out),
+      box-shadow var(--dur-hover) var(--ease-out);
+  }
+  .orbit-composer::before {
+    content: "";
+    position: absolute;
+    inset: -6px;
+    z-index: -2;
+    border-radius: inherit;
+    background: conic-gradient(
+      from var(--orbit-aura-angle),
+      var(--aura-edge) 0deg,
+      #2A3BFF 90deg,
+      #C9CEFF 170deg,
+      #4F5FF5 250deg,
+      var(--aura-edge) 360deg
+    );
+    filter: blur(20px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 500ms var(--ease-out);
+    animation: orbit-aura-spin 5s linear infinite;
+    animation-play-state: paused;
+  }
+  .orbit-composer::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: inherit;
+    pointer-events: none;
+  }
+  .orbit-composer:focus-within {
+    border-color: var(--accent-wash-line);
+    box-shadow:
+      var(--panel-highlight),
+      var(--shadow-composer),
+      0 0 0 1px color-mix(in srgb, var(--accent-wash-line) 66%, transparent);
+  }
+  .orbit-composer:focus-within::before {
+    opacity: 0.42;
+    animation-play-state: running;
+  }
+  .orbit-composer--thread {
+    border-radius: 20px;
+  }
+}
+
+@property --orbit-aura-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@keyframes orbit-aura-spin {
+  to {
+    --orbit-aura-angle: 360deg;
+  }
+}
+
+@keyframes orbit-ring-draw {
+  from {
+    stroke-dashoffset: var(--ring-c);
+  }
+}
+
+@keyframes line-rise {
+  from {
+    transform: translateY(112%);
   }
 }
 

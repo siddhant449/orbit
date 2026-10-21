@@ -1,3 +1,5 @@
+> Superseded by docs/design/orbit/ on 2026-10-22.
+
 # Interaction research (Riso Print)
 
 Researched 2026-10-21. Scope: hover, button, SVG and text animation patterns, plus dither / halftone / ASCII. All

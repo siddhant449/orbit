@@ -1,46 +1,49 @@
 import { useReducedMotion } from "motion/react";
 import type { Variants } from "motion/react";
 
-/** Motion presets, named once (docs/design/micro-interactions.md section 0). */
+/** Orbit motion tokens (docs/design/orbit/system.md section 7.1). Durations and staggers in seconds, distances in px. */
 
-/** `ease-ink`: hovers, reveals, sweeps. */
-export const easeInk = [0.2, 0.7, 0.2, 1] as const;
-/** `ease-exit`: exits and dismissals. */
-export const easeExit = [0.4, 0, 0.8, 0.4] as const;
+/** One easing everywhere: out-expo, `cubic-bezier(.16,1,.3,1)`. */
+export const easeOut = [0.16, 1, 0.3, 1] as const;
 
-/** `spring-press`: press and release (settles in about 150 ms). */
-export const springPress = { type: "spring", stiffness: 500, damping: 30, mass: 1 } as const;
-/** `spring-layout`: `layout` and `layoutId` moves (about 300 ms). */
+/** Hover colour 150 ms, hover transforms 400 ms, fade-rise reveals 900 ms, headline lines / draws / count-up 1.2 s. */
+export const durations = { hoverColor: 0.15, hover: 0.4, reveal: 0.9, line: 1.2 } as const;
+
+/** Between headline lines; between panels. */
+export const stagger = { line: 0.08, panel: 0.12 } as const;
+
+/** Button lift, panel/tile lift (marketing; the app lifts panels 3 px), reveal rise. */
+export const distance = { button: 2, panel: 8, reveal: 18 } as const;
+
+/** Magnetic CTAs (marketing only). */
+export const springMagnet = { type: "spring", stiffness: 300, damping: 24 } as const;
+/** `layout` and `layoutId` moves: sidebar indicator, segmented pill. */
 export const springLayout = { type: "spring", stiffness: 380, damping: 36 } as const;
 
-/** Durations in seconds: hover 200 ms, entry 180 ms, exit 120 ms, draw 400 ms, settle 240 ms, loader loop 1.2 s. */
-export const durations = { hover: 0.2, entry: 0.18, exit: 0.12, draw: 0.4, settle: 0.24, loop: 1.2 } as const;
+/* ------------------------------------------------------------------------------------------------------------------
+ * Deprecated Drafting names, kept so un-migrated screens compile. Removed in O4 (migration §1.1).
+ * ---------------------------------------------------------------------------------------------------------------- */
 
-/**
- * Cinematic one-shots (micro-interactions.md section 9), in seconds. The first-paint sequences (kinetic greeting,
- * composer landing, tab rise) are CSS animations with the same numbers in `drafting.css`, so they start before
- * any JS chunk and are static under reduced motion; these values drive the Motion-powered pieces.
- */
+/** @deprecated use `easeOut`. */
+export const easeInk = easeOut;
+/** @deprecated exits use opacity with `easeOut`. */
+export const easeExit = [0.4, 0, 0.8, 0.4] as const;
+/** @deprecated press is CSS `scale(0.98)` for 150 ms. */
+export const springPress = { type: "spring", stiffness: 500, damping: 30, mass: 1 } as const;
+/** @deprecated use `durations`, `stagger` and `distance`. */
 export const cinematic = {
-  /** Kinetic type: per-letter duration and stagger; the pink copy lags 70 ms, the blue copy 140 ms. */
   set: 0.42,
   setStagger: 0.022,
-  /** Object landing: the composer drops on a spring. */
   land: { type: "spring", stiffness: 320, damping: 26 } as const,
-  /** Stamped stagger: tickets and list entries. */
   stamp: 0.18,
   stampStagger: 0.06,
-  /** Label roll (nav rows, index label). */
   roll: 0.26,
-  /** Scroll reveal. */
-  reveal: 0.42,
+  reveal: durations.reveal,
   revealStagger: 0.04,
-  /** Values count up; meters and rules draw in. */
-  count: 0.42,
+  count: durations.line,
   draw: 0.7,
 } as const;
-
-/** `stamp`: entries of plates, dialogs, toasts and routes (180 ms `ease-ink`; exit is opacity only). */
+/** @deprecated overlays fade with `easeOut`. */
 export const stampVariants = {
   initial: { opacity: 0, scale: 0.96 },
   animate: { opacity: 1, scale: 1 },

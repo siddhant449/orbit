@@ -4,6 +4,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./icons": "./src/icons/index.tsx",
     "./motion": "./src/motion/provider.tsx",
     "./scroll": "./src/scroll/index.ts",
     "./tokens.css": "./src/tokens.css",

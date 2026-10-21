@@ -7,7 +7,7 @@ Every feature goes through the same loop:
 4. The build, with frontend-design used for every screen
 5. Tests and a side-by-side screenshot check
 
-Working name: **Brandloop** (packages are `@brandloop/*`). It gets renamed once the real brand is chosen.
+Product name: **Orbit** (packages stay `@brandloop/*`). The design system is `docs/design/orbit/system.md`.
 
 ## 0. Foundation: built, waiting for Clerk keys to verify end to end
 

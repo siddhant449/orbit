@@ -11,7 +11,16 @@ export default defineConfig({
   fullyParallel: false,
   // Every spec shares one Clerk test user and profile, so spec files must not run concurrently.
   workers: 1,
-  use: { baseURL, trace: "retain-on-failure" },
+  use: {
+    baseURL,
+    trace: "retain-on-failure",
+    // Orbit's app default is Dark (system §3). Specs choose day or night with `emulateMedia`, so every context starts on
+    // the "Auto" setting; design.spec clears this to check the real default.
+    storageState: {
+      cookies: [],
+      origins: [{ origin: new URL(baseURL).origin, localStorage: [{ name: "orbit-theme", value: "system" }] }],
+    },
+  },
   projects: [
     { name: "setup", testMatch: /global\.setup\.ts/ },
     {

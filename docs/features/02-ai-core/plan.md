@@ -746,7 +746,7 @@ it("has five quick links with unique keys", () => { expect(new Set(QUICK_LINKS.m
     5. `/settings/memories` shows "Prefers short paragraphs" or the mock's fact.
   - "shows 409 recovery": two rapid sends end with a single user bubble.
 - [ ] **Step 7: Run the checks.** `pnpm --filter @brandloop/agent test`, `pnpm --filter @brandloop/web test`, web `typecheck` and `lint`. Expected: PASS.
-- [ ] **Step 8: Commit.** `feat(web): chat screen, tool activity rows, history list (thin, on the design system)`
+- [ ] **Step 8: Commit.** `feat(web): chat screen, tool activity rows, history list (thin, on the design system)` (design system now `docs/design/orbit/system.md`)
 
 ### Task 8: Documents and the writing specialist
 

@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { render, screen } from "@testing-library/react";
 import { hasReducedMotionListener } from "motion/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { durations, easeExit, easeInk, springLayout, springPress, stampVariants, useMotionSafe } from "./presets";
+import { distance, durations, easeInk, easeOut, springLayout, springMagnet, stagger, useMotionSafe } from "./presets";
 
 function mockReducedMotion(reduce: boolean) {
   Object.defineProperty(window, "matchMedia", {
@@ -26,43 +26,34 @@ function Probe() {
   return createElement("output", { "data-testid": "safe" }, String(safe));
 }
 
-describe("presets (micro-interactions.md section 0)", () => {
-  it("springPress is the spring-press object", () => {
-    expect(springPress).toEqual({ type: "spring", stiffness: 500, damping: 30, mass: 1 });
+describe("presets (Orbit, system §7.1)", () => {
+  it("one easing everywhere: out-expo", () => {
+    expect(easeOut).toEqual([0.16, 1, 0.3, 1]);
   });
 
-  it("springLayout is the spring-layout object", () => {
+  it("durations, staggers and distances", () => {
+    expect(durations).toEqual({ hoverColor: 0.15, hover: 0.4, reveal: 0.9, line: 1.2 });
+    expect(stagger).toEqual({ line: 0.08, panel: 0.12 });
+    expect(distance).toEqual({ button: 2, panel: 8, reveal: 18 });
+  });
+
+  it("springs: magnetic CTA and layout moves", () => {
+    expect(springMagnet).toEqual({ type: "spring", stiffness: 300, damping: 24 });
     expect(springLayout).toEqual({ type: "spring", stiffness: 380, damping: 36 });
   });
 
-  it("durations are the named durations in seconds", () => {
-    expect(durations.entry).toBe(0.18);
-    expect(durations).toEqual({ hover: 0.2, entry: 0.18, exit: 0.12, draw: 0.4, settle: 0.24, loop: 1.2 });
-  });
-
-  it("eases are the ease-ink and ease-exit curves", () => {
-    expect(easeInk).toEqual([0.2, 0.7, 0.2, 1]);
-    expect(easeExit).toEqual([0.4, 0, 0.8, 0.4]);
-  });
-
-  it("stampVariants fade and scale in from .96 and fade out", () => {
-    expect(stampVariants).toEqual({
-      initial: { opacity: 0, scale: 0.96 },
-      animate: { opacity: 1, scale: 1 },
-      exit: { opacity: 0 },
-    });
+  it("deprecated easeInk aliases easeOut until O4", () => {
+    expect(easeInk).toBe(easeOut);
   });
 });
 
 describe("useMotionSafe", () => {
   beforeEach(() => {
-    // motion caches the media query result at module level; clear it so each test re-reads the mock.
     hasReducedMotionListener.current = false;
   });
 
   it("is false when the user prefers reduced motion", () => {
     mockReducedMotion(true);
-    expect(window.matchMedia("(prefers-reduced-motion: reduce)").matches).toBe(true);
     render(createElement(Probe));
     expect(screen.getByTestId("safe")).toHaveTextContent("false");
   });
