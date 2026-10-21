@@ -3,7 +3,7 @@ import { cn } from "@brandloop/ui";
 /** The loop mark: an open ring whose tail returns as a dot. */
 export function LogoMark({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden className={cn("size-6 text-jade", className)}>
+    <svg viewBox="0 0 24 24" aria-hidden className={cn("size-6 text-accent", className)}>
       <path
         d="M19 12a7 7 0 1 1-3.2-5.88"
         fill="none"

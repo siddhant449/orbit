@@ -30,7 +30,7 @@ export function AudienceBalance() {
                 aria-valuenow={a.percent}
                 className="mt-1.5 h-2 overflow-hidden rounded-full bg-surface-sunk"
               >
-                <div className="h-full rounded-full bg-jade" style={{ width: `${a.percent}%` }} />
+                <div className="h-full rounded-full bg-accent" style={{ width: `${a.percent}%` }} />
               </div>
               <EditableText label={`${l.label} note`} value={a.note} onSave={(note) => patch(i, { note })} className="mt-1.5 text-sm text-ink-muted" />
             </li>

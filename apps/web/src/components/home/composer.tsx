@@ -69,7 +69,7 @@ export function Composer({
 
         <form
           onSubmit={send}
-          className="mt-8 rounded-[22px] border border-line bg-surface p-2 shadow-[0_1px_0_var(--line),0_12px_32px_-18px_rgb(27_34_32/0.25)] focus-within:border-jade/60"
+          className="mt-8 rounded-[22px] border border-line bg-surface p-2 shadow-[0_1px_0_var(--line),0_12px_32px_-18px_rgb(27_34_32/0.25)] focus-within:border-accent/60"
         >
           <label htmlFor="composer" className="sr-only">
             Message
@@ -108,7 +108,7 @@ export function Composer({
               <button
                 type="button"
                 onClick={() => applyStarter(prompt)}
-                className="flex h-8 items-center gap-1.5 rounded-full border border-line px-3 text-[13px] text-ink-muted transition-colors hover:border-jade/40 hover:text-ink"
+                className="flex h-8 items-center gap-1.5 rounded-full border border-line px-3 text-[13px] text-ink-muted transition-colors hover:border-accent/40 hover:text-ink"
               >
                 <Icon className="size-3.5" />
                 {label}

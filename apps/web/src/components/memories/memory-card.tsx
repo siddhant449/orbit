@@ -58,7 +58,7 @@ function LineRow({ line }: { line: MemoryLineView }) {
 
   return (
     <li className="group flex items-start gap-2 py-1.5" style={{ paddingLeft: `${line.depth * 20}px` }}>
-      <span aria-hidden className="mt-[0.8rem] size-1.5 shrink-0 rounded-full bg-jade/60" />
+      <span aria-hidden className="mt-[0.8rem] size-1.5 shrink-0 rounded-full bg-accent/60" />
       {editing ? (
         <textarea
           aria-label="Edit memory"
@@ -77,7 +77,7 @@ function LineRow({ line }: { line: MemoryLineView }) {
               cancel();
             }
           }}
-          className="min-w-0 flex-1 resize-none rounded-row border border-jade bg-paper px-2.5 py-1.5 text-[15px] leading-relaxed text-ink"
+          className="min-w-0 flex-1 resize-none rounded-row border border-accent bg-paper px-2.5 py-1.5 text-[15px] leading-relaxed text-ink"
         />
       ) : (
         <button

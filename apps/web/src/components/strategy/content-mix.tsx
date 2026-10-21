@@ -7,11 +7,11 @@ import { NumberField, Section, useStrategy } from "./edit";
 
 /** Jade family derived from tokens, ordered dark to light. Each step also reads in dark mode. */
 const SHADES = [
-  "color-mix(in oklab, var(--jade) 62%, var(--ink))",
-  "var(--jade)",
-  "color-mix(in oklab, var(--jade) 68%, var(--surface))",
-  "color-mix(in oklab, var(--jade) 42%, var(--surface))",
-  "color-mix(in oklab, var(--jade) 22%, var(--surface))",
+  "color-mix(in oklab, var(--accent) 62%, var(--ink))",
+  "var(--accent)",
+  "color-mix(in oklab, var(--accent) 68%, var(--surface))",
+  "color-mix(in oklab, var(--accent) 42%, var(--surface))",
+  "color-mix(in oklab, var(--accent) 22%, var(--surface))",
 ];
 
 const R = 70;

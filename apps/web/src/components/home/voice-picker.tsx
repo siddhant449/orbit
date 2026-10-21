@@ -19,7 +19,7 @@ function hash(s: string) {
   return h;
 }
 
-/** Generated avatar: initials on a colour from the jade family. */
+/** Generated avatar: initials on a colour from the accent family. */
 export function VoiceAvatar({ name, className }: { name: string; className?: string }) {
   const initials = name
     .split(/\s+/)
@@ -123,7 +123,7 @@ export function VoicePicker({ voices, selectedId }: { voices: VoiceOption[]; sel
               aria-label="Change writing style"
               aria-busy={pending}
               title={current?.tagline || "Choose how your posts sound"}
-              className="flex h-8 max-w-[210px] items-center gap-2 rounded-full border border-line py-0 pl-1 pr-2.5 text-[13px] text-ink-muted transition-colors hover:border-jade/40 hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-jade data-[state=open]:border-jade/60 data-[state=open]:text-ink"
+              className="flex h-8 max-w-[210px] items-center gap-2 rounded-full border border-line py-0 pl-1 pr-2.5 text-[13px] text-ink-muted transition-colors hover:border-accent/40 hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent data-[state=open]:border-accent/60 data-[state=open]:text-ink"
             >
               {current ? (
                 <VoiceAvatar name={current.name} />
@@ -183,7 +183,7 @@ export function VoicePicker({ voices, selectedId }: { voices: VoiceOption[]; sel
                   if (row.type === "add") {
                     return (
                       <div key="add" role="option" aria-selected={false} {...common}>
-                        <span aria-hidden className="grid size-7 shrink-0 place-items-center rounded-full border border-dashed border-jade/60 text-jade">
+                        <span aria-hidden className="grid size-7 shrink-0 place-items-center rounded-full border border-dashed border-accent/60 text-accent">
                           <Plus className="size-3.5" />
                         </span>
                         <span className="min-w-0">
@@ -202,7 +202,7 @@ export function VoicePicker({ voices, selectedId }: { voices: VoiceOption[]; sel
                         <span className="block truncate text-sm font-medium text-ink">{v.own ? `${v.name} (your style)` : v.name}</span>
                         <span className="block truncate text-xs text-ink-muted">{v.tagline}</span>
                       </span>
-                      {sel && <Check aria-hidden className="size-4 shrink-0 text-jade" />}
+                      {sel && <Check aria-hidden className="size-4 shrink-0 text-accent" />}
                     </div>
                   );
                 })}

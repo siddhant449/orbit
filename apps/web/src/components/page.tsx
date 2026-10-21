@@ -17,7 +17,7 @@ export function Upcoming({ title, description, points }: { title: string; descri
       <PageHeader title={title} />
       <div className="mx-auto max-w-xl px-6 py-16">
         <p className="text-[15px] leading-relaxed text-ink">{description}</p>
-        <ul className="mt-6 space-y-2.5 border-l-2 border-jade-soft pl-4">
+        <ul className="mt-6 space-y-2.5 border-l-2 border-accent-soft pl-4">
           {points.map((point) => (
             <li key={point} className="text-sm leading-relaxed text-ink-muted">
               {point}

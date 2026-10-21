@@ -134,7 +134,7 @@ export function EditableText({
           setEditing(true);
         }}
         className={cn(
-          "block w-full -mx-2 rounded-row px-2 py-1 text-left hover:bg-surface-sunk focus-visible:bg-surface-sunk focus-visible:outline-2 focus-visible:outline-jade",
+          "block w-full -mx-2 rounded-row px-2 py-1 text-left hover:bg-surface-sunk focus-visible:bg-surface-sunk focus-visible:outline-2 focus-visible:outline-accent",
           className,
         )}
       >
@@ -149,7 +149,7 @@ export function EditableText({
     onChange: (e: { target: { value: string } }) => setDraft(e.target.value),
     onBlur: commit,
     className: cn(
-      "-mx-2 block w-[calc(100%+1rem)] rounded-row border border-jade bg-paper px-2 py-1 text-ink focus:outline-none focus:ring-2 focus:ring-jade/25",
+      "-mx-2 block w-[calc(100%+1rem)] rounded-row border border-accent bg-paper px-2 py-1 text-ink focus:outline-none focus:ring-2 focus:ring-accent/25",
       className,
     ),
   };
@@ -226,7 +226,7 @@ export function NumberField({
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
         onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-        className="h-8 w-9 rounded-row [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none border border-transparent bg-transparent px-0.5 text-right text-sm tabular-nums hover:border-line focus-visible:border-jade focus-visible:bg-paper focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-jade/25"
+        className="h-8 w-9 rounded-row [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none border border-transparent bg-transparent px-0.5 text-right text-sm tabular-nums hover:border-line focus-visible:border-accent focus-visible:bg-paper focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/25"
       />
       {suffix && <span aria-hidden className={cn("whitespace-nowrap text-sm text-ink-muted", suffix !== "%" && "ml-1.5")}>{suffix}</span>}
     </span>

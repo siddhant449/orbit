@@ -34,7 +34,7 @@ export function ProfileList({ profiles, currentProfileId }: { profiles: Item[]; 
             <Avatar name={p.name} src={p.avatarUrl} className="size-8" />
             <span className="min-w-0 flex-1 truncate text-sm font-medium">{p.name}</span>
             {p.id === currentProfileId && (
-              <span className="rounded-full bg-jade-soft px-2 py-0.5 text-xs font-medium text-jade">Current</span>
+              <span className="rounded-full bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent">Current</span>
             )}
             <Button
               variant="ghost"

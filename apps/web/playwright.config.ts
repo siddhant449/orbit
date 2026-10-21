@@ -11,7 +11,12 @@ export default defineConfig({
   use: { baseURL: "http://localhost:3000", trace: "retain-on-failure" },
   projects: [
     { name: "setup", testMatch: /global\.setup\.ts/ },
-    { name: "chromium", use: { ...devices["Desktop Chrome"] }, dependencies: ["setup"] },
+    {
+      name: "chromium",
+      // Headless Chromium on Linux rounds glyph advances to whole pixels; without hinting the screenshots match real browsers.
+      use: { ...devices["Desktop Chrome"], launchOptions: { args: ["--font-render-hinting=none"] } },
+      dependencies: ["setup"],
+    },
   ],
   webServer: {
     command: "pnpm dev",

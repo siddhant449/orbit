@@ -45,7 +45,7 @@ export function ProfileMenu({ iconOnly = false }: { iconOnly?: boolean }) {
       <DropdownMenu.Root>
         <DropdownMenu.Trigger
           className={cn(
-            "flex items-center gap-2.5 rounded-row text-left text-sm outline-none hover:bg-surface-sunk focus-visible:ring-2 focus-visible:ring-jade/30",
+            "flex items-center gap-2.5 rounded-row text-left text-sm outline-none hover:bg-surface-sunk focus-visible:ring-2 focus-visible:ring-accent/30",
             iconOnly ? "size-9 justify-center" : "h-11 w-full px-2",
           )}
           aria-label="Profile menu"
@@ -72,7 +72,7 @@ export function ProfileMenu({ iconOnly = false }: { iconOnly?: boolean }) {
               <DropdownMenu.Item key={p.id} className={itemClass} onSelect={() => switchTo(p.id, p.name)}>
                 <Avatar name={p.name} src={p.avatarUrl} className="size-6 text-[10px]" />
                 <span className="min-w-0 flex-1 truncate">{p.name}</span>
-                {p.id === account.currentProfileId && <Check className="size-4 text-jade" aria-label="Current profile" />}
+                {p.id === account.currentProfileId && <Check className="size-4 text-accent" aria-label="Current profile" />}
               </DropdownMenu.Item>
             ))}
             <DropdownMenu.Item className={itemClass} onSelect={() => setAdding(true)}>
