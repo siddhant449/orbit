@@ -2,16 +2,16 @@
 
 import { useState } from "react";
 import { CONTENT_TYPES, normalizePercents } from "@brandloop/ai";
-import { cn } from "@brandloop/ui";
+import { CountUp, cn } from "@brandloop/ui";
 import { NumberField, Section, useStrategy } from "./edit";
 
-/** Jade family derived from tokens, ordered dark to light. Each step also reads in dark mode. */
+/** Graphite weights derived from the tokens, heaviest first. Each step also reads in the night theme. */
 const SHADES = [
-  "color-mix(in oklab, var(--accent) 62%, var(--ink))",
-  "var(--accent)",
-  "color-mix(in oklab, var(--accent) 68%, var(--surface))",
-  "color-mix(in oklab, var(--accent) 42%, var(--surface))",
-  "color-mix(in oklab, var(--accent) 22%, var(--surface))",
+  "var(--ink)",
+  "color-mix(in oklab, var(--ink) 72%, var(--surface))",
+  "color-mix(in oklab, var(--ink) 50%, var(--surface))",
+  "color-mix(in oklab, var(--ink) 32%, var(--surface))",
+  "color-mix(in oklab, var(--ink) 18%, var(--surface))",
 ];
 
 const R = 70;
@@ -67,8 +67,8 @@ export function ContentMix() {
             ))}
           </svg>
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
-            <span className="font-display text-2xl font-semibold tabular-nums">
-              {active === null ? "100%" : `${mix[active]!.percent}%`}
+            <span className="type-title-1 tabular-nums">
+              <CountUp value={active === null ? 100 : mix[active]!.percent} suffix="%" />
             </span>
             <span className="max-w-[90px] text-xs text-ink-muted">
               {active === null ? "of your posts" : CONTENT_TYPES[mix[active]!.type].label}
@@ -86,7 +86,7 @@ export function ContentMix() {
                 {...act(i)}
                 className={cn("-mx-2 flex items-start gap-3 rounded-row px-2 py-3 transition-colors", active === i && "bg-surface-sunk")}
               >
-                <span aria-hidden className="mt-1.5 size-3 shrink-0 rounded-[4px]" style={{ background: SHADES[i % SHADES.length] }} />
+                <span aria-hidden className="mt-1.5 size-3 shrink-0 rounded-control border border-keyline" style={{ background: SHADES[i % SHADES.length] }} />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium">{t.label}</p>
                   <p className="text-sm text-ink-muted">{t.description}</p>

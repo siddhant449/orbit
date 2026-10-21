@@ -13,8 +13,9 @@ import { AddProfileDialog } from "./add-profile-dialog";
 import { Avatar } from "./avatar";
 import { useAccount, useCurrentProfile } from "./account-context";
 
+// Highlighted rows invert to an ink bar with paper text (H1).
 const itemClass =
-  "flex h-9 cursor-pointer select-none items-center gap-2.5 rounded-row px-2.5 text-sm text-ink outline-none data-[highlighted]:bg-surface-sunk";
+  "flex h-9 cursor-pointer select-none items-center gap-2.5 rounded-row px-2.5 type-ui text-ink outline-none data-[highlighted]:bg-ink data-[highlighted]:text-on-ink [&_svg]:text-ink-muted data-[highlighted]:[&_svg]:text-on-ink";
 
 const themes = [
   { value: "light", label: "Light", icon: Sun },
@@ -45,16 +46,16 @@ export function ProfileMenu({ iconOnly = false }: { iconOnly?: boolean }) {
       <DropdownMenu.Root>
         <DropdownMenu.Trigger
           className={cn(
-            "flex items-center gap-2.5 rounded-row text-left text-sm outline-none hover:bg-surface-sunk focus-visible:ring-2 focus-visible:ring-accent/30",
+            "flex items-center gap-2.5 rounded-row text-left type-ui outline-none hover:bg-surface-sunk focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus",
             iconOnly ? "size-9 justify-center" : "h-11 w-full px-2",
           )}
-          aria-label="Profile menu"
+          aria-label={iconOnly ? "Profile menu" : `Profile menu, ${name}`}
         >
           <Avatar name={name} src={current?.avatarUrl} />
           {!iconOnly && (
             <>
               <span className="min-w-0 flex-1 truncate font-medium text-ink">{name}</span>
-              <ChevronsUpDown className="size-4 shrink-0 text-ink-faint" />
+              <ChevronsUpDown className="icon-sm shrink-0 text-ink-faint" aria-hidden="true" />
             </>
           )}
         </DropdownMenu.Trigger>
@@ -63,30 +64,31 @@ export function ProfileMenu({ iconOnly = false }: { iconOnly?: boolean }) {
             side="top"
             align="start"
             sideOffset={8}
-            className="z-50 w-64 rounded-[14px] border border-line bg-surface p-1.5 shadow-lg"
+            data-lenis-prevent
+            className="plate plate--sm z-50 w-64 p-1.5 data-[state=open]:animate-[plate-in_120ms_var(--ease-ink)_both]"
           >
-            <DropdownMenu.Label className="px-2.5 pb-1 pt-1.5 text-xs text-ink-muted">
-              {account.team.name}
-            </DropdownMenu.Label>
+            <DropdownMenu.Label className="type-caption px-2.5 pb-1 pt-1.5 text-ink-muted">{account.team.name}</DropdownMenu.Label>
             {account.profiles.map((p) => (
               <DropdownMenu.Item key={p.id} className={itemClass} onSelect={() => switchTo(p.id, p.name)}>
                 <Avatar name={p.name} src={p.avatarUrl} className="size-6 text-[10px]" />
                 <span className="min-w-0 flex-1 truncate">{p.name}</span>
-                {p.id === account.currentProfileId && <Check className="size-4 text-accent" aria-label="Current profile" />}
+                {p.id === account.currentProfileId && (
+                  <Check className="icon-sm" aria-label="Current profile" />
+                )}
               </DropdownMenu.Item>
             ))}
             <DropdownMenu.Item className={itemClass} onSelect={() => setAdding(true)}>
-              <UserPlus className="size-4 text-ink-muted" />
+              <UserPlus className="icon-sm" aria-hidden="true" />
               Add profile
             </DropdownMenu.Item>
             <DropdownMenu.Separator className="mx-1 my-1.5 h-px bg-line" />
             <DropdownMenu.Item className={itemClass} asChild>
               <Link href="/settings">
-                <Settings className="size-4 text-ink-muted" />
+                <Settings className="icon-sm" aria-hidden="true" />
                 Settings
               </Link>
             </DropdownMenu.Item>
-            <div role="radiogroup" aria-label="Theme" className="mx-1 my-1 grid grid-cols-3 gap-1 rounded-row bg-surface-sunk p-1">
+            <div role="radiogroup" aria-label="Theme" className="mx-1 my-1.5 grid grid-cols-3 gap-1">
               {themes.map(({ value, label, icon: Icon }) => (
                 <button
                   key={value}
@@ -97,20 +99,20 @@ export function ProfileMenu({ iconOnly = false }: { iconOnly?: boolean }) {
                   title={label}
                   onClick={() => setTheme(value)}
                   className={cn(
-                    "grid h-7 place-items-center rounded-[7px] text-ink-muted",
-                    theme === value && "bg-surface text-ink shadow-sm",
+                    "grid h-8 place-items-center rounded-control border border-transparent text-ink-muted transition-colors hover:bg-surface-sunk hover:text-ink",
+                    theme === value && "border-keyline bg-ink text-on-ink hover:bg-ink hover:text-on-ink",
                   )}
                 >
-                  <Icon className="size-3.5" />
+                  <Icon className="size-3.5" aria-hidden="true" />
                 </button>
               ))}
             </div>
             <DropdownMenu.Separator className="mx-1 my-1.5 h-px bg-line" />
             <DropdownMenu.Item
-              className={cn(itemClass, "text-danger")}
+              className={cn(itemClass, "text-signal-ink [&_svg]:text-signal-ink data-[highlighted]:bg-signal-soft data-[highlighted]:text-signal-ink data-[highlighted]:[&_svg]:text-signal-ink")}
               onSelect={() => signOut({ redirectUrl: "/sign-in" })}
             >
-              <LogOut className="size-4" />
+              <LogOut className="icon-sm" aria-hidden="true" />
               Sign out
             </DropdownMenu.Item>
           </DropdownMenu.Content>

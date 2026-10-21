@@ -9,6 +9,10 @@ export function initials(name: string) {
     .join("");
 }
 
+/**
+ * Graphite line monogram: a hairline frame with the initials drawn in ink; photos replace the initials. Decorative,
+ * the owning control names the person; the initials are CSS-generated so they are not visible text for that control.
+ */
 export function Avatar({
   name,
   src,
@@ -20,16 +24,16 @@ export function Avatar({
 }) {
   return (
     <span
+      aria-hidden="true"
+      data-initials={src ? undefined : initials(name)}
       className={cn(
-        "grid size-7 shrink-0 place-items-center overflow-hidden rounded-full bg-accent-soft text-[11px] font-semibold text-accent",
+        "grid size-7 shrink-0 place-items-center overflow-hidden rounded-control border border-keyline bg-surface type-micro text-ink before:content-[attr(data-initials)]",
         className,
       )}
     >
-      {src ? (
+      {src && (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={src} alt="" className="size-full object-cover" />
-      ) : (
-        initials(name)
       )}
     </span>
   );

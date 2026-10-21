@@ -28,13 +28,13 @@ export function ProfileList({ profiles, currentProfileId }: { profiles: Item[]; 
 
   return (
     <>
-      <ul className="mt-4 divide-y divide-line rounded-[14px] border border-line">
+      <ul className="mt-4 divide-y divide-line rounded-card border border-line">
         {profiles.map((p) => (
           <li key={p.id} className="flex items-center gap-3 px-4 py-3">
             <Avatar name={p.name} src={p.avatarUrl} className="size-8" />
             <span className="min-w-0 flex-1 truncate text-sm font-medium">{p.name}</span>
             {p.id === currentProfileId && (
-              <span className="rounded-full bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent">Current</span>
+              <span className="type-caption rounded-control border border-keyline px-2 py-0.5 text-ink">Current</span>
             )}
             <Button
               variant="ghost"
@@ -52,9 +52,9 @@ export function ProfileList({ profiles, currentProfileId }: { profiles: Item[]; 
 
       <AlertDialog.Root open={target !== null} onOpenChange={(open) => !open && setTarget(null)}>
         <AlertDialog.Portal>
-          <AlertDialog.Overlay className="fixed inset-0 z-50 bg-ink/30 backdrop-blur-[2px]" />
-          <AlertDialog.Content className="fixed left-1/2 top-1/2 z-50 w-[calc(100%-32px)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-card border border-line bg-surface p-6 shadow-xl">
-            <AlertDialog.Title className="font-display text-lg font-semibold">Delete {target?.name}?</AlertDialog.Title>
+          <AlertDialog.Overlay className="fixed inset-0 z-50 bg-ink/40 data-[state=closed]:animate-[fade-out_120ms_var(--ease-exit)_both] data-[state=open]:animate-[fade-in_180ms_var(--ease-ink)_both]" />
+          <AlertDialog.Content className="fixed left-1/2 top-1/2 z-50 w-[calc(100%-32px)] max-w-md -translate-x-1/2 -translate-y-1/2 plate plate--overlay p-6 data-[state=closed]:animate-[fade-out_120ms_var(--ease-exit)_both] data-[state=open]:animate-[plate-in_180ms_var(--ease-ink)_both]">
+            <AlertDialog.Title className="type-title-2">Delete {target?.name}?</AlertDialog.Title>
             <AlertDialog.Description className="mt-2 text-sm text-ink-muted">
               It disappears from your team, along with its posts, chats and voice settings.
             </AlertDialog.Description>

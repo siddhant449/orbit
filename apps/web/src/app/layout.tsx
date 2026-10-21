@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Archivo, Hanken_Grotesk } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
-import { MotionProvider } from "@brandloop/ui";
+import { MotionProvider } from "@brandloop/ui/motion";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "sonner";
 import "./globals.css";
@@ -29,7 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               colorBackground: "var(--surface)",
               colorInput: "var(--surface)",
               colorInputForeground: "var(--ink)",
-              colorDanger: "var(--danger)",
+              colorDanger: "var(--signal-ink)",
               borderRadius: "2px",
               fontFamily: "var(--font-ui)",
               fontFamilyButtons: "var(--font-ui)",

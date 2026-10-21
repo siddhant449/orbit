@@ -30,8 +30,8 @@ export function ThemeToggle() {
             aria-pressed={pressed}
             onClick={() => setTheme(value)}
             className={cn(
-              "type-ui inline-flex min-h-11 items-center gap-2 rounded-pill border border-keyline px-4 font-medium",
-              pressed ? "bg-pink text-on-pink" : "bg-surface text-ink hover:bg-surface-sunk",
+              "type-ui inline-flex min-h-11 items-center gap-2 rounded-control border border-keyline px-4 font-medium",
+              pressed ? "bg-ink text-on-ink" : "bg-surface text-ink hover:bg-surface-sunk",
             )}
           >
             <Icon aria-hidden className="icon-sm" />

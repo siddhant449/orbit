@@ -58,7 +58,7 @@ function LineRow({ line }: { line: MemoryLineView }) {
 
   return (
     <li className="group flex items-start gap-2 py-1.5" style={{ paddingLeft: `${line.depth * 20}px` }}>
-      <span aria-hidden className="mt-[0.8rem] size-1.5 shrink-0 rounded-full bg-accent/60" />
+      <span aria-hidden className="mt-[0.9rem] h-px w-2 shrink-0 bg-line-strong" />
       {editing ? (
         <textarea
           aria-label="Edit memory"
@@ -77,7 +77,7 @@ function LineRow({ line }: { line: MemoryLineView }) {
               cancel();
             }
           }}
-          className="min-w-0 flex-1 resize-none rounded-row border border-accent bg-paper px-2.5 py-1.5 text-[15px] leading-relaxed text-ink"
+          className="min-w-0 flex-1 resize-none rounded-row border border-keyline bg-paper px-2.5 py-1.5 text-[15px] leading-relaxed text-ink"
         />
       ) : (
         <button
@@ -105,9 +105,9 @@ function LineRow({ line }: { line: MemoryLineView }) {
           </Button>
         </AlertDialog.Trigger>
         <AlertDialog.Portal>
-          <AlertDialog.Overlay className="fixed inset-0 z-50 bg-ink/30 backdrop-blur-[2px]" />
-          <AlertDialog.Content className="fixed left-1/2 top-1/2 z-50 w-[calc(100%-32px)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-card border border-line bg-surface p-6 shadow-xl">
-            <AlertDialog.Title className="font-display text-lg font-semibold">Delete this memory?</AlertDialog.Title>
+          <AlertDialog.Overlay className="fixed inset-0 z-50 bg-ink/40 data-[state=closed]:animate-[fade-out_120ms_var(--ease-exit)_both] data-[state=open]:animate-[fade-in_180ms_var(--ease-ink)_both]" />
+          <AlertDialog.Content className="fixed left-1/2 top-1/2 z-50 w-[calc(100%-32px)] max-w-md -translate-x-1/2 -translate-y-1/2 plate plate--overlay p-6 data-[state=closed]:animate-[fade-out_120ms_var(--ease-exit)_both] data-[state=open]:animate-[plate-in_180ms_var(--ease-ink)_both]">
+            <AlertDialog.Title className="type-title-2">Delete this memory?</AlertDialog.Title>
             <AlertDialog.Description className="mt-2 text-sm text-ink-muted">
               “{line.text}” will no longer be used when writing your posts.
             </AlertDialog.Description>
@@ -131,7 +131,7 @@ function Group({ group, nested }: { group: MemoryGroupView; nested: boolean }) {
     <div className={cn(nested && "rounded-row bg-paper px-3 py-3")}>
       {group.title && (
         <div className="flex items-baseline justify-between gap-3 px-2.5">
-          <h3 className="font-display text-[15px] font-semibold">{group.title}</h3>
+          <h3 className="type-title-3">{group.title}</h3>
           <p className="text-xs text-ink-faint">Updated {group.updated}</p>
         </div>
       )}
@@ -167,7 +167,7 @@ export function MemoryCard({
   return (
     <section aria-label={title} className="rounded-card border border-line bg-surface p-5 sm:p-6">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h2 className="font-display text-lg font-semibold tracking-[-0.01em]">{title}</h2>
+        <h2 className="type-title-2">{title}</h2>
         {updated && <p className="text-xs text-ink-faint">Updated {updated}</p>}
       </div>
       <p className="mt-0.5 text-sm text-ink-muted">{description}</p>

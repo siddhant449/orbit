@@ -35,7 +35,7 @@ export default async function Page() {
         <PageHeader title="Strategy" />
         <PageBody>
           <div className="max-w-xl py-6">
-            <h2 className="font-display text-xl font-semibold leading-snug tracking-[-0.01em]">No strategy yet</h2>
+            <h2 className="type-display-2">No strategy yet</h2>
             <p className="mt-2 text-[15px] leading-relaxed text-ink-muted">
               Your strategy sets your goal, positioning and what to post each week. It comes from your memories and knowledge base.
             </p>

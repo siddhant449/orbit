@@ -4,6 +4,9 @@ import { PageBody, PageHeader } from "@/components/page";
 import { AddMemory } from "@/components/memories/add-memory";
 import { ImportDialog } from "@/components/memories/import-dialog";
 import { MemoryCard, type MemoryGroupView } from "@/components/memories/memory-card";
+import { Reveal } from "@brandloop/ui/scroll";
+import { LineArt } from "@brandloop/ui";
+import { Frame } from "@/components/page";
 
 export const metadata = { title: "Memories" };
 
@@ -45,17 +48,23 @@ export default async function Page() {
         {!profile ? (
           <p className="text-sm text-ink-muted">Add a profile to start building its memories.</p>
         ) : !hasAny ? (
-          <div className="max-w-xl py-6">
-            <p className="font-display text-xl font-semibold leading-snug tracking-[-0.01em]">
-              Memories are the facts we use to make every post sound like you and talk about what you actually know.
-            </p>
-            <div className="mt-5 flex flex-wrap items-center gap-2">
-              <ImportDialog variant="primary" />
-              <AddMemory memoryKey={MEMORY_KEYS.personal} variant="secondary" />
+          <div className="grid gap-10 py-6 md:grid-cols-[1fr_220px] md:items-start">
+            <div className="max-w-xl">
+              <p className="type-title-1">
+                Memories are the facts we use to make every post sound like you and talk about what you actually know.
+              </p>
+              <div className="mt-6 flex flex-wrap items-center gap-2">
+                <ImportDialog variant="primary" />
+                <AddMemory memoryKey={MEMORY_KEYS.personal} variant="secondary" />
+              </div>
             </div>
+            <Frame className="mx-auto hidden w-[220px] text-ink-muted md:block">
+              <LineArt name="stack" />
+            </Frame>
           </div>
         ) : (
           <>
+            <Reveal index={0}>
             <MemoryCard
               title="Identity"
               description="Background and details we use to ground your posts."
@@ -63,6 +72,8 @@ export default async function Page() {
               updated={latest(identity)}
               addKey={MEMORY_KEYS.personal}
             />
+            </Reveal>
+            <Reveal index={1}>
             <MemoryCard
               title="Writing preferences"
               description="Your rules for how your posts are written."
@@ -70,6 +81,8 @@ export default async function Page() {
               updated={latest(rules)}
               addKey={MEMORY_KEYS.rules}
             />
+            </Reveal>
+            <Reveal index={2}>
             <MemoryCard
               title="Voice"
               description="How your writing sounds, in your own patterns."
@@ -77,6 +90,8 @@ export default async function Page() {
               updated={latest(voice)}
               addKey={MEMORY_KEYS.voice}
             />
+            </Reveal>
+            <Reveal index={3}>
             <MemoryCard
               title="Topics you know"
               description="What you can speak about with authority, one topic at a time."
@@ -84,13 +99,16 @@ export default async function Page() {
               updated={latest(topics)}
               addTopic
             />
+            </Reveal>
             {strategy.length > 0 && (
-              <MemoryCard
-                title="Strategy notes"
-                description="Decisions about audience and goals that shape what we suggest."
-                groups={strategy.map((d) => group(d, titleCase(d.key.split("/")[1]!)))}
-                updated={latest(strategy)}
-              />
+              <Reveal index={4}>
+                <MemoryCard
+                  title="Strategy notes"
+                  description="Decisions about audience and goals that shape what we suggest."
+                  groups={strategy.map((d) => group(d, titleCase(d.key.split("/")[1]!)))}
+                  updated={latest(strategy)}
+                />
+              </Reveal>
             )}
           </>
         )}
