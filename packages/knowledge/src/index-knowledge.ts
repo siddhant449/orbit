@@ -1,5 +1,5 @@
 import type { Embedder } from "@brandloop/ai";
-import { deleteChunks, getKnowledgeItem, replaceChunks } from "@brandloop/db";
+import { getKnowledgeItem, replaceChunks } from "@brandloop/db";
 import { chunkText } from "./chunk";
 
 /**
@@ -15,8 +15,9 @@ export async function indexKnowledge(
   if (!item) return { chunks: 0, embedded: false };
 
   const pieces = chunkText(item.content ?? "");
+  const guard = { content: item.content };
   if (pieces.length === 0) {
-    await deleteChunks(item.profileId, "KNOWLEDGE", item.id);
+    await replaceChunks(item.profileId, "KNOWLEDGE", item.id, [], guard);
     return { chunks: 0, embedded: false };
   }
 
@@ -31,11 +32,14 @@ export async function indexKnowledge(
     }
   }
 
-  await replaceChunks(
+  // Skipped (null) when the item was deleted or edited while we embedded; a newer job owns indexing then.
+  const stored = await replaceChunks(
     item.profileId,
     "KNOWLEDGE",
     item.id,
     pieces.map((text, ordinal) => ({ ordinal, title: item.title, text, embedding: vectors?.[ordinal] ?? null })),
+    guard,
   );
+  if (stored === null) return { chunks: 0, embedded: false };
   return { chunks: pieces.length, embedded: vectors !== null };
 }

@@ -17,14 +17,26 @@ function warnOnce(err: unknown) {
   console.warn("hybridSearch: embedder unavailable, using full-text only:", err instanceof Error ? err.message : String(err));
 }
 
-/** Replaces all chunks of a source in one transaction. Returns the number stored. */
+/**
+ * Replaces all chunks of a source in one transaction. Returns the number stored.
+ *
+ * With `guard` (KNOWLEDGE sources), the item row is locked first and the swap is skipped
+ * (returns null) when the item no longer exists or its content differs from `guard.content`.
+ * That serialises overlapping jobs and stops a late job from recreating chunks after a delete.
+ */
 export async function replaceChunks(
   profileId: string,
   sourceType: ChunkSource,
   sourceId: string,
   chunks: ChunkInput[],
-): Promise<number> {
-  await prisma.$transaction(async (tx) => {
+  guard?: { content: string | null },
+): Promise<number | null> {
+  return prisma.$transaction(async (tx) => {
+    if (guard) {
+      const rows = await tx.$queryRaw<{ content: string | null }[]>`
+        SELECT content FROM "KnowledgeItem" WHERE id = ${sourceId} AND "profileId" = ${profileId} FOR UPDATE`;
+      if (rows.length === 0 || rows[0]!.content !== guard.content) return null;
+    }
     await tx.$executeRaw`DELETE FROM "KnowledgeChunk" WHERE "profileId" = ${profileId} AND "sourceType" = ${sourceType}::"ChunkSource" AND "sourceId" = ${sourceId}`;
     for (const c of chunks) {
       await tx.$executeRaw`
@@ -33,8 +45,8 @@ export async function replaceChunks(
                 ${vec(c.embedding)}::vector,
                 setweight(to_tsvector('english', ${c.title}), 'A') || to_tsvector('english', ${c.text}))`;
     }
+    return chunks.length;
   });
-  return chunks.length;
 }
 
 export async function deleteChunks(profileId: string, sourceType: ChunkSource, sourceId: string): Promise<void> {

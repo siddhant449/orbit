@@ -1,6 +1,5 @@
 import { prisma } from "../client";
 import type { KnowledgeItem, KnowledgeType } from "../generated/prisma/client";
-import { deleteChunks } from "./retrieval";
 
 export const KNOWLEDGE_PAGE_SIZE = 50;
 export const KNOWLEDGE_TITLE_MAX = 100;
@@ -13,6 +12,13 @@ export class KnowledgeError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "KnowledgeError";
+  }
+}
+
+export class KnowledgeNotFoundError extends KnowledgeError {
+  constructor() {
+    super("Item not found");
+    this.name = "KnowledgeNotFoundError";
   }
 }
 
@@ -113,15 +119,36 @@ export async function listKnowledge(
   return { items: rows.slice(0, KNOWLEDGE_PAGE_SIZE), hasMore: rows.length > KNOWLEDGE_PAGE_SIZE };
 }
 
-export function completeIngest(id: string, text: string, summary: string | null): Promise<KnowledgeItem> {
-  return prisma.knowledgeItem.update({
-    where: { id },
-    data: { status: "READY", content: text, summary, error: null },
+/** Only writes when the item's content still equals what the job started from. */
+const startedFrom = (expected?: { content: string | null }) => (expected ? { content: expected.content } : {});
+
+/**
+ * Marks the item READY. `summary: undefined` leaves the existing summary alone. With `expected`,
+ * the write is compare-and-set on content; returns null when skipped (a newer job will run).
+ */
+export async function completeIngest(
+  id: string,
+  text: string,
+  summary: string | null | undefined,
+  expected?: { content: string | null },
+): Promise<KnowledgeItem | null> {
+  const { count } = await prisma.knowledgeItem.updateMany({
+    where: { id, ...startedFrom(expected) },
+    data: { status: "READY", content: text, error: null, ...(summary === undefined ? {} : { summary }) },
   });
+  return count === 0 ? null : getKnowledgeItem(id);
 }
 
-export function failIngest(id: string, message: string): Promise<KnowledgeItem> {
-  return prisma.knowledgeItem.update({ where: { id }, data: { status: "FAILED", error: message } });
+export async function failIngest(
+  id: string,
+  message: string,
+  expected?: { content: string | null },
+): Promise<KnowledgeItem | null> {
+  const { count } = await prisma.knowledgeItem.updateMany({
+    where: { id, ...startedFrom(expected) },
+    data: { status: "FAILED", error: message },
+  });
+  return count === 0 ? null : getKnowledgeItem(id);
 }
 
 /** `contentChanged` tells the caller to start a KNOWLEDGE_INGEST job that re-indexes the item. */
@@ -131,7 +158,7 @@ export async function updateKnowledge(
   patch: { title?: string; content?: string },
 ): Promise<{ item: KnowledgeItem; contentChanged: boolean }> {
   const existing = await getProfileKnowledge(profileId, id);
-  if (!existing) throw new KnowledgeError("Item not found");
+  if (!existing) throw new KnowledgeNotFoundError();
   const data: { title?: string; content?: string } = {};
   if (patch.title !== undefined) data.title = checkTitle(patch.title);
   let contentChanged = false;
@@ -150,16 +177,20 @@ export async function updateKnowledge(
   return { item, contentChanged };
 }
 
-/** Deletes the item, its search chunks and (via `store`) its uploaded file. */
+/** Deletes the item, its search chunks (same transaction) and, via `store`, its uploaded file. */
 export async function deleteKnowledge(
   profileId: string,
   id: string,
   store?: { delete(key: string): Promise<void> },
 ): Promise<void> {
   const existing = await getProfileKnowledge(profileId, id);
-  if (!existing) throw new KnowledgeError("Item not found");
-  await prisma.knowledgeItem.delete({ where: { id } });
-  await deleteChunks(profileId, "KNOWLEDGE", id);
+  if (!existing) throw new KnowledgeNotFoundError();
+  await prisma.$transaction(async (tx) => {
+    // Lock the row first so an in-flight chunk swap either finishes before us or sees the item gone.
+    await tx.$queryRaw`SELECT id FROM "KnowledgeItem" WHERE id = ${id} FOR UPDATE`;
+    await tx.$executeRaw`DELETE FROM "KnowledgeChunk" WHERE "profileId" = ${profileId} AND "sourceType" = 'KNOWLEDGE'::"ChunkSource" AND "sourceId" = ${id}`;
+    await tx.knowledgeItem.deleteMany({ where: { id, profileId } });
+  });
   if (existing.fileKey && store) {
     try {
       await store.delete(existing.fileKey);

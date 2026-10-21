@@ -5,3 +5,4 @@ export * from "./index-knowledge";
 export * from "./ingest";
 export * from "./limits";
 export * from "./upload-store";
+export * from "./verify-upload";

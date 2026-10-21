@@ -45,7 +45,16 @@ export function chunkText(text: string, opts: { targetChars?: number; overlapCha
 
   return bodies.map((body, i) => {
     if (i === 0) return body;
-    const tail = bodies[i - 1]!.slice(-overlap).trimStart();
-    return `${tail}\n\n${body}`;
+    return `${overlapTail(bodies[i - 1]!, overlap)}\n\n${body}`;
   });
+}
+
+/** The last `overlap` chars of `prev`, trimmed forward to start on a word boundary. */
+function overlapTail(prev: string, overlap: number): string {
+  if (prev.length <= overlap) return prev;
+  const tail = prev.slice(-overlap);
+  if (/\s/.test(prev[prev.length - overlap - 1]!) || /^\s/.test(tail)) return tail.trimStart();
+  const firstSpace = tail.search(/\s/);
+  // No whitespace at all (one long token): keep the raw slice rather than lose the overlap.
+  return firstSpace === -1 ? tail : tail.slice(firstSpace).trimStart();
 }

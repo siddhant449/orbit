@@ -3,7 +3,7 @@ import { prisma } from "../client";
 import { ensureAccount } from "./account";
 import {
   completeIngest, createKnowledge, deleteKnowledge, failIngest, getKnowledgeItem,
-  KNOWLEDGE_PAGE_SIZE, listKnowledge, updateKnowledge,
+  KNOWLEDGE_PAGE_SIZE, KnowledgeNotFoundError, listKnowledge, updateKnowledge,
 } from "./knowledge";
 import { replaceChunks } from "./retrieval";
 
@@ -163,5 +163,55 @@ describe("deleteKnowledge", () => {
     const item = await createKnowledge(p, { type: "TEXT", title: "N", content: words(100) });
     await expect(deleteKnowledge(other, item.id)).rejects.toThrow(/not found/i);
     expect(await getKnowledgeItem(item.id)).not.toBeNull();
+  });
+});
+
+describe("hardening", () => {
+  it("throws a typed not-found error", async () => {
+    const p = await profile(20);
+    await expect(deleteKnowledge(p, "missing")).rejects.toBeInstanceOf(KnowledgeNotFoundError);
+    await expect(updateKnowledge(p, "missing", { title: "x" })).rejects.toBeInstanceOf(KnowledgeNotFoundError);
+  });
+
+  it("completeIngest is compare-and-set on content; fails closed when it changed", async () => {
+    const p = await profile(21);
+    const item = await createKnowledge(p, { type: "TEXT", title: "T", content: words(100) });
+    expect(await completeIngest(item.id, "x", "s", { content: "different" })).toBeNull();
+    expect(await getKnowledgeItem(item.id)).toMatchObject({ content: words(100), summary: null });
+    expect(await completeIngest(item.id, words(100), "s", { content: words(100) })).toMatchObject({ summary: "s" });
+  });
+
+  it("completeIngest with undefined summary leaves the existing summary", async () => {
+    const p = await profile(22);
+    const item = await createKnowledge(p, { type: "TEXT", title: "T", content: words(100) });
+    await completeIngest(item.id, words(100), "keep me");
+    await completeIngest(item.id, words(100), undefined);
+    expect((await getKnowledgeItem(item.id))?.summary).toBe("keep me");
+  });
+
+  it("failIngest honours the same compare-and-set", async () => {
+    const p = await profile(23);
+    const item = await createKnowledge(p, { type: "URL", sourceUrl: "https://example.com/x" });
+    expect(await failIngest(item.id, "boom", { content: "other" })).toBeNull();
+    expect((await getKnowledgeItem(item.id))?.status).toBe("PROCESSING");
+  });
+
+  it("replaceChunks with a guard skips when the item is gone or its content changed", async () => {
+    const p = await profile(24);
+    const item = await createKnowledge(p, { type: "TEXT", title: "T", content: words(100) });
+    const chunk = [{ ordinal: 0, title: "T", text: "hello", embedding: null }];
+    expect(await replaceChunks(p, "KNOWLEDGE", item.id, chunk, { content: "stale" })).toBeNull();
+    expect(await replaceChunks(p, "KNOWLEDGE", "gone", chunk, { content: "x" })).toBeNull();
+    expect(await prisma.knowledgeChunk.count({ where: { sourceId: { in: [item.id, "gone"] } } })).toBe(0);
+    expect(await replaceChunks(p, "KNOWLEDGE", item.id, chunk, { content: words(100) })).toBe(1);
+  });
+
+  it("deleteKnowledge removes item and chunks together", async () => {
+    const p = await profile(25);
+    const item = await createKnowledge(p, { type: "TEXT", title: "T", content: words(100) });
+    await replaceChunks(p, "KNOWLEDGE", item.id, [{ ordinal: 0, title: "T", text: "hello", embedding: null }]);
+    await deleteKnowledge(p, item.id);
+    expect(await prisma.knowledgeChunk.count({ where: { sourceId: item.id } })).toBe(0);
+    expect(await getKnowledgeItem(item.id)).toBeNull();
   });
 });

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAiClient, createEmbedder } from "@brandloop/ai";
-import { KnowledgeError, type KnowledgeItem } from "@brandloop/db";
+import { KnowledgeError, KnowledgeNotFoundError, type KnowledgeItem } from "@brandloop/db";
 import { IngestError, ingestKnowledge, localUploadStore } from "@brandloop/knowledge";
 import { startJob } from "@/lib/run-job";
 
@@ -23,7 +23,7 @@ export function publicItem(item: KnowledgeItem, withContent = false) {
 
 export function knowledgeErrorResponse(err: unknown): NextResponse {
   if (err instanceof KnowledgeError || err instanceof IngestError) {
-    const status = err.message === "Item not found" ? 404 : 400;
+    const status = err instanceof KnowledgeNotFoundError ? 404 : 400;
     return NextResponse.json({ error: err.message }, { status });
   }
   throw err;

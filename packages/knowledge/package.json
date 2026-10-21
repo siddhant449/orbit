@@ -19,17 +19,19 @@
     "@mozilla/readability": "^0.6.0",
     "linkedom": "^0.18.13",
     "mammoth": "^1.13.0",
-    "unpdf": "^1.9.1",
-    "xlsx": "^0.18.5"
+    "read-excel-file": "^9.3.12",
+    "undici": "^8.12.3",
+    "unpdf": "^1.9.1"
   },
   "devDependencies": {
     "@brandloop/config": "workspace:*",
     "@types/node": "^20.19.43",
     "docx": "^9.13.0",
+    "dotenv": "^18.0.8",
+    "jszip": "^3.10.2",
     "pdf-lib": "^1.17.1",
-    "typescript": "5.9.3",
-    "vitest": "^5.0.5",
     "tsx": "^4.23.15",
-    "dotenv": "^18.0.8"
+    "typescript": "5.9.3",
+    "vitest": "^5.0.5"
   }
 }

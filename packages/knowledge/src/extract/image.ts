@@ -1,4 +1,4 @@
-import type { AiClient } from "@brandloop/ai";
+import { AiUnavailableError, type AiClient } from "@brandloop/ai";
 import { IngestError } from "../errors";
 
 const SYSTEM =
@@ -6,12 +6,18 @@ const SYSTEM =
   "anything else that carries meaning (charts, diagrams, screenshots). Plain text only. Never reply conversationally.";
 
 export async function extractImage(buf: Buffer, mime: string, ai: AiClient): Promise<string> {
-  const text = await ai.text({
-    model: "extract",
-    system: SYSTEM,
-    prompt: "Transcribe and describe this image.",
-    images: [{ mediaType: mime, base64: buf.toString("base64") }],
-  });
+  let text: string;
+  try {
+    text = await ai.text({
+      model: "extract",
+      system: SYSTEM,
+      prompt: "Transcribe and describe this image.",
+      images: [{ mediaType: mime, base64: buf.toString("base64") }],
+    });
+  } catch (err) {
+    if (err instanceof AiUnavailableError) throw new IngestError("Reading images isn't available right now");
+    throw err;
+  }
   if (!text.trim()) throw new IngestError("Couldn't read that image");
   return text;
 }

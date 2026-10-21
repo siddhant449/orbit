@@ -4,7 +4,6 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Document, Packer, Paragraph } from "docx";
 import { PDFDocument, StandardFonts } from "pdf-lib";
-import * as XLSX from "xlsx";
 
 const dir = join(dirname(fileURLToPath(import.meta.url)), "../test/fixtures");
 mkdirSync(dir, { recursive: true });
@@ -19,13 +18,7 @@ const doc = new Document({
 });
 writeFileSync(join(dir, "sample.docx"), await Packer.toBuffer(doc));
 
-const wb = XLSX.utils.book_new();
-XLSX.utils.book_append_sheet(
-  wb,
-  XLSX.utils.aoa_to_sheet([["topic", "note"], ["hooks", "Lead with the result (xlsx fixture)"]]),
-  "Ideas",
-);
-writeFileSync(join(dir, "sample.xlsx"), XLSX.write(wb, { type: "buffer", bookType: "xlsx" }));
+// sample.xlsx was generated once (SheetJS) and is committed as-is; no maintained writer is a dependency.
 
 writeFileSync(join(dir, "sample.md"), "# Notes\n\nConsistency beats intensity (md fixture).\n");
 
