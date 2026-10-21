@@ -69,6 +69,7 @@ model Profile {
   timezone            String          @default("UTC")
   generationDayOfWeek Int             @default(1)
   onboardingCompleted Boolean         @default(false)
+  memoryVersion       Int             @default(0)
   voiceStyleId        String?
   voiceStyle          VoiceStyle?     @relation("SelectedVoice", fields: [voiceStyleId], references: [id], onDelete: SetNull)
   memoryDocs          MemoryDoc[]
