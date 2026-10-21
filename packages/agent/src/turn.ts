@@ -2,6 +2,7 @@ import type { AiClient, Embedder } from "@brandloop/ai";
 import {
   ChatError,
   claimRun,
+  getChatDocument,
   getOrCreateChat,
   isStopRequested,
   lastAssistantContext,
@@ -155,13 +156,37 @@ function log(what: string, err: unknown) {
 type Part = ChatUIMessage["parts"][number];
 const FAILED_OUTPUT = /^(Failed:|Refused:)/;
 
+/** A tool result that didn't do its job: a `Failed:`/`Refused:` string, an `{error}` object or a question back. */
+function failedOutput(output: unknown): boolean {
+  if (typeof output === "string") return FAILED_OUTPUT.test(output);
+  if (!output || typeof output !== "object") return false;
+  const o = output as { error?: unknown; status?: unknown };
+  return typeof o.error === "string" || o.status === "needs-user-input";
+}
+
+/** The ledger's summary of each specialist handoff made this turn. */
+function handoffSummaries(handoffs: TurnContext["handoffs"]): TurnOutcome["handoffs"] {
+  return [...handoffs.values()].map((h) => {
+    const payload = h.payload as { readiness?: unknown } | null;
+    return {
+      id: h.handoffId,
+      specialist: h.specialist,
+      readiness: typeof payload?.readiness === "string" ? payload.readiness : null,
+      confidence: h.confidence,
+      parentAction: h.parentAction,
+      requestDigest: h.requestDigest,
+      hasMissingInput: h.missingInput.length > 0,
+    };
+  });
+}
+
 function toolResults(parts: Part[]): TurnOutcome["toolResults"] {
   const out: TurnOutcome["toolResults"] = [];
   for (const p of parts) {
     if (!p.type.startsWith("tool-")) continue;
     const t = p as { state?: string; output?: unknown };
     if (t.state !== "output-available" && t.state !== "output-error") continue;
-    const ok = t.state === "output-available" && !(typeof t.output === "string" && FAILED_OUTPUT.test(t.output));
+    const ok = t.state === "output-available" && !failedOutput(t.output);
     out.push({ toolName: p.type.slice("tool-".length), ok });
   }
   return out;
@@ -309,7 +334,7 @@ export async function runChatTurn(
           assistantText: textOf(parts),
           status: finish === "stop" ? "finished" : finish === "aborted" ? "aborted" : "error",
           toolResults: toolResults(parts),
-          handoffs: [],
+          handoffs: handoffSummaries(ctx.handoffs),
           artifact: ctx.documentRef.current
             ? { id: ctx.documentRef.current.id, title: ctx.documentRef.current.title }
             : null,
@@ -412,8 +437,7 @@ export async function runChatTurn(
       },
       writer: null,
       handoffs: new Map(),
-      // The open document arrives with the documents task.
-      documentRef: { current: null },
+      documentRef: { current: await getChatDocument(profileId, chatId) },
       now,
     };
     const tools = tagToolErrors(buildTools(ctx, { webSearchTool: deps.webSearchTool }));

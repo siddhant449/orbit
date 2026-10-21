@@ -79,6 +79,7 @@ model Profile {
   knowledgeChunks     KnowledgeChunk[]
   backgroundJobs      BackgroundJob[]
   chats               Chat[]
+  documents           Document[]
   currentFor          User[]          @relation("CurrentProfile")
   deletedAt           DateTime?
   createdAt           DateTime        @default(now())
@@ -252,8 +253,9 @@ model Chat {
   userId                 String
   title                  String    @default("New chat")
   pinned                 Boolean   @default(false)
-  /// No foreign key yet; the documents task adds it.
+  /// One post per chat, one chat per post.
   documentId             String?   @unique
+  document               Document? @relation(fields: [documentId], references: [id], onDelete: SetNull)
   activeRunId            String?
   activeRunStartedAt     DateTime?
   activeRequestMessageId String?
@@ -280,4 +282,52 @@ model Message {
   createdAt DateTime @default(now())
 
   @@index([chatId, seq])
+}
+
+enum DocumentKind {
+  TEXT
+}
+
+enum DocumentStatus {
+  DRAFT
+}
+
+enum VersionSource {
+  AI_CREATE
+  AI_EDIT
+  USER_EDIT
+  RESTORE
+  PROPOSAL
+}
+
+/// A post. The current text lives in the DocumentVersion whose number equals `version`.
+model Document {
+  id        String            @id @default(cuid())
+  profile   Profile           @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  profileId String
+  kind      DocumentKind      @default(TEXT)
+  status    DocumentStatus    @default(DRAFT)
+  title     String
+  version   Int               @default(1)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  deletedAt DateTime?
+  versions  DocumentVersion[]
+  chat      Chat?
+
+  @@index([profileId, deletedAt, updatedAt])
+}
+
+model DocumentVersion {
+  id            String        @id @default(cuid())
+  document      Document      @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  documentId    String
+  version       Int
+  text          String
+  hook          String?
+  source        VersionSource
+  changeSummary String?
+  createdAt     DateTime      @default(now())
+
+  @@unique([documentId, version])
 }

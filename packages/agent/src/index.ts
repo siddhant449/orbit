@@ -25,6 +25,23 @@ export { MEMORY_CONFLICT, runTool } from "./tools/run";
 export { createRunRegistry, getRunRegistry, type RunRegistry } from "./registry";
 export { finalizeAbortedParts, STOPPED_STEP, toStoredParts } from "./persist";
 export { fallbackTitle, titleChat } from "./title";
-export { createScriptedChatModel, scriptedAi, scriptedModel, type ScriptStep } from "./mock";
+export { createScriptedChatModel, SCRIPTED_DRAFT, SCRIPTED_TITLE, scriptedAi, scriptedModel, type ScriptStep } from "./mock";
+export {
+  findHandoff,
+  PostWritingPayload,
+  requestDigest,
+  SPECIALIST_KINDS,
+  specialistOutputSchema,
+  stampEnvelope,
+  type HandoffEnvelope,
+  type OutputOf,
+  type PostWriting,
+  type SpecialistKind,
+  type SpecialistOutput,
+} from "./specialists/envelope";
+export { buildGrounding, renderGrounding, type Grounding } from "./specialists/grounding";
+export { runSpecialist, type SpecialistResult } from "./specialists/run";
+export { delegateTools } from "./tools/delegate";
+export { createDocumentFromHandoff, documentTools, type CreateDocumentOutput } from "./tools/documents";
 export { chatError, chatErrorResponse, runChatTurn, STREAM_ERROR_TEXT, type ChatDeps } from "./turn";
 export { UI_MESSAGE_STREAM_HEADERS } from "ai";

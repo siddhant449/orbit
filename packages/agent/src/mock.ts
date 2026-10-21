@@ -116,7 +116,9 @@ function route(opts: CallOptions): ScriptStep {
 
   const last = results.at(-1);
   if (last) {
-    if (last.toolName === "delegateWriting") return call("createDocument", { handoffId: last.toolCallId });
+    if (last.toolName === "delegateWriting") {
+      return call("createDocument", { title: SCRIPTED_TITLE, kind: "text", specialistHandoffToolCallId: last.toolCallId });
+    }
     return { text: AFTER_TOOL[last.toolName] ?? "Done." };
   }
   if (/\bremember\b/i.test(text)) {
@@ -124,7 +126,9 @@ function route(opts: CallOptions): ScriptStep {
     return call("saveMemory", { category: "about", topic: null, facts: [fact] });
   }
   if (/\bknowledge\b/i.test(text)) return call("searchKB", { query: text.slice(0, 200), limit: 5 });
-  if (/\bdraft\b/i.test(text)) return call("delegateWriting", { request: text.slice(0, 2_000) });
+  if (/\bdraft\b/i.test(text)) {
+    return call("delegateWriting", { request: `Write a short LinkedIn post for the user. Their request: ${text.slice(0, 2_000)}`, specialty: "post" });
+  }
   if (/\bmarkdown\b/i.test(text)) return { text: MARKDOWN_REPLY };
   return { text: "Mock reply." };
 }
@@ -140,8 +144,33 @@ export function createScriptedChatModel(opts: { chunkDelayMs?: number } = {}): L
   });
 }
 
-/** Canned specialist outputs, tried in order against the requested schema. Task 8 adds the writer's. */
-const CANNED: unknown[] = [{ ok: true }];
+/** The post the mock writing specialist always returns. */
+export const SCRIPTED_TITLE = "MVP versus POC";
+export const SCRIPTED_DRAFT = [
+  "Most founders build a proof of concept when they need a minimum viable product.",
+  "A POC answers one question: can this work? An MVP answers a harder one: will anyone use it?",
+  "Build the POC in a week. Ship the MVP to ten real users. Then decide.",
+].join("\n\n");
+
+/** Canned specialist outputs, tried in order against the requested schema. */
+const CANNED: unknown[] = [
+  { ok: true },
+  {
+    summary: "A short post on MVP versus POC.",
+    findings: [],
+    recommendation: "Create the post.",
+    missingInput: [],
+    confidence: "medium",
+    parentAction: "create-document",
+    payload: {
+      readiness: "ready",
+      title: SCRIPTED_TITLE,
+      hook: "Most founders build a proof of concept when they need a minimum viable product.",
+      draft: SCRIPTED_DRAFT,
+      clarifyingQuestion: null,
+    },
+  },
+];
 
 /** A specialist client for mock mode: `text` names chats, `json` returns the first canned output the schema accepts. */
 export function scriptedAi(): AiClient {

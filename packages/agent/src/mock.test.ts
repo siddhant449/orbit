@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { describe, expect, it } from "vitest";
-import { createScriptedChatModel, scriptedAi, scriptedModel } from "./mock";
+import { PostWritingPayload, specialistOutputSchema } from "./specialists/envelope";
+import { createScriptedChatModel, SCRIPTED_DRAFT, scriptedAi, scriptedModel } from "./mock";
 
 type Prompt = { role: string; content: unknown }[];
 
@@ -20,9 +21,9 @@ async function play(model: ReturnType<typeof scriptedModel>, prompt: Prompt = []
 }
 
 const user = (text: string) => ({ role: "user", content: [{ type: "text", text }] });
-const toolResult = (toolName: string) => ({
+const toolResult = (toolName: string, toolCallId = "c1") => ({
   role: "tool",
-  content: [{ type: "tool-result", toolCallId: "c1", toolName, output: { type: "text", value: "ok" } }],
+  content: [{ type: "tool-result", toolCallId, toolName, output: { type: "text", value: "ok" } }],
 });
 const textOf = (parts: { type: string; delta?: unknown }[]) =>
   parts.filter((p) => p.type === "text-delta").map((p) => p.delta).join("");
@@ -69,9 +70,12 @@ describe("createScriptedChatModel", () => {
   it("routes 'draft' to delegateWriting then createDocument, but only with tools it was given", async () => {
     const model = createScriptedChatModel();
     expect(calls(await play(model as never, [user("Draft a post about hiring")], all))[0]!.toolName).toBe("delegateWriting");
-    expect(
-      calls(await play(model as never, [user("Draft a post about hiring"), toolResult("delegateWriting")], all))[0]!.toolName,
-    ).toBe("createDocument");
+    const first = calls(await play(model as never, [user("Draft a post about hiring")], all))[0]!;
+    expect((first.input as { specialty: string }).specialty).toBe("post");
+    expect((first.input as { request: string }).request.length).toBeGreaterThanOrEqual(40);
+    expect(calls(await play(model as never, [user("Draft a post about hiring"), toolResult("delegateWriting", "call_w9")], all))).toEqual([
+      { toolName: "createDocument", input: { title: expect.any(String), kind: "text", specialistHandoffToolCallId: "call_w9" } },
+    ]);
     // Without the writing tools (before they exist) it just replies.
     expect(textOf(await play(model as never, [user("Draft a post about hiring")], ["saveMemory"]))).toBe("Mock reply.");
   });
@@ -83,6 +87,8 @@ describe("scriptedAi", () => {
     expect(await ai.text({ model: "extract", system: "s", prompt: "p" })).toBe("Mock chat");
     const out = await ai.json({ model: "generate", system: "s", prompt: "p", schema: z.object({ ok: z.boolean() }) });
     expect(out).toEqual({ ok: true });
+    const post = await ai.json({ model: "generate", system: "s", prompt: "p", schema: specialistOutputSchema(PostWritingPayload) });
+    expect(post.payload).toMatchObject({ readiness: "ready", draft: SCRIPTED_DRAFT });
     await expect(
       ai.json({ model: "generate", system: "s", prompt: "p", schema: z.object({ impossible: z.literal("never") }) }),
     ).rejects.toThrow(/no canned output/i);

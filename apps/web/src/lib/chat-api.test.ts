@@ -18,7 +18,7 @@ vi.mock("next/server", async (importOriginal) => ({
 }));
 
 import { claimRun, ensureAccount, getChat, getOrCreateChat, prisma } from "@brandloop/db";
-import { getRunRegistry } from "@brandloop/agent";
+import { getRunRegistry, SCRIPTED_DRAFT, SCRIPTED_TITLE } from "@brandloop/agent";
 import { randomUUID } from "node:crypto";
 import {
   deleteChatHandler,
@@ -92,6 +92,15 @@ describe("POST /api/chat", () => {
     // The new chat gets a title after the response.
     await Promise.all(pending.map((fn) => fn()));
     expect((await getChat(profileId, chatId))!.title).toBe("Mock chat");
+  });
+
+  it("drafts a post end to end with the mock model, and the messages route returns it", async () => {
+    const chatId = randomUUID();
+    const sse = await (await postChatHandler(json(chatBody(chatId, "Draft a short post about MVP versus POC")))).text();
+    expect(sse).toContain('"type":"data-document"');
+    const data = await (await getChatMessagesHandler(new Request("http://test"), params(chatId))).json();
+    expect(data.document).toEqual({ id: expect.any(String), title: SCRIPTED_TITLE, version: 1, text: SCRIPTED_DRAFT });
+    expect((await getChat(profileId, chatId))!.documentId).toBe(data.document.id);
   });
 
   it("saves memory end to end with the keyword-scripted model", async () => {

@@ -1,0 +1,99 @@
+import {
+  DOCUMENT_TEXT_MAX,
+  DOCUMENT_TITLE_MAX,
+  DocumentError,
+  DocumentVersionConflict,
+  getDocument,
+  listDocumentVersions,
+  restoreDocumentVersion,
+  saveDocumentVersion,
+} from "@brandloop/db";
+import { z } from "zod";
+import { getAccount } from "@/lib/account";
+
+/**
+ * Handlers behind the document routes (design §5). Every read and write is scoped to the signed-in user's
+ * current profile, so another profile's post is a 404. Errors are `{error}`, plus `code` on 409.
+ */
+
+type Ctx = { params: Promise<{ id: string }> };
+
+const fail = (status: number, error: string, extra: object = {}) => Response.json({ error, ...extra }, { status });
+const notFound = () => fail(404, "Document not found.");
+const conflict = (version: number) =>
+  fail(409, "This post changed since you opened it. Reload it and try again.", { code: "document_version_conflict", version });
+
+async function currentProfileId(): Promise<string | null> {
+  return (await getAccount())?.currentProfile?.id ?? null;
+}
+
+async function readJson(request: Request): Promise<unknown> {
+  return request.json().catch(() => undefined);
+}
+
+function fromError(err: unknown): Response {
+  if (err instanceof DocumentVersionConflict) return conflict(err.currentVersion);
+  if (err instanceof DocumentError) return err.code === "not_found" ? notFound() : fail(400, err.message);
+  throw err;
+}
+
+const version = z.number().int().min(1);
+
+/** GET /api/documents/:id: the post with its current text. */
+export async function getDocumentHandler(_request: Request, { params }: Ctx): Promise<Response> {
+  const profileId = await currentProfileId();
+  if (!profileId) return fail(400, "Create a profile first.");
+  const doc = await getDocument(profileId, (await params).id);
+  return doc ? Response.json(doc) : notFound();
+}
+
+/** GET /api/documents/:id/versions: newest first, `{version, source, changeSummary, createdAt, chars}`. */
+export async function listVersionsHandler(_request: Request, { params }: Ctx): Promise<Response> {
+  const profileId = await currentProfileId();
+  if (!profileId) return fail(400, "Create a profile first.");
+  try {
+    return Response.json({ versions: await listDocumentVersions(profileId, (await params).id) });
+  } catch (err) {
+    return fromError(err);
+  }
+}
+
+const PatchSchema = z.object({
+  text: z.string().refine((t) => t.trim().length > 0 && t.length <= DOCUMENT_TEXT_MAX),
+  title: z.string().trim().min(1).max(DOCUMENT_TITLE_MAX).optional(),
+  expectedVersion: version,
+});
+
+/** PATCH /api/documents/:id: `{text, title?, expectedVersion}` saves a user edit. 200 `{version}` or 409. */
+export async function patchDocumentHandler(request: Request, { params }: Ctx): Promise<Response> {
+  const profileId = await currentProfileId();
+  if (!profileId) return fail(400, "Create a profile first.");
+  const parsed = PatchSchema.safeParse(await readJson(request));
+  if (!parsed.success) {
+    return fail(
+      400,
+      `Send text (1 to ${DOCUMENT_TEXT_MAX.toLocaleString("en-US")} characters), an optional title (1 to ${DOCUMENT_TITLE_MAX}) and expectedVersion.`,
+    );
+  }
+  try {
+    const doc = await saveDocumentVersion(profileId, (await params).id, { ...parsed.data, source: "USER_EDIT" });
+    return Response.json({ version: doc.version });
+  } catch (err) {
+    return fromError(err);
+  }
+}
+
+const RestoreSchema = z.object({ version, expectedVersion: version });
+
+/** POST /api/documents/:id/restore: `{version, expectedVersion}` writes a new RESTORE version. */
+export async function restoreDocumentHandler(request: Request, { params }: Ctx): Promise<Response> {
+  const profileId = await currentProfileId();
+  if (!profileId) return fail(400, "Create a profile first.");
+  const parsed = RestoreSchema.safeParse(await readJson(request));
+  if (!parsed.success) return fail(400, "Send version and expectedVersion as whole numbers.");
+  try {
+    return Response.json(await restoreDocumentVersion(profileId, (await params).id, parsed.data.version, parsed.data.expectedVersion));
+  } catch (err) {
+    return fromError(err);
+  }
+}

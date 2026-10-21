@@ -3,6 +3,7 @@ import {
   RUN_LOCK_STALE_MS,
   deleteChat,
   getChat,
+  getChatDocument,
   listChats,
   listMessages,
   renameChat,
@@ -96,14 +97,13 @@ export async function getChatMessagesHandler(_request: Request, { params }: Ctx)
   const { id } = await params;
   const chat = await getChat(ids.profileId, id);
   if (!chat) return notFound();
-  const messages = await listMessages(ids.profileId, id);
+  const [messages, doc] = await Promise.all([listMessages(ids.profileId, id), getChatDocument(ids.profileId, id)]);
   const fresh =
     chat.activeRunId && (!chat.activeRunStartedAt || Date.now() - chat.activeRunStartedAt.getTime() < RUN_LOCK_STALE_MS);
   return Response.json({
     messages: messages.map((m) => ({ id: m.id, role: m.role, parts: m.parts, metadata: m.metadata ?? undefined })),
     activeTurn: fresh ? { runId: chat.activeRunId, requestMessageId: chat.activeRequestMessageId } : null,
-    // The documents task fills this in.
-    document: null,
+    document: doc ? { id: doc.id, title: doc.title, version: doc.version, text: doc.text } : null,
   });
 }
 

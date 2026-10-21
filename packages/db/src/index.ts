@@ -10,3 +10,4 @@ export * from "./services/voice";
 export * from "./services/retrieval";
 export * from "./services/knowledge";
 export * from "./services/chat";
+export * from "./services/documents";
