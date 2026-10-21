@@ -27,10 +27,13 @@ export function Composer({
   firstName,
   voices,
   selectedVoiceId,
+  onSend,
 }: {
   firstName: string;
   voices: VoiceOption[];
   selectedVoiceId: string | null;
+  /** Starts the chat with this text. Without it the composer only says chat isn't connected. */
+  onSend?: (text: string) => void;
 }) {
   const [text, setText] = useState("");
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -53,6 +56,10 @@ export function Composer({
   function send(e?: React.FormEvent) {
     e?.preventDefault();
     if (!text.trim()) return;
+    if (onSend) {
+      onSend(text.trim());
+      return;
+    }
     toast("Chat isn't connected yet", { description: "Writing with AI arrives in the next build." });
   }
 

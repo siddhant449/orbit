@@ -90,6 +90,22 @@ const AFTER_TOOL: Record<string, string> = {
   createDocument: "Your draft is open on the right.",
 };
 
+/** A formatted reply for exercising the chat's markdown rendering offline. */
+const MARKDOWN_REPLY = [
+  "## Three ways to open the post",
+  "",
+  "Lead with the **moment**, not the lesson. A few options:",
+  "",
+  "- Start in the middle of the scene",
+  "- Name the cost of getting it wrong",
+  "- Ask the question your reader is already asking",
+  "",
+  "1. Pick one opening",
+  "2. Cut the first sentence",
+  "",
+  "Read more in [the guide](https://example.com/guide) or [this one](javascript:alert(1)).",
+].join("\n");
+
 /** Decides the next step from the conversation so far: a keyword router for offline end-to-end runs. */
 function route(opts: CallOptions): ScriptStep {
   const has = new Set((opts.tools ?? []).map((t) => t.name));
@@ -109,17 +125,18 @@ function route(opts: CallOptions): ScriptStep {
   }
   if (/\bknowledge\b/i.test(text)) return call("searchKB", { query: text.slice(0, 200), limit: 5 });
   if (/\bdraft\b/i.test(text)) return call("delegateWriting", { request: text.slice(0, 2_000) });
+  if (/\bmarkdown\b/i.test(text)) return { text: MARKDOWN_REPLY };
   return { text: "Mock reply." };
 }
 
-/** The keyword-scripted chat model behind `AI_MOCK_MODEL=1`. */
-export function createScriptedChatModel(): LanguageModel {
+/** The keyword-scripted chat model behind `AI_MOCK_MODEL=1`. `chunkDelayMs` paces the stream (default 5 ms). */
+export function createScriptedChatModel(opts: { chunkDelayMs?: number } = {}): LanguageModel {
   return new MockLanguageModelV4({
     provider: "mock",
     modelId: "mock-chat",
     // Pretend every http(s) file URL is fetched by the provider, so mock runs never download attachments.
     supportedUrls: { "*/*": [/^https?:\/\//] },
-    doStream: async (opts) => play(route(opts), 5),
+    doStream: async (call) => play(route(call), opts.chunkDelayMs ?? 5),
   });
 }
 

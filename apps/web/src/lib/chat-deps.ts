@@ -27,7 +27,9 @@ function afterResponse(fn: () => Promise<void>): void {
 export function getChatDeps(): ChatDeps {
   const base = { registry: getRunRegistry(), after: afterResponse };
   if (isMockMode()) {
-    return { ...base, model: createScriptedChatModel(), ai: scriptedAi(), embedder: fakeEmbedder(), webSearchTool: null };
+    const pace = Number(process.env.AI_MOCK_CHUNK_MS);
+    const model = createScriptedChatModel(Number.isFinite(pace) && pace > 0 ? { chunkDelayMs: pace } : {});
+    return { ...base, model, ai: scriptedAi(), embedder: fakeEmbedder(), webSearchTool: null };
   }
   return {
     ...base,

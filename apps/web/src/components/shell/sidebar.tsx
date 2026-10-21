@@ -6,6 +6,7 @@ import { useState } from "react";
 import { PanelLeftClose, PanelLeftOpen, Search } from "lucide-react";
 import { Button, cn } from "@brandloop/ui";
 import { isActive, primaryNav, type Section } from "@/lib/nav";
+import { ChatHistory } from "@/components/chat/chat-history";
 import { IndexLabel } from "./index-label";
 import { Logo, LogoMark } from "./logo";
 import { NavLink } from "./nav-link";
@@ -59,9 +60,7 @@ export function MainSidebar({ onSearch, onNavigate, onCollapse }: Handlers & { o
         <h2 id="chats-heading" className="type-caption px-2.5 text-ink-muted">
           Chats
         </h2>
-        <p className="type-ui mt-2 max-w-[26ch] px-2.5 text-ink-faint">
-          Your conversations will be listed here once you start one.
-        </p>
+        <ChatHistory onNavigate={onNavigate} />
       </section>
 
       <IndexLabel label={indexLabel} />
