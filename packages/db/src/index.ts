@@ -7,3 +7,4 @@ export * from "./services/jobs";
 export * from "./services/memory-import";
 export * from "./services/strategy";
 export * from "./services/voice";
+export * from "./services/retrieval";

@@ -1,6 +1,7 @@
+name: kleo-clone
 services:
   db:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: brandloop
       POSTGRES_PASSWORD: brandloop
@@ -8,6 +9,6 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata-pgvector:/var/lib/postgresql/data
 volumes:
-  pgdata:
+  pgdata-pgvector:

@@ -1,5 +1,5 @@
 import { createOpenAI, openai } from "@ai-sdk/openai";
-import type { LanguageModel } from "ai";
+import type { EmbeddingModel, LanguageModel } from "ai";
 
 export type ModelAlias = "generate" | "extract";
 
@@ -24,4 +24,15 @@ export function resolveModel(alias: ModelAlias): string {
 export function getModel(alias: ModelAlias, apiKey?: string): LanguageModel {
   const id = resolveModel(alias);
   return apiKey ? createOpenAI({ apiKey })(id) : openai(id);
+}
+
+/** Embedding model ID. Override with AI_MODEL_EMBED. */
+export function resolveEmbeddingModel(): string {
+  return process.env.AI_MODEL_EMBED ?? "text-embedding-3-small";
+}
+
+/** The AI SDK embedding model. Lazy like getModel: never reads the key at build time. */
+export function getEmbeddingModel(apiKey?: string): EmbeddingModel {
+  const id = resolveEmbeddingModel();
+  return apiKey ? createOpenAI({ apiKey }).embedding(id) : openai.embedding(id);
 }

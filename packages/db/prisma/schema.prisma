@@ -76,6 +76,7 @@ model Profile {
   strategy            Strategy?
   voiceStyles         VoiceStyle[]    @relation("ProfileVoices")
   knowledgeItems      KnowledgeItem[]
+  knowledgeChunks     KnowledgeChunk[]
   backgroundJobs      BackgroundJob[]
   currentFor          User[]          @relation("CurrentProfile")
   deletedAt           DateTime?
@@ -198,6 +199,29 @@ model KnowledgeItem {
   createdAt  DateTime        @default(now())
 
   @@index([profileId, createdAt])
+}
+
+enum ChunkSource {
+  KNOWLEDGE
+}
+
+model KnowledgeChunk {
+  id         String                 @id @default(cuid())
+  profile    Profile                @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  profileId  String
+  sourceType ChunkSource
+  sourceId   String
+  ordinal    Int
+  title      String
+  text       String
+  embedding  Unsupported("vector(1536)")?
+  tsv        Unsupported("tsvector")?
+  createdAt  DateTime               @default(now())
+
+  @@unique([sourceType, sourceId, ordinal])
+  @@index([profileId, sourceType])
+  @@index([tsv], type: Gin, map: "KnowledgeChunk_tsv_gin")
+  @@index([embedding], map: "KnowledgeChunk_embedding_hnsw")
 }
 
 model BackgroundJob {
