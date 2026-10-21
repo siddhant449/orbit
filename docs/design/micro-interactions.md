@@ -11,8 +11,9 @@ all entries:
 - `<MotionConfig reducedMotion="user">` at the app root; CSS motion is gated by `@media (prefers-reduced-motion:
   reduce)`. Under reduced motion every entry collapses to opacity or an instant state swap; colour and shadow changes
   stay as the feedback.
-- Motion imports: `motion/react` with `LazyMotion` + `domAnimation`; `m.*` components only; no `framer-motion` import.
-- In-app ceiling 400 ms per interaction; page-load orchestration on home ≤ 600 ms total; marketing hero ≤ 900 ms.
+- Motion imports: `motion/react` through `LazyMotion` with **lazily loaded features** (`features={() => import("./features").then((m) => m.default)}`, ruling U7); `m.*` components only; no `framer-motion` import. `m` components render their initial frame on the server and animate once the features chunk arrives.
+- Durations (cinematic direction, supersedes the old 400 ms ceiling): cinematic one-shots run 600–1200 ms; interaction feedback (hover, press, focus, selection) stays ≤ 200 ms and never blocks input; loops are slow and few.
+- No page transitions: routes switch instantly (user decision 2026-10-21).
 
 ## 0. Presets (named once, referenced everywhere)
 
@@ -26,6 +27,7 @@ all entries:
 | `draw` | `pathLength 0 → 1`, 400 ms `cubic-bezier(.4, 0, .2, 1)` | SVG strokes (logo, tick, underline, donut) |
 | `tick` | value tween 400 ms `ease-ink`, tabular numerals | numbers |
 | `loader` | `linear`, 1.2 s loop | skeleton sweep, halftone loader |
+| `cinematic` | `set` 420 ms per letter at 22 ms stagger, `land` spring 320 / 26, `stamp` 180 ms at 60 ms stagger, `roll` 260 ms, `reveal` 420 ms at 40 ms stagger | the one-shots in section 9 |
 
 Durations: hover 200 ms, press ≈ 150 ms (spring), entry 180 ms, exit 120 ms, draw 400 ms, settle 240 ms.
 
@@ -76,8 +78,8 @@ Scramble / cipher text (P07, P33) is not used: it adds noise to a writing produc
 
 | ID | Interaction | Trigger | Animates | Timing | Reduced motion | Notes | Source |
 |----|-------------|---------|----------|--------|----------------|-------|--------|
-| R1 | Route change | navigation inside `(app)` via `template.tsx` + `AnimatePresence mode="wait"` | incoming page `stamp`; outgoing `opacity 1 → 0` | in 180 ms, out 120 ms | opacity only (already) | the page header is outside the animated region so it does not flash; focus moves to the `h1` | plan |
-| R2 | Sidebar collapse / expand | Ctrl/⌘+B or the buttons | sidebar width is a CSS change; the rail and labels crossfade (`opacity`), `layout` on the nav rows keeps icons in place | 200 ms `spring-layout` | instant | `localStorage` state unchanged | plan |
+| R1 | Route change | navigation inside `(app)` | No page transitions: routes switch instantly (user decision 2026-10-21). Focus moves to the new `h1` or `main` | 0 ms | same | nothing animates on a route change | user decision |
+| R2 | Sidebar collapse / expand | Ctrl/⌘+B or the buttons | the aside width tweens; rail icons and labels crossfade | 240 ms `ease-ink` | instant | `localStorage` state unchanged; the sheet reflows with the tween | plan |
 | R3 | Section panel in / out | entering or leaving `/ideas*`, `/settings*`, `/strategy` … | panel `translateX -12px → 0` + opacity | 180 ms `ease-ink` | opacity | content column does not reflow during the move (`layoutRoot` on the sheet) | plan |
 | R4 | Mobile drawer | menu button / swipe | drawer `translateX -100% → 0`; scrim opacity | 240 ms `ease-ink`; close 180 ms `ease-exit` | opacity | focus trapped by radix Dialog; `data-lenis-prevent` on the drawer | plan |
 | R5 | Dialog / AlertDialog | open / close | plate `stamp`; scrim `opacity 0 → .4` | 180 / 120 ms | opacity | Lenis `stop()` on open, `start()` on close; body gets `data-lenis-prevent` | plan |
@@ -86,17 +88,18 @@ Scramble / cipher text (P07, P33) is not used: it adds noise to a writing produc
 | R8 | Tabs | tab change | underline plate moves via `layoutId="tab-underline"` | `spring-layout` | instant | content swaps with opacity 120 ms | P29 |
 | R9 | Composer open (later) | choosing a chip or focusing the composer | the composer sheet grows via `layout`; chips fade | `spring-layout` | instant | no shared-element flight across routes | Motion Primitives `morphing-dialog` (idea) |
 
-### 5.1 The two orchestrated load moments
+### 5.1 The orchestrated load moments
 
-Home (once per session, `sessionStorage` key `brandloop:greeted`; chrome never animates on load):
+Home (every mount; chrome never animates on load; routes switch instantly, so the sequence starts the moment the page is there):
 
 | t (ms) | What happens |
 |-------:|--------------|
-| 0 | desk, sidebar, sheet and page header render in their final state |
-| 0–320 | greeting line 1: ink plate wipes in and out, text revealed underneath (T1) |
-| 160–480 | greeting line 2, overlapping by 160 ms |
-| 360–600 | pink and blue copies settle 3× → 1× misreg; composer sheet `stamp` (180 ms) starts at 360 |
-| 600 | done; chips were static throughout; Send button is the only blue on the page |
+| 0 | desk, printed index, sheet and the page render in their final layout |
+| 160–1060 | the greeting sets in letter by letter, widths 75 → 125, pink and blue plates chasing into register (C2) |
+| 520–1000 | the composer lands on the table and its plate catches up (C5) |
+| 820–1140 | the five tickets stamp in (C6) |
+| ≥ 900 | the dither field fades in once its lazy chunk has loaded (C4) |
+| 1200 | done; the composer was usable from the first frame |
 
 Auth (once per session):
 
@@ -127,8 +130,9 @@ Motion's `useScroll` reads the real scroll position, so any scroll-linked effect
 the sidebar "Chats" list, the section panel nav, every `textarea` (composer, "Your posts", "Paste your memories", the
 import prompt), `pre` / code blocks on `/design`, and the Clerk card. Lenis is stopped while any dialog is open.
 
-Reduced motion: `respectReducedMotion` stays at its default `true`, so smoothing turns off live when the OS preference
-is set; `scrollTo` and anchors jump. The installed version's option name is confirmed in D2 before merge.
+Reduced motion: `respectReducedMotion` stays at its default `true` (confirmed in lenis 1.3.27's `LenisOptions`), so
+smoothing turns off live when the OS preference is set; `scrollTo` and anchors jump. Implemented in Task R2★ as
+`SmoothScroll` (`packages/ui/src/scroll/smooth-scroll.tsx`), wrapper mode around the sheet's scroll region.
 
 Native features that must keep working, each with a Playwright check: anchor links (`#id` scrolls and focuses),
 sticky page header stays stuck inside the sheet, keyboard scrolling (Space, Page Up/Down, Home/End, arrows) with focus
@@ -160,16 +164,25 @@ Playwright assertions for `apps/web/e2e/scroll.spec.ts` (new in D2):
 | Text (T1, T2) | final text, final number |
 | Layout (R2, R3, R7, R8) | instant |
 | Lenis | smoothing off, native scroll |
+| Cinematic (C2–C8) | final frame: letters at width 125 with copies at 3 px, composer and tickets in place, static Bayer tile instead of the canvas, no custom cursor, reveals visible |
 
 Verified by the Playwright run with `reducedMotion: 'reduce'`: no element reports a non-identity transform during
 load and no `transform` transition is pending on hover.
 
 ## 8. Motion budget and the 60 fps check
 
-Budget: in-app interactions ≤ 400 ms; home load orchestration ≤ 600 ms; only transform / opacity / filter (plus
-`clip-path` in B3, checked); no `layout` animation on lists > 20 rows; at most one looping animation visible per
-screen; `motion` imported through `LazyMotion` + `domAnimation`, `m.*` only; home route JS growth from motion work
-≤ 40 KB gz (compare `next build` output before and after).
+Budget (ruling U10, supersedes the earlier 400 ms / 40 KB figures):
+
+- Home initial JS adds **≤ 90 KB gzip eagerly** over the pre-D2 baseline (264,361 B); every lazily loaded chunk (motion
+  features, drafting cursor, dither field) is recorded beside the first-load figure in
+  `docs/features/ui-redesign/bundle-baseline.md`.
+- Canvas, dither and the cursor load **after first paint** (`next/dynamic` with `ssr: false`, mounted from an idle
+  callback) and pause when off-screen (`IntersectionObserver`) or when the tab is hidden; canvases cap
+  `devicePixelRatio` at 1 (dither) / 1.5 (anything else).
+- INP < 200 ms: interaction feedback ≤ 200 ms, never blocking input; no `layout` animation on lists > 20 rows.
+- Hero sequences hold 60 fps on a mid laptop (4× CPU throttle in the check below): only `transform`, `opacity`,
+  `filter` and `clip-path` animate, except the kinetic greeting's `font-stretch` (one heading, one shot, ≤ 1.1 s).
+- Reduced motion means static final frames everywhere (section 7).
 
 60 fps check (run on `/design`, Chrome, 1440 × 900 and 390 × 844, day and night, 4× CPU throttle):
 
@@ -184,3 +197,19 @@ screen; `motion` imported through `LazyMotion` + `domAnimation`, `m.*` only; hom
    does, switch to the PNG tile.
 5. Save the trace as `.superpowers/sdd/<plan>/perf/<block>-<viewport>-<theme>.json` and note any failure in the
    task's review notes with the frame time and the offending property.
+
+## 9. Cinematic catalogue (Task R2★)
+
+Implemented in `packages/ui/src/{motion,cursor,effects,scroll}` and the shell / home components. All one-shots are
+600–1200 ms, all feedback ≤ 200 ms, all reduced-motion fallbacks are final frames. C1 (route print) was built as a
+prototype and removed: no page transitions, routes switch instantly (user decision 2026-10-21).
+
+| ID | Interaction | Trigger | Animates | Timing | Reduced motion | Perf / a11y | Source |
+|----|-------------|---------|----------|--------|----------------|-------------|--------|
+| C2 | Kinetic greeting | home mount | per letter: `opacity 0 → 1`, `translateY .18em → 0`, `font-stretch 75% → 125%`; the pink copy 70 ms behind, the blue copy 140 ms behind, ending at ±3 px | 420 ms `ease-ink` per letter, 22 ms stagger (≈ 950 ms for 26 letters) | letters at 125 %, copies at 3 px | `h1[aria-label="What are we writing today?"]`, letter spans and copies `aria-hidden`; one heading only (font-stretch re-lays out one line per frame) | Motion Primitives `text-effect`, Originkit `text-colour-sweep` (ideas) |
+| C3 | Drafting cursor | pointer moves (fine pointer, hover-capable, no reduced motion) | a fixed `aria-hidden` crosshair follows the pointer via `transform: translate3d` written per frame; a caption readout shows x / y in sheet pixels; the label reads `OPEN` over links and buttons (ink plate), `WRITE` over the composer sheet (pink plate), `DRAG` over `[draggable]`; hidden over text inputs, which keep the native caret, and when the pointer leaves the window | follow 0 ms (rAF), label swap 120 ms | not mounted | `pointer-events: none`, z-index above dialogs, never hides focus rings; native cursor hidden via `html[data-drafting-cursor] { cursor: none }` except on text fields; `next/dynamic`, mounted after first paint | Heron lesson; Originkit `axis-cursor` idea (not fetched) |
+| C4 | Dither field | home mount, after first paint | Canvas 2D, 3 px cells, dpr 1: two low-frequency fields thresholded through an 8 × 8 Bayer matrix, pink and blue dots, overprint where both pass; drifts at 24 fps; the pointer pulls the two inks apart by up to 4 px within 160 px; density masked toward the headline | continuous, 24 fps; fade in 600 ms | static CSS Bayer tile (`--ghost` dots), no canvas | `aria-hidden`, `pointer-events: none`; paused off-screen and on `document.hidden`; `requestIdleCallback` mount; re-reads tokens on theme change | Originkit `dither-burn`, `bayer-vortex` (ideas, Canvas 2D rewrite) |
+| C5 | Object landing | home mount (composer); later: dialogs that "drop" | face `opacity 0 → 1`, `translateY -28px → 0`, `rotate -1.2deg → 0`, `scale 1.02 → 1`; the ink plate behind it `translate 0 → 6px 6px` 120 ms later | spring 320 / 26 (≈ 480 ms); plate 200 ms `ease-ink` | in place | transform only; the textarea is focusable throughout | Ascension lesson; Originkit `tactile-button` plate idea |
+| C6 | Stamped stagger | home mount (tickets); list entries later | `scale 1.12 → 1`, `rotate -2deg → 0`, `opacity 0 → 1` per item | 180 ms `ease-ink`, 60 ms stagger | in place | transform / opacity | Originkit `wax-seal` stamp idea (CSS, no `three`) |
+| C7 | Printed index (nav) | hover / focus-visible on a nav row | ink bar `scaleX 0 → 1` from the left; label rolls up and its `aria-hidden` duplicate rolls in; the index label at the sidebar foot swaps by a vertical roll | 200 ms `ease-ink`; roll 260 ms; leave 120 ms `ease-exit` | bar and label swap instantly | the duplicate label is `aria-hidden`; `aria-current="page"` holds the bar | Signal-A and FORMAT lessons; Originkit `label-slide-button` (adapted) |
+| C8 | Scroll reveal | element enters the viewport (once) | `opacity 0 → 1`, `translateY 12px → 0`; siblings stagger 40 ms | 420 ms `ease-ink` | visible | `whileInView` with `once`; never on first-fold content, never on > 20 rows | Motion `whileInView` |

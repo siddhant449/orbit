@@ -14,7 +14,10 @@ the motion budget, the slop checklist.
 2. Everything is printed: hard edges, hard offset shadows, 1 px keylines, grain visible at rest. No blur, no gradient,
    no glow, anywhere.
 3. Scale does the talking: one wide Archivo line against small Hanken text, with nothing in between.
-4. The app is a quiet drafting sheet on a paper desk. Each screen gets exactly one riso moment; everything else is flat.
+4. The app is a drafting table in a print room, and motion is the press at work: display type sets in letter by letter,
+   printed objects land on the table, and the pointer is a drafting instrument. Every screen has a composition and a
+   motion score (§10). Interaction feedback stays instant (≤ 200 ms); the cinema is in the one-shots. Routes switch
+   instantly, with no transition.
 5. Night print is the same press run on black stock with light inks: overlaps bloom (screen) instead of bruise (multiply).
 
 ## 2. Palette
@@ -307,15 +310,25 @@ Every device is CSS or inline SVG, animates transform/opacity only, and is `aria
 .plate--overlay { box-shadow: var(--shadow-overlay); }  /* 6px 6px 0 0 */
 ```
 
-Interactive plates (buttons, pressable rows) do not use `box-shadow`; the shadow is a pseudo-element plate so the press
-can animate with transform only:
+Interactive plates (buttons, pressable rows) do not use `box-shadow`. The element itself is the **static plate** and a
+child is the **moving face**, so the press animates with transform only and the plate never moves with the face (a
+`::before` behind a translated element would both move and, inside the stacking context a transform creates, paint over
+the face):
+
+```html
+<button class="press"><span class="press__face">Send</span></button>
+```
 
 ```css
-.press { position: relative; translate: 0 0; transition: translate 150ms var(--ease-ink); }
-.press::before { content: ""; position: absolute; inset: -1px; z-index: -1; background: var(--plate-shadow);
-                 border-radius: inherit; translate: 4px 4px; }
-.press:active, .press[data-pressed] { translate: 4px 4px; }  /* face lands on the plate */
+.press { position: relative; padding: 0 3px 3px 0; background: var(--plate-shadow); border: 0;
+         border-radius: var(--radius-control); }
+.press__face { display: inline-flex; translate: 0 0; background: var(--ink); color: var(--on-ink);
+               border: 1px solid var(--keyline); border-radius: inherit; transition: translate 150ms var(--ease-ink); }
+.press:active .press__face, .press[data-pressed] .press__face { translate: 3px 3px; }  /* face lands on the plate */
 ```
+
+The button box includes the 3 px plate; the face is 3 px shorter and narrower than the box. Focus rings go on the
+button (the plate), so they never move during the press.
 
 ### 5.2 Overprint
 
@@ -363,7 +376,10 @@ Settling animation (home, auth only): copies start at 3× `--misreg` and settle 
 
 ### 5.4 Grain
 
-One tile, rendered once, laid over the desk and the sheet as a fixed `::after` with `pointer-events: none`:
+One tile, rendered once, **beneath all content** (ruling U11): it is a background layer of the desk, blended into the
+paper colour with `background-blend-mode`, so no text, input or button is ever painted under grain and presence never
+depends on whether an element is positioned. The opaque sheet (`--surface`) covers it; the sidebar sits on it; the home
+hero field is the only other grainy area and it is its own canvas.
 
 ```svg
 <svg xmlns="http://www.w3.org/2000/svg" width="128" height="128">
@@ -376,11 +392,12 @@ One tile, rendered once, laid over the desk and the sheet as a fixed `::after` w
 </svg>
 ```
 
-Day: `opacity: .07; mix-blend-mode: multiply`. Night: `opacity: .09; mix-blend-mode: screen`. Delivered as a data-URI
-`background-image` tile (the browser rasterises it once); if the 60 fps check shows paint cost, swap for the
-pre-rendered 128 px PNG (≈ 3 KB) with identical values. Grain never sits over an input, a table or a dialog body (those
-plates are opaque and above the grain layer). The animated version (three seeds 7 / 11 / 19 cycled at 8 fps by
-opacity) exists on marketing and `/design` only and is static under reduced motion (P22).
+Strength is baked into the tile's alpha table: day `tableValues="0 0 0 0 0 .035 .07"` with `background-blend-mode:
+multiply`, night `0 0 0 0 0 .045 .09` with `screen`. Applied as `body { background-image: var(--grain-tile);
+background-color: var(--paper); background-blend-mode: var(--grain-blend); }` (the browser rasterises the tile once); if
+the 60 fps check shows paint cost, swap for the pre-rendered 128 px PNG with identical values. No fixed overlay exists,
+so nothing can sit under grain by accident. The animated version (three seeds 7 / 11 / 19 cycled at 8 fps) exists on
+marketing and `/design` only and is static under reduced motion (P22).
 
 ### 5.5 Halftone skeleton (P25)
 
@@ -407,8 +424,9 @@ from the left on reveal (P11). One highlighted phrase per screen at most.
 
 ### 5.7 Registration crosses (P26)
 
-8 × 8 px cross, 1 px `--line-strong`, placed at the four corners of marketing frames and empty-state plates, 12 px
-inset. Never in app chrome, never on data.
+8 × 8 px cross, 1 px `--line-strong`, 12 px inset. In the app they mark the four corners of the **desk** (the window,
+≥ 768 px), as on a drafting table, and they pair with the sheet's ruled margin (§9). Also on marketing frames and
+empty-state plates. Never on data, never inside the sheet.
 
 ### 5.8 Dither, halftone and ASCII
 
@@ -485,6 +503,11 @@ No sparkle, wand or star icons for AI actions; generation uses the `PenLine` fam
 | Meter | SVG bar with ink keyline, fill plate | — | h 8 | as Donut | draw in | hand-built |
 | Link | anchor + SVG underline | inline, standalone | — | blue | underline draw | hand-built (P13) |
 | SmoothScroll | Lenis provider | root, wrapper | — | — | Lenis + Motion frame | `lenis/react` |
+| KineticHeading | `h1` with `aria-label`, letter spans (`aria-hidden`), pink and blue plate copies | hero, title | display-1 / hero | ink, pink, blue | letters set in, widths 75 → 125, plates chase into register | hand-built (Motion Primitives `text-effect`, Originkit `text-colour-sweep` as ideas) |
+| DraftingCursor | crosshair, coordinate readout, context label | — | 14 px cross | ink, pink (WRITE), ink (OPEN) | follows the pointer, label swaps | hand-built (Heron lesson; Originkit `axis-cursor` idea, not fetched) |
+| DitherField | Canvas 2D two-ink Bayer field | hero | — | pink, blue, overprint | drift, pointer reaction, lazy, paused off-screen | hand-built (Originkit `dither-burn`, `bayer-vortex` as ideas) |
+| Ticket | rectangular stamped chip with a perforated edge and two offset plates | default, selected | h 32 | keyline, pink, blue | stamp in (C6), plate swap on hover | hand-built (Originkit `wax-seal` as the stamp idea) |
+| Reveal | `whileInView` wrapper | fade-print, stagger | — | — | scroll-driven reveal (C8) | hand-built on Motion `whileInView` |
 | Hairline / Divider | 1 px rule | line, keyline | — | line, keyline | none | hand-built |
 | Highlight | inline plate | — | — | highlight | scaleX reveal | adapt Originkit `text-colour-sweep` idea |
 
@@ -492,30 +515,85 @@ No sparkle, wand or star icons for AI actions; generation uses the `PenLine` fam
 
 | Region | Spec |
 |--------|------|
-| Desk | `--paper` with grain; holds sidebar/rail and the sheet |
-| Sidebar (248 px) | brand row (logo mark 24 + wordmark in Archivo 600 / 100 at 19 px), search icon button, collapse button; `nav[aria-label="Main"]` rows h 32, 13 px caption group labels in `--ink-muted` (sentence case); "Chats" section; profile menu on a top hairline. No keyline between sidebar and desk; the sheet's keyline is the edge |
+| Desk | `--paper` with grain beneath everything (§5.4); registration crosses at its four corners (§5.7); holds the printed index and the sheet |
+| Sidebar, the printed index (248 px) | brand row (logo mark 24 + wordmark in Archivo 600 / 100 at 19 px), search icon button, collapse button; `nav[aria-label="Main"]` rows h 36 with kinetic hover (C7: ink bar sweeps in from the left, the label rolls up and its duplicate rolls in); "Chats" section; profile menu on a top hairline. At the foot, the **index label**: the current (or hovered) page name set in Archivo 800 / 125 at 88 px in `--ghost`, clipped by the sidebar edge like a running head, swapping by a vertical roll. No keyline between sidebar and desk; the sheet's keyline is the edge |
 | Rail (56 px) | mark, search, five icon rows (sr-only labels), expand, profile; current row = ink bar 32 × 32 |
 | Section panel (228 px) | title-2 header (section title), groups with caption labels, rows as sidebar; vertical `--line` hairline on its right edge |
-| Sheet | `--surface`, keyline, `--shadow-raised`, radius 2, inset 12 px; the Lenis wrapper scrolls inside it (`micro-interactions.md` §6); `scrollbar-gutter: stable` |
+| Sheet, the drafting table | `--surface`, keyline, `--shadow-raised`, radius 2, inset 12 px; a **ruled margin** 28 px from its left edge (1 px `--line`) with coordinate ticks every 32 px (`--line-strong`, 4 px, every fourth 8 px) that the cursor readout measures against; the Lenis wrapper scrolls inside it (`micro-interactions.md` §6); `scrollbar-gutter: stable`; ruler hidden < 768 px |
 | Page header | h 56, sticky, `--surface` opaque (no backdrop blur), bottom hairline; title-2 title preceded by a 1 px × 20 px `--keyline` vertical rule (bleibtgleich meta pattern); actions right; 390: title truncates, actions collapse |
 | Command palette | overlay plate 560 max, input h 48 with search icon, groups with caption headings, items h 36 with ink-bar highlight, kbd hints on the right, `data-lenis-prevent` on the list; placeholder "Search pages and profiles…" unchanged |
 | Profile menu | plate 256 with team name caption, profile rows with avatars, "Add profile", separator, "Settings", theme radiogroup as three chips (aria-labels Light / Dark / System), separator, "Sign out" in danger |
 | Mobile drawer | `min(300px, 86vw)`, paper, keyline right edge, slides in by transform; same sidebar/section content; close button top-right |
-| Route transition | `app/(app)/template.tsx` with `AnimatePresence`, stamp in 180 ms, exit 120 ms opacity only |
-| Auth | paper desk, centred wordmark display-1 with 3 px misregistration, Clerk card as an overlay plate; Clerk `appearance.variables`: `colorPrimary` ink, `colorText` ink, `colorBackground` surface, `borderRadius: "2px"`, `fontFamily: var(--font-ui)` |
+| Route transition | **No page transitions: routes switch instantly (user decision 2026-10-21).** After a route change focus moves to the page's `h1` (or `main`), with no animation |
+| Drafting cursor | app-wide on fine pointers: crosshair, coordinate readout in sheet pixels, context label `WRITE` / `OPEN` / `DRAG`; hidden over text inputs (native caret); off under reduced motion and `pointer: coarse` (C3) |
+| Smooth scroll | Lenis in wrapper mode inside the sheet, driven from Motion's frame loop; native under reduced motion (§6 of `micro-interactions.md`) |
+| Auth | paper desk, centred wordmark display-1 with 3 px misregistration, Clerk card as an overlay plate; Clerk `appearance.variables`: `colorPrimary` ink, `colorForeground` ink (the installed `Variables` type has no `colorText`), `colorBackground` surface, `borderRadius: "2px"`, `fontFamily: var(--font-ui)`, `fontFamilyMono: var(--font-ui)` |
 
-## 10. One riso moment per screen
+## 10. Cinematic direction
 
-| Screen | The moment | Everything else |
-|--------|-----------|-----------------|
-| Home | the greeting "What are we writing today?" wipes in per line from an ink plate and its pink/blue copies settle into register (P31 + P32, ≤ 600 ms total, once per session); the composer is a raised sheet; Send is the only blue on the page | chips flat, hairlines, no other motion on load |
-| Memories | each memory line carries a 6 px source tab on its left edge: pink = written by you, blue = extracted or imported, overprint = mirrored; when a group is empty the two-plate "nothing here yet" shape sits in it | sheets flat, toasts stamp in |
-| Strategy | the content-mix donut draws its pink, blue and overprint segments in as overprinted strokes and the percentages tick up (tabular) | sections are rules, not cards; number fields plain |
-| Voice picker | the nine preset avatars are two-ink Bayer portraits; the selected one wears the overprint ring and its row sits on pink stock; hover grows the dots | listbox rows flat, search plain |
-| Settings (account, team) | the "Save changes" button morphs label → halftone dots → hand-drawn tick (P06) | forms on a strict 4 px grid, nothing else moves |
-| Auth | the logo mark draws itself once, then the wordmark lands with 3 px misregistration | Clerk card plain plate |
-| Placeholders ("on the way" pages) | a registration-cross frame holding a Bayer two-plate illustration that drifts 2 px out of register on hover | description and bullets as body text |
-| Command palette (shell) | rows invert to an ink bar with keycap hints | plate, no blur |
+The restrained "one moment per screen" rule is withdrawn (user decision after Task 1). Every screen has a composition and
+a motion score. What we take from the four references, as lessons only: **FORMAT by Obys**, the scale jump (one gigantic
+display line clipped by the grid against caption-sized text) and type that rises into place from a clipped edge behind a
+curtain wipe; **Signal-A Studio**, emphasis by width and weight inside one block, nav on hairline rules, labels that move
+on hover; **Heron AI**, the drafting instrument (grain, registration crosses, ruler ticks, a cursor with a coordinate
+readout, spot colour at pin-point scale, a drawing that draws itself); **Ascension by Pegassi**, the entry gate where the
+first interaction is an object that lands, with grain carrying the mood. All four run Lenis at lerp ≈ .1 and settle a
+wheel tick in about a second; their one-shots run 600–1500 ms; their feedback is instant.
+
+Rules for every score: one-shots 600–1200 ms, feedback ≤ 200 ms and never blocking input; `prefers-reduced-motion`
+renders the final frame of every sequence (no Lenis smoothing, no cursor, no animated canvas); heavy effects load after
+first paint and pause off-screen; budgets in `micro-interactions.md` §8.
+
+### 10.1 Shell: the print room
+
+Composition: the window is the desk (paper, grain beneath, registration crosses at the corners). Left, the **printed
+index**: brand row, nav rows on the paper, the "Chats" running list, and at the foot the current page's name set huge in
+Archivo 125 and clipped by the sidebar edge (FORMAT's clipped wordmark). Right, the **drafting table**: the sheet with
+its keyline, 4 px plate, a ruled margin with coordinate ticks, and the page printed on it.
+
+| t (ms) | Score |
+|-------:|-------|
+| nav hover 0–200 | ink bar `scaleX 0 → 1` from the left; the label rolls up 100 % while its `aria-hidden` duplicate rolls in from below (Signal-A); text flips to `--on-ink` at 40 %; the index label at the foot swaps to the hovered name by a 260 ms vertical roll; leave 120 ms `ease-exit` |
+| route change | No page transitions: routes switch instantly (user decision 2026-10-21). Focus moves to the new `h1` (or `main`) with no visible ring on the heading |
+| collapse / expand 0–240 | sidebar width tweens (`ease-ink`); rail icons and labels crossfade; the index label clips out |
+| drawer (< 768) 0–260 | `translateX -100% → 0` on the paper drawer (`ease-ink`), scrim opacity; close 180 ms `ease-exit` |
+| command palette 0–180 | overlay plate stamps in (`scale .96 → 1`, opacity), rows invert to an ink bar on selection, keycap hints |
+
+Reduced motion: every row is its final frame.
+
+### 10.2 Home: the press
+
+Composition: the greeting is **kinetic display type at hero scale** (Archivo 800, width 125, `clamp(40px, 6.4vw, 88px)`,
+two lines, left-aligned with the composer column), a caption-sized "Good afternoon, Ahmed" above it. The composer is a
+**printed object**: surface face, keyline, 6 px ink plate, that lands on the table. Behind the headline and the
+composer lies the **dithered two-ink field**: a 3 px Bayer screen of pink and blue drifting slowly, overprinting to
+purple where they cross, densest around the composer and dissolving (by dot density, never by gradient) toward the
+headline, reacting to the cursor by pulling the two inks a few pixels out of register around it. Below, five
+**stamped tickets** (rectangular, keyline, perforated left edge, 2 px pink and blue plates behind). Send is the only
+blue plate on the page and a **tactile press**.
+
+| t (ms) | Score |
+|-------:|-------|
+| 0 | the page is there (no page transitions) |
+| 160–1060 | the greeting sets in: each letter `opacity 0 → 1`, `translateY .18em → 0`, `font-stretch 75% → 125%`, 420 ms `ease-ink`, 22 ms stagger; the pink copy runs the same score 70 ms behind and the blue copy 140 ms behind, each ending 3 px out of register (the plates chase into register) |
+| 520–1000 | the composer lands: `opacity 0 → 1`, `translateY -28px → 0`, `rotate -1.2deg → 0`, `scale 1.02 → 1` on a spring (stiffness 320, damping 26); its ink plate starts flush and slides out to 6 px / 6 px 120 ms later (the sheet settles, the shadow catches up) |
+| 820–1140 | the tickets stamp in: `scale 1.12 → 1`, `rotate -2deg → 0`, opacity, 180 ms `ease-ink`, 60 ms stagger |
+| ≥ 900 | the dither field fades in (opacity, 600 ms) once its chunk has loaded after first paint |
+| feedback | ticket hover: the two plates swap sides (180 ms) and the label rolls; Send press: face onto plate (spring-press); Send hover: pink and blue plates misregister 2 px; composer focus: keyline → `--focus` |
+
+Reduced motion: letters at width 125 and copies at 3 px from the first frame, composer and tickets in place, the field is
+a static CSS Bayer tile. The score plays on every mount of home; it finishes under 1.2 s and the composer is usable from
+the first frame.
+
+### 10.3 Other screens
+
+Until their own cinematic tasks land, screens switch in instantly, their content below the fold
+reveals on scroll (C8: `opacity 0 → 1`, `translateY 12px → 0`, 420 ms, 40 ms stagger, once), and they keep these
+anchors for later: **Memories**, source tabs per line (pink yours, blue extracted, overprint mirrored) and two-plate
+empty state; **Strategy**, the donut draws its overprinted segments while percentages tick; **Voice picker**, Bayer
+monogram portraits with the overprint ring on the one in use; **Settings**, "Save changes" morphs label → halftone →
+tick; **Auth**, the mark draws itself, the wordmark lands misregistered; **Placeholders**, a registration-cross frame
+holding a two-plate illustration that drifts on hover; **Command palette**, rows invert to an ink bar with keycap hints.
 
 ## 11. Slop checklist
 
@@ -595,5 +673,8 @@ page titles `Posts`, `Memories`, `Manage account`, `Manage team`, `Strategy`, an
 - `--ink-faint` is darker than the current token so placeholders pass AA on sunk fields; `--danger` is re-hued to a
   printed red.
 - Avatars become square. Preset avatars are generated two-ink monograms, since presets are fictional and carry no photo.
-- No registration crosses in app chrome (restraint); they live in empty states and marketing.
+- Registration crosses mark the desk corners in the app (cinematic direction, Task R2★); never inside the sheet or on data.
+- The home starter chips are rectangular stamped tickets, not pills (cinematic direction); filter and theme chips stay pills.
+- No page transitions: routes switch instantly (user decision 2026-10-21). The `template.tsx` + `AnimatePresence` route stamp from the restrained plan is dropped too.
+- Grain is a background layer of the desk (U11), not a fixed overlay.
 - Tabular numerals: Hanken has no `tnum` feature but its figures are already equal-width; declared anyway.
