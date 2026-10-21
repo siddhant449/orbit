@@ -1,0 +1,19 @@
+{
+  "name": "brandloop",
+  "private": true,
+  "packageManager": "pnpm@11.22.0",
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "db:up": "docker --context default compose up -d db",
+    "db:migrate": "pnpm --filter @brandloop/db migrate",
+    "db:seed": "pnpm --filter @brandloop/db seed"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.0",
+    "typescript": "^5.8.0"
+  }
+}

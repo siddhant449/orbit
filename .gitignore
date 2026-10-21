@@ -1,0 +1,17 @@
+node_modules
+.next
+.turbo
+dist
+coverage
+.env
+.env.local
+.env*.local
+*.log
+.DS_Store
+.playwright-mcp
+playwright-report
+test-results
+packages/db/src/generated
+
+# Downloaded Kleo bundles and captures for recon (third-party code, never committed)
+.recon/

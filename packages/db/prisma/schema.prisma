@@ -1,0 +1,77 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum TeamRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+/// A signed-in person. Identity comes from Clerk.
+model User {
+  id               String       @id @default(cuid())
+  clerkId          String       @unique
+  email            String
+  name             String?
+  currentProfileId String?
+  currentProfile   Profile?     @relation("CurrentProfile", fields: [currentProfileId], references: [id], onDelete: SetNull)
+  memberships      Membership[]
+  ownedProfiles    Profile[]    @relation("ProfileOwner")
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+}
+
+/// Billing and collaboration unit. Owns the subscription (Feature 9) and its profiles.
+model Team {
+  id                  String       @id @default(cuid())
+  name                String
+  memberships         Membership[]
+  profiles            Profile[]
+  deletedAt           DateTime?
+  deletionRequestedAt DateTime?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+}
+
+model Membership {
+  id        String   @id @default(cuid())
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  teamId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  role      TeamRole @default(MEMBER)
+  createdAt DateTime @default(now())
+
+  @@unique([teamId, userId])
+}
+
+/// A LinkedIn persona the user writes as. Language and timezone live here, not on User.
+model Profile {
+  id                  String    @id @default(cuid())
+  team                Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  teamId              String
+  owner               User      @relation("ProfileOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  ownerUserId         String
+  name                String
+  fullName            String?
+  jobTitle            String?
+  company             String?
+  bio                 String?
+  avatarUrl           String?
+  language            String    @default("en-US")
+  timezone            String    @default("UTC")
+  generationDayOfWeek Int       @default(1)
+  onboardingCompleted Boolean   @default(false)
+  currentFor          User[]    @relation("CurrentProfile")
+  deletedAt           DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([teamId])
+}

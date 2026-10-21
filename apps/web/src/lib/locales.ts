@@ -1,0 +1,15 @@
+export const languages = [
+  { value: "en-US", label: "English (US)" },
+  { value: "en-GB", label: "English (UK)" },
+  { value: "cs-CZ", label: "Čeština" },
+  { value: "da-DK", label: "Dansk" },
+  { value: "de-DE", label: "Deutsch" },
+  { value: "es-ES", label: "Español" },
+  { value: "fr-FR", label: "Français" },
+  { value: "it-IT", label: "Italiano" },
+  { value: "nl-NL", label: "Nederlands" },
+  { value: "pl-PL", label: "Polski" },
+  { value: "pt-BR", label: "Português (Brasil)" },
+  { value: "sv-SE", label: "Svenska" },
+  { value: "hi-IN", label: "हिन्दी" },
+];

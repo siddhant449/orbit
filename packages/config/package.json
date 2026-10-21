@@ -1,0 +1,5 @@
+{
+  "name": "@brandloop/config",
+  "private": true,
+  "files": ["tsconfig.base.json"]
+}

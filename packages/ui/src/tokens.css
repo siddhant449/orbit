@@ -1,0 +1,69 @@
+/* Brandloop design tokens. Imported by apps after `@import "tailwindcss"`. */
+@source "./";
+
+:root {
+  --paper: #f4f5f2;
+  --surface: #ffffff;
+  --surface-sunk: #eef0ec;
+  --ink: #1b2220;
+  --ink-muted: #68716d;
+  --ink-faint: #9aa29e;
+  --line: #e1e4e0;
+  --jade: #1e7558;
+  --jade-ink: #ffffff;
+  --jade-soft: #d6f0e3;
+  --danger: #b4372b;
+  --focus: #1e7558;
+}
+
+:root[data-theme="dark"],
+.dark {
+  --paper: #111513;
+  --surface: #181d1b;
+  --surface-sunk: #1f2522;
+  --ink: #e6ebe8;
+  --ink-muted: #9ba6a1;
+  --ink-faint: #6b7570;
+  --line: #2a312e;
+  --jade: #4cc497;
+  --jade-ink: #0c1a14;
+  --jade-soft: #1d3b2f;
+  --danger: #ef7a6c;
+  --focus: #4cc497;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-surface-sunk: var(--surface-sunk);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-faint: var(--ink-faint);
+  --color-line: var(--line);
+  --color-jade: var(--jade);
+  --color-jade-ink: var(--jade-ink);
+  --color-jade-soft: var(--jade-soft);
+  --color-danger: var(--danger);
+  --font-sans: var(--font-ui), system-ui, sans-serif;
+  --font-display: var(--font-display-face), var(--font-ui), sans-serif;
+  --radius-row: 10px;
+  --radius-card: 20px;
+}
+
+@layer base {
+  html { color-scheme: light; }
+  html.dark { color-scheme: dark; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+  }
+}

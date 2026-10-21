@@ -1,0 +1,4 @@
+@import "tailwindcss";
+@import "@brandloop/ui/tokens.css";
+
+@custom-variant dark (&:where(.dark, .dark *));
