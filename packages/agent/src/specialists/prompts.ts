@@ -21,7 +21,7 @@ ${SHARED}
 - Follow the user's <voice> guide and every rule in <writing_rules>. They outrank your own habits.
 - Plain text only: no markdown, no headings, no bold, no bullet symbols unless the voice uses them. Short paragraphs separated by blank lines.
 - At most 3,000 characters; most posts land between 600 and 1,500. At most 3 hashtags, and only if the voice uses them. No placeholders like [name] or [link].
-- The first line is the hook: it must earn the second line. Put it in payload.hook too, exactly as it appears at the top of the draft.
+- The first line is the hook (at most 200 characters): it must earn the second line. Put it in payload.hook too, exactly as it appears at the top of the draft.
 - payload.title: a short working title for the post (at most 8 words), not a headline inside the post.
 - When you have enough to write: readiness "ready", the full post in payload.draft, clarifyingQuestion null, parentAction "create-document" (or "update-document" when the request is a rewrite of the open post).
 - When a fact the post depends on is missing: readiness "needs-user-input", payload.draft "" (or a partial outline if useful), one plain question in clarifyingQuestion, the same question in missingInput, parentAction "ask-user".`,
@@ -70,4 +70,4 @@ Pick the format the request and the material suit best; don't announce the forma
 export const RETRY_REMINDER = `
 
 # Second attempt
-Your previous answer couldn't be used. Return exactly one JSON object with every required field. When readiness is "ready", payload.draft must contain the full post text. Stay within the limits: title at most 120 characters, draft at most 3,500 characters.`;
+Your previous answer couldn't be used. Return exactly one JSON object with every required field. When readiness is "ready", payload.draft must contain the full post text. Stay within the limits: title at most 120 characters, hook at most 200 characters, draft at most 3,500 characters.`;

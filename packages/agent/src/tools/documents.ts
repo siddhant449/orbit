@@ -1,4 +1,4 @@
-import { createDocumentForChat, DocumentError, type DocumentSnapshot } from "@brandloop/db";
+import { createDocumentForChat, DocumentError, getChatDocument, type DocumentSnapshot } from "@brandloop/db";
 import { tool } from "ai";
 import { z } from "zod";
 import type { TurnContext } from "../context";
@@ -29,6 +29,11 @@ export const documentData = (d: DocumentSnapshot) => ({ id: d.id, title: d.title
  * `data-textDelta` parts and finishes with a `data-document` snapshot, inside `data-creating` on/off.
  */
 export async function createDocumentFromHandoff(ctx: TurnContext, input: CreateDocumentInput): Promise<CreateDocumentOutput> {
+  // Checked first, before streaming, so the panel doesn't flicker into "creating" and the model gets the
+  // most useful answer; the transactional create below still catches a post made concurrently.
+  const existing = ctx.documentRef.current ?? (await getChatDocument(ctx.profileId, ctx.chatId));
+  if (existing) return { error: EXISTING_POST };
+
   const id = input.specialistHandoffToolCallId;
   const envelope = await findHandoff(ctx, id);
   if (!envelope) {

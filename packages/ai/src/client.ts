@@ -13,7 +13,14 @@ export class AiUnavailableError extends Error {
 }
 
 export type AiImage = { mediaType: string; base64: string };
-type BaseOpts = { model: ModelAlias; system: string; prompt: string; images?: AiImage[] };
+type BaseOpts = {
+  model: ModelAlias;
+  system: string;
+  prompt: string;
+  images?: AiImage[];
+  /** Cancels the request (a stopped chat turn or its deadline); the call rejects with the abort error. */
+  abortSignal?: AbortSignal;
+};
 
 export type AiClient = {
   json<T>(opts: BaseOpts & { schema: z.ZodType<T> }): Promise<T>;
@@ -90,7 +97,7 @@ export function createAiClient(
   };
 
   return {
-    async text({ model, system, prompt, images }) {
+    async text({ model, system, prompt, images, abortSignal }) {
       let result;
       try {
         result = await generateText({
@@ -98,6 +105,7 @@ export function createAiClient(
           instructions: system,
           messages: buildMessages(prompt, images),
           maxOutputTokens: MAX_OUTPUT_TOKENS,
+          abortSignal,
         });
       } catch (err) {
         rethrowClearly(err);
@@ -105,7 +113,7 @@ export function createAiClient(
       assertCompleted(result.finishReason);
       return result.text.trim();
     },
-    async json<T>({ model, system, prompt, images, schema }: BaseOpts & { schema: z.ZodType<T> }) {
+    async json<T>({ model, system, prompt, images, schema, abortSignal }: BaseOpts & { schema: z.ZodType<T> }) {
       let result;
       try {
         result = await generateText({
@@ -114,6 +122,7 @@ export function createAiClient(
           messages: buildMessages(prompt, images),
           output: Output.object({ schema }),
           maxOutputTokens: MAX_OUTPUT_TOKENS,
+          abortSignal,
         });
       } catch (err) {
         rethrowClearly(err);

@@ -17,7 +17,7 @@ export const PARENT_ACTIONS = ["create-document", "update-document", "respond", 
 export const PostWritingPayload = z.object({
   readiness: z.enum(["ready", "needs-user-input"]),
   title: z.string().max(120),
-  hook: z.string(),
+  hook: z.string().max(200),
   draft: z.string().max(3_500),
   clarifyingQuestion: z.string().nullable(),
 });

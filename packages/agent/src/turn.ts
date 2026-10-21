@@ -154,7 +154,7 @@ function log(what: string, err: unknown) {
 }
 
 type Part = ChatUIMessage["parts"][number];
-const FAILED_OUTPUT = /^(Failed:|Refused:)/;
+const FAILED_OUTPUT = /^(Failed:|Refused:|EXISTING_POST:)/;
 
 /** A tool result that didn't do its job: a `Failed:`/`Refused:` string, an `{error}` object or a question back. */
 function failedOutput(output: unknown): boolean {

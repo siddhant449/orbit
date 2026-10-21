@@ -501,7 +501,9 @@ describe("drafting a post", () => {
     const assistant = (await listMessages(p, chatId)).at(-1)!;
     const create = parts(assistant).find((x) => x.type === "tool-createDocument")!;
     expect(String((create.output as { error: string }).error)).toMatch(/^EXISTING_POST:/);
-    expect((assistant.context as any).activeTask.completedActions).toEqual(["delegateWriting"]);
+    const delegate = parts(assistant).find((x) => x.type === "tool-delegateWriting")!;
+    expect(String(delegate.output)).toMatch(/^EXISTING_POST:/);
+    expect((assistant.context as any).activeTask.completedActions).toEqual([]);
   });
 });
 

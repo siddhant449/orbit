@@ -23,7 +23,7 @@ export async function cleanup(): Promise<void> {
   await prisma.user.deleteMany({ where: users });
 }
 
-type AiCall = { model: string; system: string; prompt: string };
+type AiCall = { model: string; system: string; prompt: string; abortSignal?: AbortSignal };
 
 /**
  * A scripted AiClient. `json` returns `json` (or its result when it is a function); `text` returns `text`.
@@ -37,7 +37,7 @@ export function fakeAi(
   const ai = {
     calls,
     async json<T>(opts: AiCall): Promise<T> {
-      const call = { model: opts.model, system: opts.system, prompt: opts.prompt };
+      const call = { model: opts.model, system: opts.system, prompt: opts.prompt, abortSignal: opts.abortSignal };
       calls.push(call);
       return (typeof json === "function" ? (json as (o: AiCall) => unknown)(call) : json) as T;
     },

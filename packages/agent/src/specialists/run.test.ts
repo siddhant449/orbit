@@ -1,4 +1,6 @@
+import { createAiClient } from "@brandloop/ai";
 import { NoObjectGeneratedError } from "ai";
+import { MockLanguageModelV4 } from "ai/test";
 import { describe, expect, it } from "vitest";
 import { fakeAi } from "../test/fixtures";
 import { runSpecialist } from "./run";
@@ -100,5 +102,43 @@ describe("runSpecialist", () => {
     });
     expect((await runSpecialist(g, "personal-grounding", { ...input, skills: [] })).ok).toBe(true);
     expect(g.calls[0]!.model).toBe("extract");
+  });
+
+  it("aborting mid-specialist rejects with AbortError and makes no second attempt", async () => {
+    let seen: AbortSignal | undefined;
+    const model = new MockLanguageModelV4({
+      doGenerate: (opts) => {
+        seen = opts.abortSignal;
+        return new Promise((_, reject) =>
+          opts.abortSignal!.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError"))),
+        );
+      },
+    });
+    const ai = createAiClient("key", { model: () => model });
+    const controller = new AbortController();
+    const pending = runSpecialist(ai, "post-writing", { ...input, abortSignal: controller.signal });
+    setTimeout(() => controller.abort(), 10);
+    await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+    expect(model.doGenerateCalls).toHaveLength(1);
+    expect(seen?.aborted).toBe(true);
+  });
+
+  it("does not retry once the turn was stopped, even after a retryable failure", async () => {
+    const controller = new AbortController();
+    const ai = fakeAi(() => {
+      controller.abort();
+      throw new Error("The model declined this request.");
+    });
+    await expect(runSpecialist(ai, "post-writing", { ...input, abortSignal: controller.signal })).rejects.toMatchObject({ name: "AbortError" });
+    expect(ai.calls).toHaveLength(1);
+    expect(ai.calls[0]!.abortSignal).toBe(controller.signal);
+  });
+
+  it("rejects a hook over 200 characters as a format failure and retries", async () => {
+    const long = { ...valid(), payload: { ...valid().payload, hook: "h".repeat(201) } };
+    const ai = sequence(long, long);
+    const res = await runSpecialist(ai, "post-writing", input);
+    expect(res).toMatchObject({ ok: false, reason: "the output didn't match the expected format" });
+    expect(ai.calls).toHaveLength(2);
   });
 });

@@ -57,6 +57,8 @@ describe("handoff envelope", () => {
     expect(schema.safeParse({ ...out, payload: { ...out.payload, draft: "x".repeat(3_501) } }).success).toBe(false);
     expect(schema.safeParse({ ...out, payload: { ...out.payload, title: "x".repeat(121) } }).success).toBe(false);
     expect(schema.safeParse({ ...out, confidence: "very" }).success).toBe(false);
+    expect(schema.safeParse({ ...out, payload: { ...out.payload, hook: "h".repeat(201) } }).success).toBe(false);
+    expect(schema.safeParse({ ...out, payload: { ...out.payload, hook: "h".repeat(200) } }).success).toBe(true);
   });
 
   it("finds a handoff in this turn first, then in the chat's stored delegate parts, never another chat's", async () => {

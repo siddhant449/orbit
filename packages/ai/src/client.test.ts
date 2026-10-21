@@ -274,6 +274,36 @@ describe("createAiClient images", () => {
   });
 });
 
+describe("createAiClient abortSignal", () => {
+  it("passes the caller's abort signal to the model for json() and text()", async () => {
+    const { client, model } = make('{"a":1}');
+    const controller = new AbortController();
+    await client.json({ ...base, model: "generate", schema, abortSignal: controller.signal });
+    await client.text({ ...base, model: "extract", abortSignal: controller.signal });
+    expect(model.doGenerateCalls).toHaveLength(2);
+    for (const call of model.doGenerateCalls) {
+      expect(call.abortSignal).toBeDefined();
+      controller.signal.aborted || expect(call.abortSignal!.aborted).toBe(false);
+    }
+    controller.abort();
+    expect(model.doGenerateCalls.every((c) => c.abortSignal!.aborted)).toBe(true);
+  });
+
+  it("rejects with an AbortError when aborted mid-call", async () => {
+    const model = new MockLanguageModelV4({
+      doGenerate: (opts) =>
+        new Promise((_, reject) =>
+          opts.abortSignal!.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError"))),
+        ),
+    });
+    const client = createAiClient("key", { model: () => model });
+    const controller = new AbortController();
+    const pending = client.json({ ...base, model: "generate", schema, abortSignal: controller.signal });
+    setTimeout(() => controller.abort(), 10);
+    await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+  });
+});
+
 describe("resolveModel", () => {
   it("has OpenAI defaults", () => {
     vi.stubEnv("AI_MODEL_GENERATE", undefined);

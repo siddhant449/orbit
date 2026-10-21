@@ -6,6 +6,7 @@ import { stampEnvelope, type HandoffEnvelope, type PostWriting } from "../specia
 import { buildGrounding, renderGrounding } from "../specialists/grounding";
 import { runSpecialist } from "../specialists/run";
 import { capOutput } from "./cap";
+import { EXISTING_POST } from "./documents";
 import { isAbort } from "./run";
 
 /** Skills the post writer always gets (design §11). */
@@ -17,12 +18,19 @@ export const REQUEST_MAX = 4_000;
 /**
  * Runs the writing specialist and returns its stamped envelope, or a `Failed:` string. The envelope is
  * kept in `ctx.handoffs` under this tool call's id, so `createDocument` can take the draft from it.
+ *
+ * delegateWriting only ever feeds createDocument (specialty "post", a new post). Rewrites of the open
+ * post go through updateDocument, which runs its own editing call. So when the chat already has a post
+ * this returns the EXISTING_POST guidance without spending a model call on a draft that couldn't be saved.
+ * The abort signal (stop, turn deadline) cancels the specialist call and is rethrown, never reported.
  */
 export async function delegateWritingRun(
   ctx: TurnContext,
   input: { request: string },
   toolCallId: string,
+  abortSignal?: AbortSignal,
 ): Promise<HandoffEnvelope<PostWriting> | string> {
+  if (ctx.documentRef.current) return EXISTING_POST;
   try {
     const grounding = await buildGrounding({
       profileId: ctx.profileId,
@@ -31,12 +39,13 @@ export async function delegateWritingRun(
       writingStyleId: ctx.selections.writingStyleId,
       embedder: ctx.embedder,
     });
-    const doc = ctx.documentRef.current;
+    // A new post: there is no open document (see the short-circuit above), so no source revision either.
     const res = await runSpecialist(ctx.ai, "post-writing", {
       request: input.request,
       grounding: renderGrounding(grounding),
-      document: doc,
+      document: null,
       skills: WRITING_SKILLS,
+      abortSignal,
     });
     if (!res.ok) {
       return `Failed: the writing specialist couldn't produce a usable draft (${res.reason}). Ask the user to rephrase or try again.`;
@@ -45,7 +54,7 @@ export async function delegateWritingRun(
       toolCallId,
       taskId: ctx.taskId,
       request: input.request,
-      document: doc ? { id: doc.id, version: doc.version } : null,
+      document: null,
       now: ctx.now(),
     });
     ctx.handoffs.set(toolCallId, envelope);
@@ -72,7 +81,7 @@ export function delegateTools(ctx: TurnContext) {
         request: z.string().min(REQUEST_MIN).max(REQUEST_MAX),
         specialty: z.enum(["post"]),
       }),
-      execute: ({ request }, { toolCallId }) => delegateWritingRun(ctx, { request }, toolCallId),
+      execute: ({ request }, { toolCallId, abortSignal }) => delegateWritingRun(ctx, { request }, toolCallId, abortSignal),
       toModelOutput: ({ output }) => specialistModelOutput(output),
     }),
   };

@@ -74,27 +74,45 @@ function systemFor(kind: SpecialistKind, skills: string[], retry: boolean): stri
 export async function runSpecialist<K extends SpecialistKind>(
   ai: AiClient,
   kind: K,
-  input: { request: string; grounding: string; document: SpecialistDocument | null; skills: string[] },
+  input: {
+    request: string;
+    grounding: string;
+    document: SpecialistDocument | null;
+    skills: string[];
+    /** The tool call's signal: a stop or the turn deadline cancels the call and skips any retry. */
+    abortSignal?: AbortSignal;
+  },
 ): Promise<SpecialistResult<OutputOf<K>>> {
+  const signal = input.abortSignal;
   const strict = specialistOutputSchema(PAYLOADS[kind]);
   const asked = specialistOutputSchema(MODEL_PAYLOADS[kind]);
   const prompt = [`<request>\n${defuseTags(input.request)}\n</request>`, input.grounding, documentBlock(input.document)].join("\n\n");
 
   let reason = "the AI request failed";
   for (let attempt = 0; attempt < 2; attempt++) {
+    signal?.throwIfAborted();
     try {
-      const raw = await ai.json({ model: MODEL_ALIAS[kind], system: systemFor(kind, input.skills, attempt > 0), prompt, schema: asked });
+      const raw = await ai.json({
+        model: MODEL_ALIAS[kind],
+        system: systemFor(kind, input.skills, attempt > 0),
+        prompt,
+        schema: asked,
+        abortSignal: signal,
+      });
       const output = strict.parse(raw) as OutputOf<K>;
       const empty = emptiness(kind, output);
       if (empty) throw new SoftFailure(empty);
       return { ok: true, output };
     } catch (err) {
       if (isAbort(err)) throw err;
+      // Stopped while the call was failing: unwind instead of reporting (or retrying) the failure.
+      signal?.throwIfAborted();
       const c = classify(err);
       reason = c.reason;
       console.warn(`[agent] specialist ${kind} attempt ${attempt + 1} failed: ${reason}`);
       if (!c.retry) break;
     }
   }
+  signal?.throwIfAborted();
   return { ok: false, reason };
 }
