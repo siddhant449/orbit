@@ -2,6 +2,10 @@
 export const LIMITS = {
   /** Characters in one user message; more is a 413. */
   messageChars: 200_000,
+  /** Parts in one user message. */
+  messageParts: 20,
+  /** File parts in one user message. */
+  messageFiles: 10,
   /** Knowledge items selected in the composer per turn. */
   knowledgeSelections: 5,
   /** Orchestrator steps per turn. */

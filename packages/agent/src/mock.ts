@@ -117,6 +117,8 @@ export function createScriptedChatModel(): LanguageModel {
   return new MockLanguageModelV4({
     provider: "mock",
     modelId: "mock-chat",
+    // Pretend every http(s) file URL is fetched by the provider, so mock runs never download attachments.
+    supportedUrls: { "*/*": [/^https?:\/\//] },
     doStream: async (opts) => play(route(opts), 5),
   });
 }

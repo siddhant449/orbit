@@ -5,8 +5,12 @@ const TextPartSchema = z.object({ type: z.literal("text"), text: z.string() });
 const FilePartSchema = z.object({
   type: z.literal("file"),
   mediaType: z.string(),
-  url: z.string(),
-  filename: z.string().optional(),
+  url: z
+    .string()
+    .min(1)
+    .max(2048)
+    .refine((u) => !/^\s*data:/i.test(u), "Inline data: URLs aren't accepted; upload the file first."),
+  filename: z.string().max(255).optional(),
 });
 
 export const MessageMetadataSchema = z.object({
@@ -23,7 +27,11 @@ export const ChatRequestSchema = z.object({
   message: z.object({
     id: z.string().min(1).max(200),
     role: z.literal("user"),
-    parts: z.array(z.union([TextPartSchema, FilePartSchema])).min(1),
+    parts: z
+      .array(z.union([TextPartSchema, FilePartSchema]))
+      .min(1)
+      .max(LIMITS.messageParts)
+      .refine((parts) => parts.filter((p) => p.type === "file").length <= LIMITS.messageFiles, "Too many files."),
     metadata: MessageMetadataSchema.omit({ modelId: true }).optional(),
   }),
   selectedKnowledgeBaseIds: z.array(z.string().min(1)).max(LIMITS.knowledgeSelections).default([]),

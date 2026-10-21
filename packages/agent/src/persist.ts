@@ -16,7 +16,25 @@ const KEPT = new Set(["text", "step-start", "source-url", "file"]);
 export function toStoredParts(parts: Parts): Parts {
   return parts
     .filter((p) => KEPT.has(p.type) || isTool(p))
-    .map((p) => (p.type === "text" && p.state === "streaming" ? { ...p, state: "done" as const } : p));
+    .map((p) => {
+      if (p.type === "text" && p.state === "streaming") return { ...p, state: "done" as const };
+      if (isTool(p)) return safeToolError(p);
+      return p;
+    });
+}
+
+const ERROR_TEXT_CHARS = 500;
+
+/**
+ * Provider-executed tool errors bypass our stream `onError`, so their text is raw provider data: store a
+ * plain sentence instead. Our own error texts are already safe; they are only capped.
+ */
+function safeToolError(p: Part): Part {
+  const t = p as Part & { state?: string; errorText?: string; providerExecuted?: boolean };
+  if (t.state !== "output-error" || typeof t.errorText !== "string") return p;
+  if (t.providerExecuted) return { ...t, errorText: `The ${p.type.slice("tool-".length)} step failed.` } as Part;
+  if (t.errorText.length <= ERROR_TEXT_CHARS) return p;
+  return { ...t, errorText: `${t.errorText.slice(0, ERROR_TEXT_CHARS - 1)}…` } as Part;
 }
 
 /**

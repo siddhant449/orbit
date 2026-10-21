@@ -214,3 +214,70 @@ describe("history, rename, pin, delete", () => {
     expect((await getChatMessagesHandler(new Request("http://test"), params(a))).status).toBe(404);
   });
 });
+
+describe("request caps", () => {
+  const post = (body: BodyInit, headers: Record<string, string> = {}) =>
+    postChatHandler(new Request("http://localhost:3000/api/chat", { method: "POST", body, headers, duplex: "half" } as RequestInit));
+  const file = (url: string) => ({ type: "file", mediaType: "image/png", url });
+  const withParts = (parts: unknown[]) => JSON.stringify(chatBody(randomUUID(), "x", { message: { id: randomUUID(), role: "user", parts } }));
+
+  it("rejects a declared content-length over the cap with 413 before reading", async () => {
+    const res = await post("{}", { "content-length": String(2_000_000) });
+    expect(res.status).toBe(413);
+    expect(await res.json()).toMatchObject({ code: "request_too_large" });
+  });
+
+  it("rejects an undeclared body that streams past the cap with 413", async () => {
+    const chunk = new TextEncoder().encode("x".repeat(100_000));
+    let sent = 0;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(c) {
+        if (sent++ < 30) c.enqueue(chunk);
+        else c.close();
+      },
+    });
+    const res = await post(stream as unknown as BodyInit);
+    expect(res.status).toBe(413);
+  });
+
+  it("caps parts at 20 and file parts at 10", async () => {
+    const text = { type: "text", text: "hi" };
+    expect((await post(withParts(Array.from({ length: 21 }, () => text)))).status).toBe(400);
+    expect((await post(withParts([text, ...Array.from({ length: 11 }, () => file("/api/files/a.png"))]))).status).toBe(400);
+  });
+
+  it("rejects data: URLs, URLs over 2048 chars and foreign origins", async () => {
+    const text = { type: "text", text: "hi" };
+    for (const url of [
+      "data:image/png;base64,AAAA",
+      `/api/files/${"a".repeat(2050)}`,
+      "https://evil.example.com/api/files/a.png",
+      "/some/other/path.png",
+      "javascript:alert(1)",
+    ]) {
+      const res = await post(withParts([text, file(url)]));
+      expect(res.status, url).toBe(400);
+    }
+  });
+
+  it("accepts same-origin upload paths and allowlisted blob origins", async () => {
+    vi.stubEnv("BLOB_PUBLIC_ORIGIN", "https://blob.example.com, https://cdn.example.com");
+    const text = { type: "text", text: "hi" };
+    for (const url of ["/api/files/a.png", "http://localhost:3000/api/files/b.png", "https://cdn.example.com/x/y.png"]) {
+      const res = await post(withParts([text, file(url)]));
+      expect(res.status, url).toBe(200);
+      await res.text();
+    }
+  });
+});
+
+describe("cross-profile access", () => {
+  it("profile B gets 404 on profile A's existing chat for stream and messages", async () => {
+    const chatId = randomUUID();
+    await (await postChatHandler(json(chatBody(chatId, "Hello")))).text();
+    const other = await ensureAccount({ clerkId: `${CLERK}_b`, email: "webchat-b@example.test", firstName: "B", teamNameSuffix: " (test)" });
+    env.account = { user: { id: other.user.id }, currentProfile: { id: other.currentProfile!.id } };
+    expect((await getChatStreamHandler(new Request("http://test"), params(chatId))).status).toBe(404);
+    expect((await getChatMessagesHandler(new Request("http://test"), params(chatId))).status).toBe(404);
+  });
+});

@@ -45,3 +45,14 @@ describe("toStoredParts", () => {
     expect(stored[0]).toEqual({ type: "text", text: "Hal", state: "done" });
   });
 });
+
+describe("toStoredParts and tool error text", () => {
+  it("replaces provider-executed error text and caps ours", () => {
+    const stored = toStoredParts([
+      { type: "tool-web_search", toolCallId: "ws_1", state: "output-error", input: {}, errorText: '{"status":"failed","raw":"provider internals"}', providerExecuted: true },
+      { type: "tool-searchKB", toolCallId: "c1", state: "output-error", input: {}, errorText: "x".repeat(2000) },
+    ] as unknown as Parts) as unknown as { errorText: string }[];
+    expect(stored[0]!.errorText).toBe("The web_search step failed.");
+    expect(stored[1]!.errorText.length).toBeLessThanOrEqual(500);
+  });
+});

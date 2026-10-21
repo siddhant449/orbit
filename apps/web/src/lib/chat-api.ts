@@ -9,10 +9,18 @@ import {
   requestStop,
   setChatPinned,
 } from "@brandloop/db";
-import { ChatRequestSchema, UI_MESSAGE_STREAM_HEADERS, chatError, chatErrorResponse, runChatTurn } from "@brandloop/agent";
+import {
+  ChatRequestSchema,
+  UI_MESSAGE_STREAM_HEADERS,
+  chatError,
+  chatErrorResponse,
+  getRunRegistry,
+  runChatTurn,
+} from "@brandloop/agent";
 import { z } from "zod";
 import { getAccount } from "@/lib/account";
 import { getChatDeps, isMockMode } from "@/lib/chat-deps";
+import { checkAttachments, readCappedJson } from "@/lib/chat-request";
 import { AI_UNAVAILABLE_MESSAGE } from "@/lib/run-job";
 
 /**
@@ -41,9 +49,15 @@ export async function postChatHandler(request: Request): Promise<Response> {
   const ids = await currentIds();
   if (!ids) return noProfile();
   if (!isMockMode() && !process.env.OPENAI_API_KEY) return chatError("ai_unavailable", AI_UNAVAILABLE_MESSAGE, 503);
-  const parsed = ChatRequestSchema.safeParse(await request.json().catch(() => null));
+  const read = await readCappedJson(request);
+  if (!read.ok) {
+    return read.tooLarge ? chatError("request_too_large", "That request is too large.", 413) : badRequest();
+  }
+  const parsed = ChatRequestSchema.safeParse(read.value);
   if (!parsed.success) return badRequest();
-  return runChatTurn(getChatDeps(), ids, parsed.data);
+  const body = checkAttachments(parsed.data, new URL(request.url).origin);
+  if (!body) return badRequest("Attachments must be files uploaded to Brandloop.");
+  return runChatTurn(getChatDeps(), ids, body);
 }
 
 /** GET /api/chat/:id/stream: replay and tail the active run on this instance, or 204. */
@@ -52,7 +66,7 @@ export async function getChatStreamHandler(_request: Request, { params }: Ctx): 
   if (!ids) return noProfile();
   const { id } = await params;
   if (!(await getChat(ids.profileId, id))) return notFound();
-  const stream = getChatDeps().registry.replay(id);
+  const stream = getRunRegistry().replay(id);
   if (!stream) return new Response(null, { status: 204 });
   return new Response(stream.pipeThrough(new TextEncoderStream()), { headers: UI_MESSAGE_STREAM_HEADERS });
 }
@@ -67,7 +81,7 @@ export async function stopChatHandler(request: Request): Promise<Response> {
   if (!parsed.success) return badRequest();
   const { chatId, runId } = parsed.data;
   if (!(await getChat(ids.profileId, chatId))) return Response.json({ stopped: false });
-  const local = getChatDeps().registry.abort(chatId, runId);
+  const local = getRunRegistry().abort(chatId, runId);
   const flagged = await requestStop(ids.profileId, chatId, runId);
   return Response.json({ stopped: local || flagged });
 }

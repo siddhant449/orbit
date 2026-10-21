@@ -11,7 +11,7 @@ import {
 import { tool, type LanguageModel } from "ai";
 import { MockLanguageModelV4 } from "ai/test";
 import { randomUUID } from "node:crypto";
-import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { scriptedModel } from "./mock";
 import { createRunRegistry } from "./registry";
@@ -273,14 +273,17 @@ describe("runChatTurn", () => {
     expect(String(system.content)).not.toContain("Runs a design studio in Pune");
   });
 
-  it("titles a new chat after the first turn, and only the first", async () => {
+  it("titles the chat while it still has the default title, and stops once it has one", async () => {
     const d = deps(scriptedModel([{ text: "ok" }]));
     await (await runChatTurn(d, caller, body("Help me plan posts about pricing"))).text();
     expect(afterFns).toHaveLength(1);
-    await Promise.all(afterFns.map((fn) => fn()));
-    expect((await getChat(p, chatId))!.title).toBe("Fake text");
+    // The first title job never ran (say the instance died): the next turn tries again.
     await (await runChatTurn(d, caller, body("Second"))).text();
-    expect(afterFns).toHaveLength(1);
+    expect(afterFns).toHaveLength(2);
+    await afterFns[1]!();
+    expect((await getChat(p, chatId))!.title).toBe("Fake text");
+    await (await runChatTurn(d, caller, body("Third"))).text();
+    expect(afterFns).toHaveLength(2);
   });
 
   it("carries the active task into the next turn's prompt", async () => {
@@ -311,5 +314,129 @@ describe("chatError", () => {
     const res = chatError("chat_turn_active", "Busy.", 409, { activeTurn: undefined });
     expect(res.status).toBe(409);
     expect(await res.json()).toEqual({ code: "chat_turn_active", cause: "Busy.", error: "Busy." });
+  });
+});
+
+describe("runChatTurn fix round 1", () => {
+  it("a retried POST for a finished turn returns 409 chat_turn_complete without calling the model", async () => {
+    const first = body("Hi");
+    await (await runChatTurn(deps(scriptedModel([{ text: "Hello there." }])), caller, first)).text();
+    const before = await listMessages(p, chatId);
+    const model = scriptedModel([{ text: "Duplicate." }]);
+    const res = await runChatTurn(deps(model), caller, { ...first, runId: randomUUID() });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: "chat_turn_complete", activeTurn: null });
+    expect(model.doStreamCalls).toHaveLength(0);
+    const after = await listMessages(p, chatId);
+    expect(after).toHaveLength(2);
+    expect(after.map((m) => m.parts)).toEqual(before.map((m) => m.parts));
+    expect((await getChat(p, chatId))!.activeRunId).toBeNull();
+  });
+
+  it("a retried POST whose first attempt died before replying runs, using the stored message text for the title", async () => {
+    await getOrCreateChat(p, u, chatId);
+    await prisma.message.create({
+      data: { id: "died-1", chatId, role: "USER", parts: [{ type: "text", text: "Stored words about pricing" }] },
+    });
+    const ai = fakeAi(undefined, "Pricing");
+    const model = scriptedModel([{ text: "Answer." }]);
+    const res = await runChatTurn(deps(model, { ai }), caller, body("Different words", { messageId: "died-1" }));
+    expect(res.status).toBe(200);
+    await res.text();
+    const msgs = await listMessages(p, chatId);
+    expect(msgs.map((m) => m.role)).toEqual(["user", "assistant"]);
+    expect((msgs[1]!.context as any).requestMessageId).toBe("died-1");
+    expect(afterFns).toHaveLength(1);
+    await afterFns[0]!();
+    expect(ai.calls[0]!.prompt).toContain("Stored words about pricing");
+    expect(JSON.stringify(model.doStreamCalls[0]!.prompt)).not.toContain("Different words");
+  });
+
+  it("refuses to stream when the retried message is not the newest (409, lock released)", async () => {
+    await getOrCreateChat(p, u, chatId);
+    await prisma.message.createMany({
+      data: [
+        { id: "old-user", chatId, role: "USER", parts: [{ type: "text", text: "old" }] },
+        { id: "orphan-reply", chatId, role: "ASSISTANT", parts: [{ type: "text", text: "unlinked" }] },
+      ],
+    });
+    const model = scriptedModel([{ text: "x" }]);
+    const res = await runChatTurn(deps(model), caller, body("old", { messageId: "old-user" }));
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: "chat_turn_complete" });
+    expect(model.doStreamCalls).toHaveLength(0);
+    expect((await getChat(p, chatId))!.activeRunId).toBeNull();
+  });
+
+  it("an invalid tool input is a recoverable step error, not a failed turn", async () => {
+    const model = scriptedModel([
+      { toolCalls: [{ toolName: "saveMemory", input: { category: "about", topic: null } }] },
+      { text: "Fixed it." },
+    ]);
+    const sse = await (await runChatTurn(deps(model), caller, body("remember this"))).text();
+    expect(sse).not.toContain("Something went wrong while answering");
+    await settle();
+    const last = (await listMessages(p, chatId)).at(-1)!;
+    expect((last.context as any).finish).toBe("stop");
+    expect((last.context as any).activeTask.status).toBe("completed");
+    const part = parts(last).find((x) => x.type === "tool-saveMemory")!;
+    expect(part.state).toBe("output-error");
+    expect(String(part.errorText)).toMatch(/saveMemory/);
+    expect(String(part.errorText)).toMatch(/facts/);
+    expect(String(part.errorText).length).toBeLessThanOrEqual(400);
+    expect(parts(last).some((x) => x.type === "text" && x.text === "Fixed it.")).toBe(true);
+  });
+
+  it("an unknown tool name is a recoverable step error", async () => {
+    const model = scriptedModel([{ toolCalls: [{ toolName: "postToLinkedIn", input: {} }] }, { text: "Can't do that." }]);
+    const sse = await (await runChatTurn(deps(model), caller, body("post it"))).text();
+    expect(sse).toContain("There is no tool named postToLinkedIn");
+    expect(sse).not.toContain("Something went wrong while answering");
+    await settle();
+    const last = (await listMessages(p, chatId)).at(-1)!;
+    expect((last.context as any).finish).toBe("stop");
+    expect((last.context as any).activeTask.status).toBe("completed");
+    // The unknown call streams as a dynamic-tool part, which is not stored (it names no tool we define).
+    expect(parts(last).some((x) => x.type === "text" && x.text === "Can't do that.")).toBe(true);
+  });
+
+  it("a tool that throws becomes a safe step error and the turn still finishes", async () => {
+    const boom = tool({
+      description: "boom",
+      inputSchema: z.object({}),
+      execute: async (): Promise<string> => {
+        throw new Error("connection string postgres://secret@host");
+      },
+    });
+    const model = scriptedModel([{ toolCalls: [{ toolName: "web_search", input: {} }] }, { text: "Recovered." }]);
+    const b = { ...body("search"), webSearchEnabled: true };
+    await (await runChatTurn(deps(model, { webSearchTool: boom }), caller, b)).text();
+    await settle();
+    const last = (await listMessages(p, chatId)).at(-1)!;
+    expect((last.context as any).finish).toBe("stop");
+    const part = parts(last).find((x) => x.type === "tool-web_search")!;
+    expect(part.state).toBe("output-error");
+    expect(String(part.errorText)).toContain("web_search");
+    expect(String(part.errorText)).not.toContain("secret");
+  });
+
+  it("a turn past its deadline is saved as aborted", async () => {
+    const model = scriptedModel([{ text: "one two three four five six seven eight" }], { chunkDelayMs: 40 });
+    await (await runChatTurn(deps(model, { turnTimeoutMs: 100 }), caller, body("Hi"))).text().catch(() => {});
+    await settle();
+    const last = (await listMessages(p, chatId)).at(-1)!;
+    expect((last.context as any).finish).toBe("aborted");
+  });
+
+  it("does not log a stop as a stream error", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    const model = scriptedModel([{ text: "one two three four five six" }], { chunkDelayMs: 40 });
+    const reg = createRunRegistry();
+    const res = await runChatTurn(deps(model, { registry: reg }), caller, body("Hi", { runId: "run-quiet" }));
+    setTimeout(() => reg.abort(chatId, "run-quiet"), 90);
+    await res.text().catch(() => {});
+    await settle();
+    expect(log.mock.calls.flat().join(" ")).not.toMatch(/abort/i);
+    log.mockRestore();
   });
 });

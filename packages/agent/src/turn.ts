@@ -14,8 +14,11 @@ import {
   convertToModelMessages,
   createUIMessageStream,
   createUIMessageStreamResponse,
+  InvalidToolInputError,
+  NoSuchToolError,
   stepCountIs,
   streamText,
+  ToolCallRepairError,
   toUIMessageStream,
   type LanguageModel,
   type Tool,
@@ -30,6 +33,7 @@ import { finalizeAbortedParts, toStoredParts } from "./persist";
 import { buildSystemPrompt, loadPromptInput } from "./prompt";
 import type { RunRegistry } from "./registry";
 import { titleChat } from "./title";
+import { isAbort } from "./tools/run";
 import { buildTools, type ChatUIMessage } from "./tools";
 import { ActiveTaskSchema, type ActiveTask, type ChatRequestBody, type MessageMetadata } from "./types";
 
@@ -43,7 +47,12 @@ export type ChatDeps = {
   webSearchTool?: Tool | null;
   now?: () => Date;
   generateId?: () => string;
+  /** Whole-turn deadline; past it the turn is aborted and its partial reply saved. Default 285 s (route max 300 s). */
+  turnTimeoutMs?: number;
 };
+
+const TURN_TIMEOUT_MS = 285_000;
+const DEFAULT_TITLE = "New chat";
 
 export const STREAM_ERROR_TEXT = "Something went wrong while answering. Try again.";
 
@@ -58,14 +67,90 @@ const CHAT_ERRORS = {
   message_id_conflict: { status: 400, cause: "That message id belongs to another message." },
 } as const;
 
+/** A retried POST that must not run again: the message already has a reply, or it isn't the newest. */
+class TurnComplete extends Error {}
+
+/** A tool body threw something unexpected. Carries only the tool name to the stream. */
+class ToolStepError extends Error {
+  constructor(readonly toolName: string, cause: unknown) {
+    super(`tool ${toolName} threw`, { cause });
+    this.name = "ToolStepError";
+  }
+}
+
+const safeName = (name: string) => name.replace(/[^\w.-]/g, "").slice(0, 60) || "that tool";
+
+/** A short, provider-free summary of why a tool input was rejected, from the zod issues in the cause chain. */
+function issueSummary(err: unknown): string {
+  let cur: unknown = err;
+  for (let depth = 0; cur && depth < 6; depth++) {
+    const issues = (cur as { issues?: unknown }).issues;
+    if (Array.isArray(issues) && issues.length > 0) {
+      return issues
+        .slice(0, 3)
+        .map((i: { path?: unknown[]; message?: string }) => {
+          const path = Array.isArray(i.path) && i.path.length > 0 ? i.path.join(".") : "input";
+          return `${path}: ${String(i.message ?? "invalid").slice(0, 80)}`;
+        })
+        .join("; ")
+        .slice(0, 240);
+    }
+    cur = (cur as { cause?: unknown }).cause;
+  }
+  return "the input didn't match the tool's schema";
+}
+
+/**
+ * Text for a recoverable step error the model can act on, or null when the error is a top-level stream
+ * failure. Never includes stacks, provider text or the thrown message.
+ */
+function toolErrorText(err: unknown): string | null {
+  const e = ToolCallRepairError.isInstance(err) ? err.originalError : err;
+  if (InvalidToolInputError.isInstance(e)) {
+    return `Invalid input for ${safeName(e.toolName)}: ${issueSummary(e)}. Fix the input and call it again.`;
+  }
+  if (NoSuchToolError.isInstance(e)) {
+    return `There is no tool named ${safeName(e.toolName)}. Use only the tools you were given.`;
+  }
+  if (e instanceof ToolStepError) return `Failed: the ${safeName(e.toolName)} step hit an unexpected error.`;
+  return null;
+}
+
+/** Our tools report expected failures as strings; anything they throw is tagged so the stream can tell it from a model failure. */
+function tagToolErrors<T extends Record<string, unknown>>(tools: T): T {
+  const out: Record<string, unknown> = {};
+  for (const [name, t] of Object.entries(tools)) {
+    const exec = (t as { execute?: (...a: unknown[]) => unknown }).execute;
+    if (typeof exec !== "function") {
+      out[name] = t;
+      continue;
+    }
+    out[name] = {
+      ...(t as object),
+      execute: async (...args: unknown[]) => {
+        try {
+          return await exec.apply(t, args);
+        } catch (err) {
+          if (isAbort(err)) throw err;
+          log(`tool ${name} threw`, err);
+          throw new ToolStepError(name, err);
+        }
+      },
+    };
+  }
+  return out as T;
+}
+
 /** Maps a db `ChatError` to its response. `activeTurn` may be missing on a contended 409. */
 export function chatErrorResponse(err: ChatError): Response {
   const { status, cause } = CHAT_ERRORS[err.code];
   return chatError(err.code, cause, status, err.code === "chat_turn_active" ? { activeTurn: err.activeTurn ?? null } : {});
 }
 
-const log = (what: string, err: unknown) =>
+function log(what: string, err: unknown) {
+  if (isAbort(err)) return; // a stop is not an error
   console.error(`[agent] ${what}: ${err instanceof Error ? err.message : String(err)}`);
+}
 
 type Part = ChatUIMessage["parts"][number];
 const FAILED_OUTPUT = /^(Failed:|Refused:)/;
@@ -106,7 +191,6 @@ export async function runChatTurn(
   const { id: chatId, runId } = body;
   const requestMessageId = body.message.id;
 
-  const userText = textOf(body.message.parts as Part[]);
   const totalText = body.message.parts.reduce((n, p) => n + (p.type === "text" ? p.text.length : 0), 0);
   if (totalText > LIMITS.messageChars) {
     return chatError(
@@ -116,9 +200,10 @@ export async function runChatTurn(
     );
   }
 
-  let created: boolean;
+  let defaultTitle: boolean;
   try {
-    ({ created } = await getOrCreateChat(profileId, userId, chatId));
+    const { chat } = await getOrCreateChat(profileId, userId, chatId);
+    defaultTitle = chat.title === DEFAULT_TITLE;
     // The lock's clock is the server's, not the injectable turn clock.
     await claimRun(chatId, runId, requestMessageId);
   } catch (err) {
@@ -133,10 +218,11 @@ export async function runChatTurn(
     deps.registry.finish(chatId, runId);
     await releaseRun(chatId, runId).catch((e) => log("release after failed setup", e));
     if (err instanceof ChatError) return chatErrorResponse(err);
+    if (err instanceof TurnComplete) return chatError("chat_turn_complete", err.message, 409, { activeTurn: null });
     log("chat turn setup failed", err);
     return chatError("internal_error", STREAM_ERROR_TEXT, 500);
   }
-  const { ctx, tools, instructions, window, modelMessages, prevTask, controller } = setup;
+  const { ctx, tools, instructions, window, modelMessages, prevTask, controller, userText } = setup;
 
   const assistantId = newId();
   const createdAt = now().toISOString();
@@ -144,10 +230,31 @@ export async function runChatTurn(
   const metadata: MessageMetadata = { createdAt, modelId };
   let streamFailed = false;
 
+  /** Top-level failures (model, network, processing) fail the turn; tool step errors are recoverable. */
   const streamErrorText = (err: unknown) => {
     streamFailed = true;
     log("chat stream error", err);
     return STREAM_ERROR_TEXT;
+  };
+  // The SDK reports an invalid tool call twice: once with the error object (tool-input-error), then with
+  // its string form (tool-output-error). Remember the text made for the object so the string maps to it.
+  const toolErrorByMessage = new Map<string, string>();
+  const uiErrorText = (err: unknown) => {
+    if (typeof err === "string") {
+      const known = toolErrorByMessage.get(err);
+      if (known) return known;
+      if (/^AI_(InvalidToolInputError|NoSuchToolError|ToolCallRepairError)\b/.test(err)) {
+        return "That tool call was invalid. Check the tool name and input, then try again.";
+      }
+      return streamErrorText(err);
+    }
+    const text = toolErrorText(err);
+    if (text === null) return streamErrorText(err);
+    if (err instanceof Error) {
+      toolErrorByMessage.set(String(err), text);
+      toolErrorByMessage.set(err.message, text);
+    }
+    return text;
   };
 
   const stream = createUIMessageStream<ChatUIMessage>({
@@ -162,7 +269,7 @@ export async function runChatTurn(
         tools,
         stopWhen: stepCountIs(LIMITS.steps),
         maxOutputTokens: LIMITS.maxOutputTokens,
-        abortSignal: controller.signal,
+        abortSignal: AbortSignal.any([controller.signal, AbortSignal.timeout(deps.turnTimeoutMs ?? TURN_TIMEOUT_MS)]),
         // Another instance may have asked this run to stop (POST /api/chat/stop landed elsewhere).
         prepareStep: async () => {
           if (await isStopRequested(chatId, runId).catch(() => false)) controller.abort();
@@ -184,7 +291,7 @@ export async function runChatTurn(
           sendReasoning: false,
           sendSources: true,
           messageMetadata: ({ part }) => (part.type === "start" || part.type === "finish" ? metadata : undefined),
-          onError: streamErrorText,
+          onError: uiErrorText,
         }),
       );
     },
@@ -226,7 +333,7 @@ export async function runChatTurn(
             finish,
           },
         });
-        if (created && userText) deps.after(async () => void (await titleChat(deps.ai, chatId, userText)));
+        if (defaultTitle && userText) deps.after(async () => void (await titleChat(deps.ai, chatId, userText)));
       } catch (err) {
         log("saving the assistant message failed", err);
       } finally {
@@ -261,6 +368,17 @@ export async function runChatTurn(
     });
 
     const stored = await listMessages(profileId, chatId);
+    const own = stored.find((m) => m.id === requestMessageId && m.role === "user");
+    const answered = stored.some(
+      (m) =>
+        m.role === "assistant" &&
+        (m.context as { requestMessageId?: unknown } | null)?.requestMessageId === requestMessageId,
+    );
+    // A retried POST (same message id) after the reply was saved: never answer twice. The client adopts
+    // the stored reply through GET /api/chat/:id/messages.
+    if (answered) throw new TurnComplete("This message already has a reply.");
+    // The stored copy wins over a retry's body, so the model, the ledger and the title all see one text.
+    const userText = textOf((own?.parts ?? body.message.parts) as Part[]);
     const history = stored.map((m) => ({
       id: m.id,
       role: m.role,
@@ -268,6 +386,10 @@ export async function runChatTurn(
       ...(m.metadata ? { metadata: m.metadata } : {}),
     })) as ChatUIMessage[];
     const window = windowHistory(history);
+    const newest = window.at(-1);
+    if (newest?.role !== "user" || newest.id !== requestMessageId) {
+      throw new TurnComplete("This message isn't the newest in the chat. Reload the conversation.");
+    }
 
     const parsed = ActiveTaskSchema.safeParse((await lastAssistantContext(chatId))?.activeTask);
     const prevTask: ActiveTask | null = parsed.success ? parsed.data : null;
@@ -294,10 +416,10 @@ export async function runChatTurn(
       documentRef: { current: null },
       now,
     };
-    const tools = buildTools(ctx, { webSearchTool: deps.webSearchTool });
+    const tools = tagToolErrors(buildTools(ctx, { webSearchTool: deps.webSearchTool }));
     const instructions = buildSystemPrompt(await loadPromptInput(ctx, prevTask));
     const modelMessages = await convertToModelMessages(window, { tools, ignoreIncompleteToolCalls: true });
     const controller = deps.registry.start(chatId, runId);
-    return { ctx, tools, instructions, window, modelMessages, prevTask, controller };
+    return { ctx, tools, instructions, window, modelMessages, prevTask, controller, userText };
   }
 }

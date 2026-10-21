@@ -6,7 +6,7 @@ import { capOutput } from "./cap";
 export const MEMORY_CONFLICT = "Failed: your memory changed while saving. Read it again and retry.";
 
 /** An abort or cancellation: an `AbortError` from fetch, an aborted signal's default reason, or our own. */
-function isAbort(err: unknown): boolean {
+export function isAbort(err: unknown): boolean {
   if (err instanceof Error || (typeof DOMException !== "undefined" && err instanceof DOMException)) {
     return (err as Error).name === "AbortError";
   }
