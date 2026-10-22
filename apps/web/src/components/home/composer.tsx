@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { toast } from "sonner";
 import { ComposerShell, pillClass, cn } from "@brandloop/ui";
 import { MicIcon, PlusIcon, SendIcon } from "@brandloop/ui/icons";
@@ -34,6 +34,7 @@ export function Composer({
   voices,
   selectedVoiceId,
   onSend,
+  initialText,
 }: {
   greeting: GreetingText;
   /** The home cards, rendered on the server (real data or honest empty states). */
@@ -42,9 +43,22 @@ export function Composer({
   selectedVoiceId: string | null;
   /** Starts the chat with this text. Without it the composer only says chat isn't connected. */
   onSend?: (text: string) => void;
+  /** Pre-fills the box (home's `?prompt=`); never sent on its own. */
+  initialText?: string;
 }) {
-  const [text, setText] = useState("");
+  const [text, setText] = useState(initialText ?? "");
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // A pre-filled prompt ends mid-sentence ("It's about "): put the caret there, after the shell's route focus.
+  useEffect(() => {
+    if (!initialText) return;
+    const t = window.setTimeout(() => {
+      const el = inputRef.current;
+      el?.focus();
+      el?.setSelectionRange(el.value.length, el.value.length);
+    }, 120);
+    return () => window.clearTimeout(t);
+  }, [initialText]);
 
   function applyStarter(prompt: string) {
     setText(prompt);

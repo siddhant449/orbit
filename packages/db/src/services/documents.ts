@@ -149,6 +149,55 @@ export async function getChatDocument(profileId: string, chatId: string): Promis
   return chat?.documentId ? snapshot(prisma, profileId, chat.documentId) : null;
 }
 
+/** A row on the Posts board, list and calendar: the post with its current version's text. */
+export type PostSummary = {
+  id: string;
+  title: string;
+  status: "DRAFT";
+  version: number;
+  text: string;
+  chatId: string;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export const POSTS_PAGE_SIZE = 200;
+
+/**
+ * The profile's posts, last edited first. A post is reachable only through its chat today, so a post whose chat was
+ * deleted is left out (and not counted) until posts get their own page.
+ */
+export async function listPosts(profileId: string, opts: { limit?: number } = {}): Promise<{ posts: PostSummary[]; total: number }> {
+  const limit = Math.min(Math.max(opts.limit ?? POSTS_PAGE_SIZE, 1), 500);
+  const where = { profileId, deletedAt: null, chat: { is: { deletedAt: null } } };
+  const [rows, total] = await Promise.all([
+    prisma.document.findMany({
+      where,
+      orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+      take: limit,
+      select: { id: true, title: true, status: true, version: true, createdAt: true, updatedAt: true, chat: { select: { id: true } } },
+    }),
+    prisma.document.count({ where }),
+  ]);
+  if (rows.length === 0) return { posts: [], total };
+  const versions = await prisma.documentVersion.findMany({
+    where: { OR: rows.map((r) => ({ documentId: r.id, version: r.version })) },
+    select: { documentId: true, text: true },
+  });
+  const textOf = new Map(versions.map((v) => [v.documentId, v.text]));
+  const posts = rows.map((r) => ({
+    id: r.id,
+    title: r.title,
+    status: r.status,
+    version: r.version,
+    text: textOf.get(r.id) ?? "",
+    chatId: r.chat!.id,
+    createdAt: r.createdAt,
+    updatedAt: r.updatedAt,
+  }));
+  return { posts, total };
+}
+
 type SaveInput = {
   text: string;
   title?: string;
