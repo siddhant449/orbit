@@ -41,7 +41,7 @@ test.afterEach(async ({ page }) => {
   created.clear();
 });
 
-test("generates this week's ideas and drafts one in a new chat", async ({ page }) => {
+test("generates this week's ideas, regenerates without repeats, and links Draft this home with ?prompt=", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.emulateMedia({ colorScheme: "dark" });
   await page.goto("/ideas");
