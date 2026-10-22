@@ -1,13 +1,38 @@
-import { Upcoming } from "@/components/page";
+import { listPosts } from "@brandloop/db";
+import { getAccount } from "@/lib/account";
+import { EmptyState, PageBody, PageHeader } from "@/components/page";
+import { PostsScreen } from "@/components/posts/posts-screen";
 
 export const metadata = { title: "Posts" };
 
-export default function Page() {
+/** Posts (screens.md B5 / B6): `?view=board|list|calendar`, read from the profile's real posts. */
+export default async function Page() {
+  const profile = (await getAccount()).currentProfile;
+  if (!profile) {
+    return (
+      <>
+        <PageHeader title="Posts" />
+        <PageBody>
+          <EmptyState title="No profile yet" body="Add a profile to start writing posts." />
+        </PageBody>
+      </>
+    );
+  }
+  const { posts, total } = await listPosts(profile.id);
   return (
-    <Upcoming
-      title={"Posts"}
-      description={"Every draft, scheduled and published post for this profile, on a board, a list or a calendar."}
-      points={["Move posts between Ideas, Draft, Scheduled and Published, or add your own columns.", "Schedule to LinkedIn at the best time in your timezone.", "Open any post to edit it with the AI beside you."]}
+    <PostsScreen
+      posts={posts.map((p) => ({
+        id: p.id,
+        title: p.title,
+        status: p.status,
+        version: p.version,
+        text: p.text,
+        chatId: p.chatId,
+        updatedAt: p.updatedAt.toISOString(),
+      }))}
+      total={total}
+      timeZone={profile.timezone}
+      nowISO={new Date().toISOString()}
     />
   );
 }
