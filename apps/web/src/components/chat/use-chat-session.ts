@@ -247,15 +247,17 @@ export function useChatSession({
     };
   }, [status, chatId, turn]);
 
-  const send = useCallback(async (text: string) => {
+  /** `formatId`: a framework or template for this message only (sent in the body, so it never lingers in the selections). */
+  const send = useCallback(async (text: string, opts: { formatId?: string | null } = {}) => {
     const t = text.trim();
     if (!t) return;
     lastErrorRef.current = null;
     setNotice(null);
     const ctx = docContext.current;
+    const body = { ...(ctx ? { documentContext: ctx } : {}), ...(opts.formatId ? { selectedFormatId: opts.formatId } : {}) };
     await chatRef.current.sendMessage(
       { text: t, metadata: { createdAt: new Date().toISOString() } },
-      ctx ? { body: { documentContext: ctx } } : undefined,
+      Object.keys(body).length ? { body } : undefined,
     );
   }, []);
 

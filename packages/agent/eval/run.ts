@@ -4,6 +4,7 @@
  * the report, then deletes the eval user and checks nothing is left.
  *
  *   pnpm --filter @brandloop/agent eval            # full run
+ *   pnpm --filter @brandloop/agent eval --metrics  # only rewrite the formatting-metrics table (no AI, no database)
  *   pnpm --filter @brandloop/agent eval --report   # only rebuild docs/research/orbit-quality-eval.md from saved runs
  *   pnpm --filter @brandloop/agent eval --rejudge <n>   # re-score a saved run with the current judge
  *
@@ -25,6 +26,7 @@ import { EVAL_FIXTURE, evalRowsLeft, removeEvalUser, seedEvalProfile } from "./f
 import { DRAFT_FROM_C, EVAL_CHATS } from "./prompts";
 import { reportMarkdown, spliceGenerated, transcriptMarkdown, type DocSnapshot, type RunRecord, type TurnRecord } from "./report";
 import { aggregate, blindOrder, judgePairwise, kleoDraft, judgeTurn, parseKleoReplies, tallyPairwise, unblind, type PairwiseWinner } from "./rubric";
+import { metricsFromTranscripts, metricsTableMarkdown, spliceMetrics } from "./metrics";
 import { summarizeParts } from "./transcript";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -186,7 +188,23 @@ async function judgeTurns(judge: AiClient, turns: TurnRecord[], run: number, sta
   return pairwise;
 }
 
+/** `--metrics`: rewrites the formatting-metrics table from saved transcripts and Kleo's lab file. No AI, no database. */
+function writeMetrics() {
+  const runs = existsSync(BENCH_DIR)
+    ? readdirSync(BENCH_DIR).filter((n) => /^orbit-run-\d+\.json$/.test(n)).sort((a, b) => Number(/\d+/.exec(a)![0]) - Number(/\d+/.exec(b)![0]))
+    : [];
+  // Kleo's drafts plus the newest Orbit run, so the table stays one screen.
+  const rows = metricsFromTranscripts(runs.slice(-1).map((n) => join(BENCH_DIR, n)), join(BENCH_DIR, "kleo-quality-lab.md"));
+  const existing = existsSync(REPORT) ? readFileSync(REPORT, "utf8") : REPORT_HEADER;
+  writeFileSync(REPORT, spliceMetrics(existing, metricsTableMarkdown(rows)));
+  console.log(`metrics: ${rows.length} drafts -> ${REPORT}`);
+}
+
 async function main() {
+  if (process.argv.includes("--metrics")) {
+    writeMetrics();
+    return;
+  }
   if (process.argv.includes("--report")) {
     writeReport();
     return;
@@ -263,6 +281,7 @@ async function main() {
             message: { id: randomUUID(), role: "user", parts: [{ type: "text", text }], metadata: { createdAt: new Date().toISOString() } },
             selectedKnowledgeBaseIds: [],
             selectedWritingStyleId: null,
+        selectedFormatId: null,
             webSearchEnabled: false,
             ...(chat.openDocument && openDoc ? { documentContext: { id: openDoc.id, version: openDoc.version } } : {}),
           });

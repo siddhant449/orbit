@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { bannedWordsFromRules, CHECK_IDS, runDeterministicChecks } from "./checks";
+import { resolveRules } from "../writing/rules";
+import { bannedWordsFromRules, CHECK_IDS, mergeChecks, runDeterministicChecks, runWritingChecks } from "./checks";
 
 const clean = [
   "Most founders build a proof of concept when they need a minimum viable product.",
@@ -80,5 +81,32 @@ describe("bannedWordsFromRules", () => {
 
   it("returns nothing without a banned heading", () => {
     expect(bannedWordsFromRules("- Short paragraphs\n- No hashtags")).toEqual([]);
+  });
+});
+
+describe("runWritingChecks", () => {
+  const ctx = { postType: null, groundingText: null, researchDates: null, personalDetails: "allowed" as const };
+  const rules = (md: string) => resolveRules({ userRulesMarkdown: md, style: null, turn: {} });
+
+  it("returns nothing when no rule is set and the post is clean", () => {
+    expect(runWritingChecks("Hook line.\n\nBody line.", rules(""), ctx)).toEqual([]);
+  });
+
+  it("returns one result per enforced rule, passing or failing", () => {
+    const r = runWritingChecks("Launch day \u2014 finally.\n\nBody.", rules("- No emojis\n- Don't use em dashes"), ctx);
+    expect(r.map((c) => [c.id, c.passed])).toEqual([["emoji", true], ["dashes", false]]);
+  });
+
+  it("does not repeat the banned-words, placeholders or markdown checks", () => {
+    const r = runWritingChecks("Hook.\n\nreal synergy [Name] **bold**", rules("## Banned words\n- synergy"), ctx);
+    expect(r.map((c) => c.id)).toEqual([]);
+  });
+
+  it("merges into the 8 checks without reordering them: a stricter result replaces the same id", () => {
+    const base = runDeterministicChecks("Hook \ud83d\ude80\n\nBody.", { bannedWords: [] });
+    const merged = mergeChecks(base, runWritingChecks("Hook \ud83d\ude80\n\nBody.", rules("- No emojis\n- Don't use em dashes"), ctx));
+    expect(merged.slice(0, 8).map((c) => c.id)).toEqual([...CHECK_IDS]);
+    expect(merged.find((c) => c.id === "emoji")!.passed).toBe(false);
+    expect(merged.map((c) => c.id)).toEqual([...CHECK_IDS, "dashes"]);
   });
 });

@@ -1,6 +1,7 @@
 import { listMemory, memoryLines, MEMORY_KEYS } from "@brandloop/db";
 import { getAccount } from "@/lib/account";
 import { EmptyState, PageBody, PageHeader } from "@/components/page";
+import { EnforcedChecks } from "@/components/memories/enforced-checks";
 import { AddMemory } from "@/components/memories/add-memory";
 import { ImportDialog } from "@/components/memories/import-dialog";
 import { MemoryCard, type MemoryGroupView } from "@/components/memories/memory-card";
@@ -79,6 +80,9 @@ export default async function Page() {
               updated={latest(rules)}
               addKey={MEMORY_KEYS.rules}
             />
+            <div className="mt-3">
+              <EnforcedChecks markdown={rules.map((d) => d.content).join("\n")} />
+            </div>
             </Reveal>
             <Reveal index={2}>
             <MemoryCard

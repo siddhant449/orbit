@@ -51,7 +51,9 @@ export {
 } from "./specialists/envelope";
 export { buildGrounding, renderGrounding, type Grounding } from "./specialists/grounding";
 export { runSpecialist, type SpecialistResult } from "./specialists/run";
-export { bannedWordsFromRules, CHECK_IDS, runDeterministicChecks, type CheckId, type CheckResult } from "./specialists/checks";
+export { bannedWordsFromRules, CHECK_IDS, mergeChecks, runDeterministicChecks, runWritingChecks, WRITING_CHECK_IDS, type CheckId, type CheckResult } from "./specialists/checks";
+export { acceptOverrides, compileHardRules, DEFAULT_HARD_RULES, DEFAULT_TARGETS, enforcedChips, resolveRules, type EffectiveRules, type HardRules, type TurnOverrides } from "./writing/rules";
+export { lintPost, type LintContext, type LintId, type Violation } from "./writing/lint";
 export { editDocumentText, EditResultSchema, FinalReviewPayload, type EditOutcome, type FinalReview } from "./specialists/editing";
 export { delegateEditingRun, delegateTools } from "./tools/delegate";
 export {

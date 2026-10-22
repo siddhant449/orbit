@@ -15,6 +15,7 @@ import {
   textareaClass,
 } from "@/components/dialog-classes";
 import { selectVoiceAction } from "@/app/(app)/actions";
+import { StyleDetailsSheet } from "@/components/chat/style-details-sheet";
 
 export type VoiceOption = { id: string; name: string; tagline: string; own: boolean };
 
@@ -59,6 +60,7 @@ export function VoicePicker({ voices, selectedId }: { voices: VoiceOption[]; sel
   const listId = useId();
   const [open, setOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  const [detailsId, setDetailsId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const [pending, startTransition] = useTransition();
@@ -213,6 +215,18 @@ export function VoicePicker({ voices, selectedId }: { voices: VoiceOption[]; sel
                         <span className="block truncate text-[12px] text-text-2">{v.tagline}</span>
                       </span>
                       {sel && <CheckIcon size={16} className="shrink-0 text-accent-text" />}
+                      <button
+                        type="button"
+                        aria-label={`Details: ${v.name}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpen(false);
+                          setDetailsId(v.id);
+                        }}
+                        className="orbit-transition shrink-0 rounded-pill border border-line-control px-2.5 py-1 text-[12px] font-medium text-text-2 hover:border-text-3 hover:text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-text"
+                      >
+                        Details
+                      </button>
                     </div>
                   );
                 })}
@@ -221,7 +235,15 @@ export function VoicePicker({ voices, selectedId }: { voices: VoiceOption[]; sel
           </Popover.Portal>
         </Popover.Root>
       </div>
-      <AddStyleDialog open={addOpen} onOpenChange={setAddOpen} />
+      <AddStyleDialog
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        onReady={(id) => {
+          setAddOpen(false);
+          setDetailsId(id);
+        }}
+      />
+      <StyleDetailsSheet styleId={detailsId} onClose={() => setDetailsId(null)} />
     </>
   );
 }
@@ -233,105 +255,175 @@ function splitPosts(text: string) {
     .filter(Boolean);
 }
 
-function AddStyleDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
+type AddTab = "paste" | "export";
+type Phase = { kind: "form" } | { kind: "analysing"; count: number };
+
+/** Learns the profile's own style from pasted posts or LinkedIn's data export. Stays open, with a status line, until it's ready. */
+function AddStyleDialog({ open, onOpenChange, onReady }: { open: boolean; onOpenChange: (o: boolean) => void; onReady: (voiceStyleId: string) => void }) {
   const router = useRouter();
+  const [tab, setTab] = useState<AddTab>("paste");
   const [text, setText] = useState("");
+  const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const [phase, setPhase] = useState<Phase>({ kind: "form" });
   const count = splitPosts(text).length;
 
-  async function poll(jobId: string) {
-    for (let i = 0; i < 90; i++) {
-      await wait(2000);
+  async function poll(jobId: string, voiceStyleId: string) {
+    for (let i = 0; i < 150; i++) {
+      await wait(i < 5 ? 800 : 2000);
       try {
         const res = await fetch(`/api/jobs/${jobId}`);
         if (!res.ok) continue;
         const job = (await res.json()) as { status: string; error?: string | null };
         if (job.status === "DONE") {
+          setPhase({ kind: "form" });
+          setText("");
+          setFile(null);
           router.refresh();
-          toast.success("Your writing style is ready", { description: "Find it at the top of the style list." });
+          onReady(voiceStyleId);
           return;
         }
         if (job.status === "FAILED") {
-          toast.error(job.error || "Couldn't learn your style");
+          setPhase({ kind: "form" });
+          setError(job.error || "Couldn't learn your style");
           return;
         }
       } catch {
         /* keep polling */
       }
     }
-    toast.error("Learning your style is taking longer than expected. Check back soon.");
+    setPhase({ kind: "form" });
+    setError("Learning your style is taking longer than expected. Check back soon.");
   }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    const posts = splitPosts(text);
-    if (posts.length < 3 || posts.length > 10 || posts.some((p) => p.length < 200)) {
-      setError(POSTS_ERROR);
-      return;
+    let init: RequestInit;
+    let analysing = 0;
+    if (tab === "paste") {
+      const posts = splitPosts(text);
+      if (posts.length < 3 || posts.length > 30 || posts.some((p) => p.length < 200)) {
+        setError(POSTS_ERROR);
+        return;
+      }
+      analysing = posts.length;
+      init = { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ posts }) };
+    } else {
+      if (!file) {
+        setError("Choose Shares.csv or your LinkedIn export zip");
+        return;
+      }
+      const form = new FormData();
+      form.set("file", file);
+      init = { method: "POST", body: form };
     }
     setError(null);
-    setSubmitting(true);
+    setPhase({ kind: "analysing", count: analysing });
     try {
-      const res = await fetch("/api/voice/own", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ posts }),
-      });
-      const body = (await res.json().catch(() => ({}))) as { jobId?: string; error?: string };
-      if (!res.ok || !body.jobId) {
+      const res = await fetch("/api/voice/own", init);
+      const body = (await res.json().catch(() => ({}))) as { jobId?: string; voiceStyleId?: string; error?: string };
+      if (!res.ok || !body.jobId || !body.voiceStyleId) {
+        setPhase({ kind: "form" });
         setError(body.error || "Couldn't start learning your style");
         return;
       }
-      toast("Learning your style. It'll appear in the style list in a moment.");
-      onOpenChange(false);
-      setText("");
-      void poll(body.jobId);
-    } finally {
-      setSubmitting(false);
+      void poll(body.jobId, body.voiceStyleId);
+    } catch {
+      setPhase({ kind: "form" });
+      setError("Couldn't start learning your style");
     }
   }
 
+  const analysing = phase.kind === "analysing";
   return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange}>
+    <Dialog.Root open={open} onOpenChange={(o) => (analysing && !o ? undefined : onOpenChange(o))}>
       <Dialog.Portal>
         <Dialog.Overlay className={dialogOverlayClass} />
         <Dialog.Content className={cn(dialogContentClass, "max-w-lg")}>
           <Dialog.Title className={dialogTitleClass}>Add your style</Dialog.Title>
           <Dialog.Description className={dialogDescriptionClass}>
-            Paste 3 to 10 of your own posts, each at least 200 characters. We&apos;ll describe how you write so new drafts sound like you.
+            Paste 3 to 30 of your own posts, or import your LinkedIn data export. We measure how you lay posts out and describe how you write, so new drafts sound like you.
           </Dialog.Description>
-          <form onSubmit={submit} className="mt-5 flex flex-col gap-1.5" noValidate>
-            <Label htmlFor="voice-posts">Your posts</Label>
-            <textarea
-              id="voice-posts"
-              rows={9}
-              value={text}
-              onChange={(e) => {
-                setText(e.target.value);
-                setError(null);
-              }}
-              aria-invalid={error ? true : undefined}
-              aria-describedby="voice-posts-hint"
-              placeholder={"First post…\n---\nSecond post…\n---\nThird post…"}
-              className={textareaClass}
-            />
-            <p id="voice-posts-hint" className="text-xs text-text-2">
-              Separate posts with a line containing --- ({count} {count === 1 ? "post" : "posts"} found)
-            </p>
+          <div role="tablist" aria-label="Where the posts come from" className="mt-4 flex gap-2">
+            {(["paste", "export"] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                role="tab"
+                aria-selected={tab === t}
+                disabled={analysing}
+                onClick={() => {
+                  setTab(t);
+                  setError(null);
+                }}
+                className={cn(
+                  "orbit-transition h-8 rounded-pill border px-3.5 text-[13px] font-medium disabled:opacity-50",
+                  tab === t ? "border-inverse bg-inverse text-on-inverse" : "border-line-control text-text hover:border-text-3",
+                )}
+              >
+                {t === "paste" ? "Paste posts" : "Import LinkedIn export"}
+              </button>
+            ))}
+          </div>
+          <form onSubmit={submit} className="mt-4 flex flex-col gap-1.5" noValidate>
+            {tab === "paste" ? (
+              <>
+                <Label htmlFor="voice-posts">Your posts</Label>
+                <textarea
+                  id="voice-posts"
+                  rows={9}
+                  value={text}
+                  disabled={analysing}
+                  onChange={(e) => {
+                    setText(e.target.value);
+                    setError(null);
+                  }}
+                  aria-invalid={error ? true : undefined}
+                  aria-describedby="voice-posts-hint"
+                  placeholder={"First post…\n---\nSecond post…\n---\nThird post…"}
+                  className={textareaClass}
+                />
+                <p id="voice-posts-hint" className="text-xs text-text-2">
+                  Separate posts with a line containing --- ({count} {count === 1 ? "post" : "posts"} found)
+                </p>
+              </>
+            ) : (
+              <>
+                <Label htmlFor="voice-export">Shares.csv or the export zip</Label>
+                <input
+                  id="voice-export"
+                  type="file"
+                  accept=".csv,.zip,text/csv,application/zip"
+                  disabled={analysing}
+                  onChange={(e) => {
+                    setFile(e.target.files?.[0] ?? null);
+                    setError(null);
+                  }}
+                  className="text-[13px] text-text-2 file:mr-3 file:rounded-pill file:border file:border-line-control file:bg-transparent file:px-3 file:py-1.5 file:text-[13px] file:text-text"
+                />
+                <p className="text-xs text-text-2">
+                  In LinkedIn, open Settings, Data privacy, Get a copy of your data, and pick Posts. Up to 10 MB. We keep your newest 100 original posts and read nothing else in the file.
+                </p>
+              </>
+            )}
             {error && (
               <p role="alert" className="text-[13px] text-danger">
                 {error}
               </p>
             )}
+            {analysing && (
+              <p role="status" data-style-status className="text-[13px] text-text-2">
+                {phase.count > 0 ? `Analysing ${phase.count} posts…` : "Analysing your posts…"}
+              </p>
+            )}
             <div className={cn(dialogActionsClass, "mt-4")}>
               <Dialog.Close asChild>
-                <Button type="button" variant="ghost">
+                <Button type="button" variant="ghost" disabled={analysing}>
                   Cancel
                 </Button>
               </Dialog.Close>
-              <Button type="submit" disabled={submitting || !text.trim()}>
-                {submitting ? "Starting…" : "Learn my style"}
+              <Button type="submit" disabled={analysing || (tab === "paste" ? !text.trim() : !file)}>
+                {analysing ? "Analysing…" : "Learn my style"}
               </Button>
             </div>
           </form>

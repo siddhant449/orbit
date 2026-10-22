@@ -1,8 +1,10 @@
 import { z } from "zod";
 import { describe, expect, it } from "vitest";
 import { EditResultSchema } from "./specialists/editing";
-import { FinalReviewPayload, PostWritingPayload, specialistOutputSchema } from "./specialists/envelope";
-import { createScriptedChatModel, SCRIPTED_DRAFT, SCRIPTED_IDEAS, SCRIPTED_SLIDES, scriptedAi, scriptedModel } from "./mock";
+import { FinalReviewPayload, PostWritingModelPayload, PostWritingPayload, specialistOutputSchema } from "./specialists/envelope";
+import { renderBlocks, type WriterBlock } from "./writing/render";
+import { ExtractedStyleSchema } from "@brandloop/ai";
+import { createScriptedChatModel, SCRIPTED_DRAFT, SCRIPTED_IDEAS, SCRIPTED_SLIDES, SCRIPTED_STYLE, scriptedAi, scriptedModel } from "./mock";
 
 type Prompt = { role: string; content: unknown }[];
 
@@ -141,8 +143,10 @@ describe("scriptedAi", () => {
     expect(await ai.text({ model: "extract", system: "s", prompt: "p" })).toBe("Mock chat");
     const out = await ai.json({ model: "generate", system: "s", prompt: "p", schema: z.object({ ok: z.boolean() }) });
     expect(out).toEqual({ ok: true });
-    const post = await ai.json({ model: "generate", system: "s", prompt: "p", schema: specialistOutputSchema(PostWritingPayload) });
-    expect(post.payload).toMatchObject({ readiness: "ready", draft: SCRIPTED_DRAFT });
+    const post = await ai.json({ model: "generate", system: "s", prompt: "p", schema: specialistOutputSchema(PostWritingModelPayload) });
+    expect(post.payload).toMatchObject({ readiness: "ready", postType: "framework" });
+    expect(renderBlocks((post.payload as unknown as { blocks: WriterBlock[] }).blocks, { bullet: "-", numbered: true })).toBe(SCRIPTED_DRAFT);
+    expect(SCRIPTED_DRAFT).toContain("\n- A POC asks");
     await expect(
       ai.json({ model: "generate", system: "s", prompt: "p", schema: z.object({ impossible: z.literal("never") }) }),
     ).rejects.toThrow(/no canned output/i);
@@ -164,5 +168,21 @@ describe("scriptedAi", () => {
     const out = await ai.json({ model: "generate", system: "s", prompt: "p", schema });
     expect(out.ideas).toHaveLength(SCRIPTED_IDEAS.length);
     expect(out.ideas[0]!.hook).toBeTruthy();
+  });
+
+  it("returns the canned own-style extraction, and it fails every earlier canned schema", async () => {
+    const out = await scriptedAi().json({ model: "extract", system: "s", prompt: "p", schema: ExtractedStyleSchema });
+    expect(out.referencePostIndexes).toEqual([0, 1, 2]);
+    expect(ExtractedStyleSchema.safeParse(SCRIPTED_STYLE).success).toBe(true);
+    const earlier = [
+      z.object({ ok: z.boolean() }),
+      z.object({ replacement: z.string() }),
+      EditResultSchema,
+      specialistOutputSchema(PostWritingPayload),
+      specialistOutputSchema(FinalReviewPayload),
+      z.object({ slides: z.array(z.object({ title: z.string(), body: z.string() })) }),
+      z.object({ ideas: z.array(z.object({ title: z.string() })) }),
+    ];
+    for (const schema of earlier) expect(schema.safeParse(SCRIPTED_STYLE).success).toBe(false);
   });
 });

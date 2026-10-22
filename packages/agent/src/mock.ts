@@ -1,4 +1,5 @@
 import type { AiClient } from "@brandloop/ai";
+import { renderBlocks, type WriterBlock } from "./writing/render";
 import { simulateReadableStream, type LanguageModel } from "ai";
 import { MockLanguageModelV4 } from "ai/test";
 
@@ -98,6 +99,12 @@ function openDocumentFirstLine(prompt: Prompt): string | null {
   return body?.split("\n").find((l) => l.trim())?.trim() ?? null;
 }
 
+function openDocumentText(prompt: Prompt): string | null {
+  const system = prompt.find((m) => m.role === "system");
+  const content = typeof system?.content === "string" ? system.content : "";
+  return /<open_document[^>]*>\n([\s\S]*?)\n<\/open_document>/.exec(content)?.[1] ?? null;
+}
+
 const AFTER_TOOL: Record<string, string> = {
   saveMemory: "Saved that to your memory.",
   searchKB: "Here is what I found in your knowledge base.",
@@ -108,6 +115,8 @@ const AFTER_TOOL: Record<string, string> = {
   suggestVisuals: "Here are three image ideas for your post.",
   proposeVisual: "Here is the image. Check the prompt, then make it.",
   editVisual: "On it. The new image will appear in the panel.",
+  analyzePost: "Here is the analysis. Fix the first item before anything else.",
+  generateHooks: "Here are five hook options, each a different kind. Pick the one you like.",
 };
 
 /** A formatted reply for exercising the chat's markdown rendering offline. */
@@ -146,6 +155,9 @@ function route(opts: CallOptions): ScriptStep {
   }
   const last = results.at(-1);
   if (last) {
+    if (last.toolName === "delegateWriting" && /\[e2e:needs-facts\]/.test(text)) {
+      return { text: `Before I write this I need two facts only you have. ${SCRIPTED_QUESTIONS.map((q, i) => `${i + 1}. ${q}`).join(" ")}` };
+    }
     if (last.toolName === "delegateWriting") {
       return call("createDocument", { title: SCRIPTED_TITLE, kind: "text", specialistHandoffToolCallId: last.toolCallId });
     }
@@ -176,8 +188,31 @@ function route(opts: CallOptions): ScriptStep {
     });
   }
   if (firstLine && /\breview\b/i.test(text)) return call("delegateEditing", { request: text.slice(0, 4_000), specialty: "final-review" });
+  if (/\banalyze\b/i.test(text) && has.has("analyzePost")) {
+    const pasted = text.includes("\n") ? text.slice(text.indexOf("\n") + 1).trim() : "";
+    return call("analyzePost", { postContent: pasted.length >= 20 ? pasted : null });
+  }
+  const picked = /Use this opening line: "([^"]+)"/.exec(text)?.[1];
+  if (picked) {
+    return call("delegateWriting", {
+      request: `Write a short LinkedIn post for the user that opens with the line they picked. Their request: ${text.slice(0, 1_000)}`,
+      specialty: "post",
+      personalDetails: null,
+      overrides: null,
+      chosenHook: { text: picked, spine: null },
+    });
+  }
+  if (/\bhook (variations?|options?)\b|\bopening lines\b/i.test(text)) {
+    return call("generateHooks", { topic: "Hiring your first engineer as a founder", draftBody: firstLine ? openDocumentText(opts.prompt) : null, count: 5, excludeHooks: [] });
+  }
   if (/\bdraft\b/i.test(text)) {
-    return call("delegateWriting", { request: `Write a short LinkedIn post for the user. Their request: ${text.slice(0, 2_000)}`, specialty: "post" });
+    return call("delegateWriting", {
+      request: `Write a short LinkedIn post for the user. Their request: ${text.slice(0, 2_000)}`,
+      specialty: "post",
+      personalDetails: /\b(without|skip|no) personal (details|anecdotes)\b/i.test(text) ? "none" : null,
+      overrides: null,
+      chosenHook: null,
+    });
   }
   if (/\bmarkdown\b/i.test(text)) return { text: MARKDOWN_REPLY, ...(/\bslowly\b/i.test(text) && { chunkDelayMs: SLOW_CHUNK_MS }) };
   return { text: "Mock reply." };
@@ -196,11 +231,12 @@ export function createScriptedChatModel(opts: { chunkDelayMs?: number } = {}): L
 
 /** The post the mock writing specialist always returns. */
 export const SCRIPTED_TITLE = "MVP versus POC";
-export const SCRIPTED_DRAFT = [
-  "Most founders build a proof of concept when they need a minimum viable product.",
-  "A POC answers one question: can this work? An MVP answers a harder one: will anyone use it?",
-  "Build the POC in a week. Ship the MVP to ten real users. Then decide.",
-].join("\n\n");
+export const SCRIPTED_BLOCKS: WriterBlock[] = [
+  { kind: "hook", lines: ["Most founders build a proof of concept when they need a minimum viable product."] },
+  { kind: "bullets", lines: ["A POC and an MVP answer different questions:", "A POC asks: can this work?", "An MVP asks: will anyone use it?"] },
+  { kind: "close", lines: ["Build the POC in a week. Ship the MVP to ten real users. Then decide."] },
+];
+export const SCRIPTED_DRAFT = renderBlocks(SCRIPTED_BLOCKS, { bullet: "-", numbered: true });
 
 /** Canned specialist outputs, tried in order against the requested schema. */
 const CANNED: unknown[] = [
@@ -215,8 +251,10 @@ const CANNED: unknown[] = [
     payload: {
       readiness: "ready",
       title: SCRIPTED_TITLE,
-      hook: "Most founders build a proof of concept when they need a minimum viable product.",
-      draft: SCRIPTED_DRAFT,
+      postType: "framework",
+      blocks: SCRIPTED_BLOCKS,
+      facts: [],
+      missingFacts: [],
       clarifyingQuestion: null,
     },
   },
@@ -272,16 +310,164 @@ export const SCRIPTED_IDEAS = [
 
 CANNED.push({ ideas: SCRIPTED_IDEAS });
 
+/** The mock own-style extraction (Task W4): the descriptive parts of a style; the layout is measured by the server. */
+const MOCK_RULES = (t: string) => ({ do: [`Keep ${t} short and plain.`], dont: [`Pad the ${t}.`] });
+export const SCRIPTED_STYLE = {
+  language: "en-GB",
+  voiceTarget: "Write plainly, in short blocks, with one concrete detail per post.",
+  rules: { hooks: MOCK_RULES("hooks"), rhythm: MOCK_RULES("rhythm"), formatting: MOCK_RULES("formatting"), diction: MOCK_RULES("word choice"), closings: MOCK_RULES("closings"), global: MOCK_RULES("posts") },
+  signatureMoves: [{ label: "Plain open", pattern: "[A flat claim about the work].", useWhen: "opening any post" }],
+  finalChecks: ["Is the hook one short line?", "Is there one concrete detail?"],
+  referencePostIndexes: [0, 1, 2],
+  postTypes: ["story", "opinion", "short"],
+};
+CANNED.push(SCRIPTED_STYLE);
+
+/** The mock post analysis (Task W10): six good ratings and one cosmetic note, which belongs under "Optional". */
+export const SCRIPTED_ANALYSIS = {
+  criteria: ["hook", "fold-layout", "flow", "voice-rules", "accuracy", "audience-clarity"].map((id) => ({ id, rating: "good", note: `The ${id} reads well.` })),
+  issues: [{ quote: "", problem: "The closing line could be a little warmer.", rewrite: "", impact: "nit" }],
+  optional: [],
+};
+CANNED.push(SCRIPTED_ANALYSIS);
+
+/** One scripted hook per purpose, plain and short, about hiring a first engineer (Task W7). */
+const MOCK_HOOK_TEXTS: Record<string, string> = {
+  claim: "Hiring your first engineer is a product decision.",
+  contrarian: "Stop searching for a rockstar engineer.",
+  mistake: "The costliest first-hire mistake: hiring for speed.",
+  "how-to": "How to brief an engineer before day one.",
+  comparison: "Generalist or specialist? Pick by stage.",
+  curiosity: "What good engineers ask before they say yes.",
+  story: "Last spring, my first hire quit in week two.",
+  proof: "Our first hire shipped on day four.",
+  number: "Three questions to ask before any first hire.",
+  prediction: "Soon, small teams will hire for judgement first.",
+  question: "What if the job post is the real filter?",
+  announcement: "New: a hiring checklist for founders.",
+};
+
+/** The scripted answer to a hooks call: one hook for each purpose named in the prompt's <assignments>. */
+function mockHooks(prompt: string): { hooks: unknown[] } | null {
+  const block = /<assignments>\n([\s\S]*?)\n<\/assignments>/.exec(prompt)?.[1];
+  if (!block) return null;
+  const purposes = [...block.matchAll(/^\d+\. ([a-z-]+) \(/gm)].map((m) => m[1]!);
+  return {
+    hooks: purposes.map((purpose) => ({
+      purpose,
+      text: MOCK_HOOK_TEXTS[purpose] ?? "A plain first line.",
+      claim: `The post makes the ${purpose} point.`,
+      mustDeliver: "One concrete example that backs the line.",
+      bodyShape: "A short lead-in and two to three items",
+      isPersonal: purpose === "story" || purpose === "proof",
+    })),
+  };
+}
+
+/** Keyword routes, tried before CANNED: one schema can return a different canned output per scenario. */
+export const SCRIPTED_QUESTIONS = ["Who was your first hire, and when did you hire them?", "What changed for the team after they joined?"];
+const WALL =
+  "A proof of concept answers one narrow question about whether the idea can work at all, while a minimum viable product answers a much wider one about real demand, about paying users, about retention and about what the team should build next";
+export const EMOJI_DRAFT_BLOCKS: WriterBlock[] = [
+  { kind: "hook", lines: ["Stop building the wrong thing \u{1F680}"] },
+  { kind: "prose", lines: [WALL] },
+  { kind: "close", lines: ["Pick the harder question first."] },
+];
+export const EMOJI_REPAIRED_BLOCKS: WriterBlock[] = [
+  { kind: "hook", lines: ["Stop building the wrong thing \u{1F680}"] },
+  { kind: "prose", lines: ["A proof of concept answers one narrow question.", "A minimum viable product answers a wider one."] },
+  { kind: "prose", lines: ["The wider one is about real demand and paying users."] },
+  { kind: "close", lines: ["Pick the harder question first."] },
+];
+const ROUTES: { match: RegExp; output: unknown }[] = [
+  {
+    // A format picked in the composer (Task W8): the scripted writer follows a plan with a numbered list.
+    match: /The user picked this format \("Myth, truth, proof"\)/,
+    output: {
+      summary: "A myth-truth-proof post.",
+      findings: [],
+      recommendation: "Create the post.",
+      missingInput: [],
+      confidence: "medium",
+      parentAction: "create-document",
+      payload: {
+        readiness: "ready",
+        title: "MVP myths",
+        postType: "framework",
+        blocks: [
+          { kind: "hook", lines: ["An MVP is not a small version of the product."] },
+          { kind: "numbered", lines: ["Three things an MVP actually is:", "A test of one risky assumption", "A way to hear from real users", "A reason to stop building early"] },
+          { kind: "close", lines: ["Build the smallest thing that can prove you wrong."] },
+        ],
+        facts: [],
+        missingFacts: [],
+        clarifyingQuestion: null,
+      },
+    },
+  },
+  {
+    match: /\[e2e:emoji-draft\]/,
+    output: {
+      summary: "A short post.",
+      findings: [],
+      recommendation: "Create the post.",
+      missingInput: [],
+      confidence: "medium",
+      parentAction: "create-document",
+      payload: { readiness: "ready", title: "Wrong thing first", postType: "opinion", blocks: EMOJI_DRAFT_BLOCKS, facts: [], missingFacts: [], clarifyingQuestion: null },
+    },
+  },
+  // The polish pass's repair call (writing/polish.ts) carries the same request, so it matches the marker too.
+  { match: /\[e2e:emoji-draft\]/, output: { blocks: EMOJI_REPAIRED_BLOCKS } },
+  {
+    match: /\[e2e:needs-facts\]/,
+    output: {
+      summary: "The post needs facts only the author has.",
+      findings: [],
+      recommendation: "Ask the user for the missing facts.",
+      missingInput: SCRIPTED_QUESTIONS,
+      confidence: "low",
+      parentAction: "ask-user",
+      payload: {
+        readiness: "needs-user-input",
+        title: "Your first hire",
+        postType: "story",
+        blocks: [],
+        facts: [],
+        missingFacts: SCRIPTED_QUESTIONS,
+        clarifyingQuestion: SCRIPTED_QUESTIONS[0],
+      },
+    },
+  },
+];
+
 /** A specialist client for mock mode: `text` names chats, `json` returns the first canned output the schema accepts. */
 export function scriptedAi(): AiClient {
   return {
     async text() {
       return "Mock chat";
     },
-    async json({ schema }) {
+    async json({ schema, prompt }) {
+      const hooks = mockHooks(prompt);
+      if (hooks) {
+        const parsed = schema.safeParse(hooks);
+        if (parsed.success) return parsed.data;
+      }
+      for (const route of ROUTES) {
+        if (!route.match.test(prompt)) continue;
+        const parsed = schema.safeParse(route.output);
+        if (parsed.success) return parsed.data;
+      }
       for (const candidate of CANNED) {
         const parsed = schema.safeParse(candidate);
-        if (parsed.success) return parsed.data;
+        if (!parsed.success) continue;
+        // A picked hook becomes the opening of the scripted post (the real writer is told the same in its brief).
+        const chosen = /chosenHook: open the post with exactly this hook: "([^"]+)"/.exec(prompt)?.[1];
+        const payload = (parsed.data as { payload?: { blocks?: WriterBlock[] } } | null)?.payload;
+        if (chosen && payload?.blocks?.length) {
+          return { ...parsed.data, payload: { ...payload, blocks: [{ kind: "hook", lines: [chosen] }, ...payload.blocks.slice(1)] } } as typeof parsed.data;
+        }
+        return parsed.data;
       }
       throw new Error("scriptedAi has no canned output for this schema.");
     },

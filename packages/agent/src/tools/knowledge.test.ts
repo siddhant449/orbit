@@ -106,14 +106,16 @@ describe("readKB and listKB", () => {
 });
 
 describe("buildTools", () => {
-  const sel = { knowledgeIds: [], writingStyleId: null, webSearchEnabled: true, quickLinkKey: null };
+  const sel = { knowledgeIds: [], writingStyleId: null, webSearchEnabled: true, quickLinkKey: null, formatId: null };
 
-  it("buildTools exposes the fifteen tools", async () => {
+  it("buildTools exposes the seventeen tools", async () => {
     expect(Object.keys(buildTools(await testContext())).sort()).toEqual([
+      "analyzePost",
       "createDocument",
       "delegateEditing",
       "delegateWriting",
       "editMemory",
+      "generateHooks",
       "getContentStrategy",
       "getPostVersions",
       "listKB",

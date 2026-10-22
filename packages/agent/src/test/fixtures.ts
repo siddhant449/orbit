@@ -5,7 +5,7 @@ import { ensureAccount, prisma } from "@brandloop/db";
 import type { TurnContext } from "../context";
 
 /** Every fixture user starts with this, so cleanup never touches other packages' test data. */
-const CLERK_PREFIX = "user_test_agent";
+const CLERK_PREFIX = "user_wr_agent";
 
 /** A fresh user, team and profile. Same `n` in one run returns the same profile (call `cleanup` between tests). */
 export async function testProfile(n = 1): Promise<{ userId: string; profileId: string }> {
@@ -60,15 +60,17 @@ export async function testContext(over: Partial<TurnContext> = {}): Promise<Turn
     chatId: "chat_test",
     runId: "run_test",
     requestMessageId: "msg_test",
+    userText: "",
     taskId: "task_test",
     ai: fakeAi(),
     embedder: fakeEmbedder(),
-    selections: { knowledgeIds: [], writingStyleId: null, webSearchEnabled: true, quickLinkKey: null },
+    selections: { knowledgeIds: [], writingStyleId: null, webSearchEnabled: true, quickLinkKey: null, formatId: null },
     writer: null,
     handoffs: new Map(),
     documentRef: { current: null },
     documentContext: null,
     now: () => new Date("2026-10-21T09:00:00Z"),
+    deadline: new Date(Date.now() + 285_000),
     ...over,
   };
 }

@@ -59,6 +59,7 @@ function body(text: string, over: { messageId?: string; runId?: string; id?: str
     },
     selectedKnowledgeBaseIds: [],
     selectedWritingStyleId: null,
+    selectedFormatId: null,
     webSearchEnabled: false,
   };
 }
@@ -451,7 +452,7 @@ describe("drafting a post", () => {
     const model = scriptedModel([
       {
         toolCalls: [
-          { toolCallId: "call_w", toolName: "delegateWriting", input: { request: "A short post about MVP vs POC for founders", specialty: "post" } },
+          { toolCallId: "call_w", toolName: "delegateWriting", input: { request: "A short post about MVP vs POC for founders", specialty: "post", personalDetails: null, overrides: null, chosenHook: null } },
         ],
       },
       { toolCalls: [{ toolName: "createDocument", input: { title: "MVP versus POC", kind: "text", specialistHandoffToolCallId: "call_w" } }] },
@@ -488,7 +489,7 @@ describe("drafting a post", () => {
     const model = scriptedModel([
       {
         toolCalls: [
-          { toolCallId: "call_w2", toolName: "delegateWriting", input: { request: "Another short post about MVP vs POC for founders", specialty: "post" } },
+          { toolCallId: "call_w2", toolName: "delegateWriting", input: { request: "Another short post about MVP vs POC for founders", specialty: "post", personalDetails: null, overrides: null, chosenHook: null } },
         ],
       },
       { toolCalls: [{ toolName: "createDocument", input: { title: "Second", kind: "text", specialistHandoffToolCallId: "call_w2" } }] },

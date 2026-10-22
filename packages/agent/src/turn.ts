@@ -182,6 +182,9 @@ function handoffSummaries(handoffs: TurnContext["handoffs"]): TurnOutcome["hando
       parentAction: h.parentAction,
       requestDigest: h.requestDigest,
       hasMissingInput: h.missingInput.length > 0,
+      missingFacts: Array.isArray((h.payload as { missingFacts?: unknown } | null)?.missingFacts)
+        ? ((h.payload as { missingFacts: unknown[] }).missingFacts.filter((f): f is string => typeof f === "string"))
+        : [],
     };
   });
 }
@@ -455,6 +458,7 @@ export async function runChatTurn(
       chatId,
       runId,
       requestMessageId,
+      userText,
       // Continue the active task's id, so tools and the ledger agree on it.
       taskId: prevTask?.status === "active" ? prevTask.taskId : newId(),
       ai: deps.ai,
@@ -464,6 +468,7 @@ export async function runChatTurn(
         writingStyleId: body.selectedWritingStyleId,
         webSearchEnabled: body.webSearchEnabled,
         quickLinkKey: body.quickLinkKey ?? null,
+        formatId: body.selectedFormatId,
       },
       writer: null,
       handoffs: new Map(),
@@ -471,6 +476,7 @@ export async function runChatTurn(
       documentContext: body.documentContext ?? null,
       visuals: deps.visuals ?? null,
       now,
+      deadline: new Date(Date.now() + (deps.turnTimeoutMs ?? TURN_TIMEOUT_MS)),
     };
     const tools = tagToolErrors(buildTools(ctx, { webSearchTool: deps.webSearchTool }));
     const instructions = buildSystemPrompt(await loadPromptInput(ctx, prevTask));

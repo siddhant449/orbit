@@ -164,4 +164,13 @@ describe("memoryTools", () => {
     expect(out.length).toBeLessThanOrEqual(12_000 + 80);
     expect(out).toMatch(/\[output truncated at 12,000 characters\]$/);
   });
+
+  it("the learning guard keeps a writing request from becoming a remembered fact (the Kleo case)", async () => {
+    const test = "Write one LinkedIn post for founders hiring their first engineer. No personal details. Just a test.";
+    const out = await saveMemoryFacts(p, { category: "about", topic: null, facts: ["Has hired their first engineer"] }, test);
+    expect(out).toMatch(/^Refused: nothing was saved/);
+    expect((await prisma.memoryDoc.findUnique({ where: { profileId_key: { profileId: p, key: "identity/about" } } }))?.content ?? "").not.toMatch(/first engineer/);
+    const ok = await saveMemoryFacts(p, { category: "about", topic: null, facts: ["Runs a design studio in Pune"] }, "I run a design studio in Pune.");
+    expect(ok).toMatch(/^✓ Updated about/);
+  });
 });

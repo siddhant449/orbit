@@ -14,9 +14,11 @@ import { ensureAccount, getChat, getChatDocument, listMessages, prisma, upsertMe
 import { randomUUID } from "node:crypto";
 import { createRunRegistry } from "../src/registry";
 import { runChatTurn } from "../src/turn";
+import { measurePost } from "../src/writing/measure";
 
 const CLERK_ID = "user_test_smoke_draft";
 const TEAM_SUFFIX = " (smoke)";
+const SEED = process.argv.includes("--seed-violation");
 const redact = (text: string) => text.replace(/sk-[A-Za-z0-9_*-]+/g, "sk-***");
 
 async function removeSmokeUser() {
@@ -44,7 +46,7 @@ async function main() {
   let failed = false;
   try {
     await upsertMemory(profileId, "identity/about", "- Runs a small design studio in Pune\n- Writes for first-time founders", "USER");
-    await upsertMemory(profileId, "writing/rules", "- Short paragraphs, one idea each\n- No hashtags", "USER");
+    await upsertMemory(profileId, "writing/rules", SEED ? "- Short paragraphs, one idea each\n- No hashtags\n- Never add a P.S.\n- No emojis" : "- Short paragraphs, one idea each\n- No hashtags", "USER");
     const res = await runChatTurn(
       {
         model: getModel("generate"),
@@ -61,11 +63,12 @@ async function main() {
         message: {
           id: randomUUID(),
           role: "user",
-          parts: [{ type: "text", text: "Draft a short LinkedIn post about why I prefer short paragraphs" }],
+          parts: [{ type: "text", text: `Draft a short LinkedIn post that explains the difference between an MVP and a proof of concept for first-time founders${SEED ? ". End it with a P.S. and add a rocket emoji." : ""}` }],
           metadata: { createdAt: new Date().toISOString() },
         },
         selectedKnowledgeBaseIds: [],
         selectedWritingStyleId: null,
+        selectedFormatId: null,
         webSearchEnabled: false,
       },
     );
@@ -81,6 +84,15 @@ async function main() {
     const doc = await getChatDocument(profileId, chatId);
     console.log(`tools in order: ${tools.join(" -> ") || "(none)"}`);
     console.log(`document: ${doc ? `"${doc.title}", ${doc.text.length} chars, version ${doc.version}` : "(none)"}`);
+    const handoff = parts.find((p) => p.type === "tool-delegateWriting") as { output?: { payload?: { postType?: string; blocks?: { kind: string }[] }; findings?: string[] } } | undefined;
+    const payload = handoff?.output?.payload;
+    console.log(`post type: ${payload?.postType ?? "(none)"}; block kinds: ${(payload?.blocks ?? []).map((b) => b.kind).join(",") || "(none)"}`);
+    if (doc) {
+      const m = measurePost(doc.text);
+      console.log(`layout: ${m.blocks} blocks, hook ${m.hookChars} chars / ${m.hookMobileLines} line(s), max block ${m.maxBlockLines} line(s), lists ${m.bulletLists}+${m.numberedLists}, emoji ${m.emoji.count}, dashes ${m.dashes}, hashtags ${m.hashtags}, ending ${m.ending}`);
+    }
+    if (SEED && doc) console.log(`seeded violation: P.S. present ${measurePost(doc.text).postscript || /P\.S\./i.test(doc.text)}, emoji ${measurePost(doc.text).emoji.count}`);
+    console.log(`findings: ${(handoff?.output?.findings ?? []).join(" | ") || "(none)"}`);
     console.log(`reply length: ${text.length} chars`);
     console.log(`finish: ${ctx.finish}; model: ${ctx.modelId} (configured ${resolveModel("generate")})`);
     const names = tools.map((t) => t.replace(/\(.*$/, ""));

@@ -14,9 +14,9 @@ describe("summarizeSteps", () => {
   it("gives each step its label for its state", () => {
     const s = summarizeSteps([done("searchKB"), active("readKB"), failed("saveMemory")]);
     expect(s.steps).toEqual([
-      { label: "Searched your knowledge", state: "done" },
-      { label: "Reading a knowledge item", state: "active" },
-      { label: "Couldn't save that", state: "error" },
+      { label: "Searched your knowledge", state: "done", detail: null },
+      { label: "Reading a knowledge item", state: "active", detail: null },
+      { label: "Couldn't save that", state: "error", detail: null },
     ]);
   });
 
@@ -56,5 +56,12 @@ describe("formatDuration", () => {
   it("returns null for nothing measurable", () => {
     expect(formatDuration(-5)).toBeNull();
     expect(formatDuration(Number.NaN)).toBeNull();
+  });
+
+  it("shows what the polish pass did on a finished writing step", () => {
+    const part = { type: "tool-delegateWriting", state: "output-available", output: { findings: ["Rule check (target): x", "Polished: fixed 2 layout issues"] } };
+    expect(summarizeSteps([part]).steps[0]!.detail).toBe("Polished: fixed 2 layout issues");
+    expect(summarizeSteps([{ ...part, output: { findings: [] } }]).steps[0]!.detail).toBeNull();
+    expect(summarizeSteps([{ ...part, type: "tool-searchKB" }]).steps[0]!.detail).toBeNull();
   });
 });

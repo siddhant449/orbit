@@ -4,9 +4,12 @@ import { lazy, memo, Suspense } from "react";
 import { collapseToolRuns, parseProposal, type ChatUIMessage, type Proposal } from "@brandloop/agent/client";
 import type { EditVisualOutput, ProposeVisualOutput, SuggestVisualsOutput } from "@brandloop/agent";
 import { cn } from "@brandloop/ui";
+import { AnalysisCard, analysisOf } from "./analysis-card";
 import { DraftCard } from "./document-panel";
+import { HookCards, hookCardsOf } from "./hook-cards";
 import { ProposalCard } from "./proposal-card";
 import { VisualConceptCards, VisualEditStatus, VisualProposalCard } from "./visual-cards";
+import { ReviewCard, reviewChecksOf } from "./review-card";
 import { MemoryTag, memoryTagOf } from "./memory-tag";
 import { StepsDisclosure } from "./steps-disclosure";
 import type { ToolPartLike } from "./tool-row";
@@ -58,6 +61,15 @@ export function MessageParts({ message, streaming }: { message: ChatUIMessage; s
     const tag = memoryTagOf(p);
     return tag ? [{ key: i, ...tag }] : [];
   });
+  const reviews = (message.parts as (ToolPartLike & { toolCallId?: string })[]).flatMap((p, i) => {
+    const checks = reviewChecksOf(p);
+    return checks ? [{ key: p.toolCallId ?? String(i), checks }] : [];
+  });
+  const hookSets = hookCardsOf(message.parts as ToolPartLike[]);
+  const analyses = (message.parts as ToolPartLike[]).flatMap((p) => {
+    const a = analysisOf(p);
+    return a ? [a] : [];
+  });
   return (
     <>
       {items.map((it, i) => {
@@ -72,6 +84,15 @@ export function MessageParts({ message, streaming }: { message: ChatUIMessage; s
         return null;
       })}
       {draft && <DraftCard fallback={draft} />}
+      {analyses.map((a, i) => (
+        <AnalysisCard key={i} analysis={a} />
+      ))}
+      {hookSets.map((cards, i) => (
+        <HookCards key={i} cards={cards} />
+      ))}
+      {reviews.map(({ key, checks }) => (
+        <ReviewCard key={key} checks={checks} />
+      ))}
       {proposals.map(({ toolCallId, proposal }) => (
         <ProposalCard key={toolCallId} toolCallId={toolCallId} proposal={proposal} />
       ))}

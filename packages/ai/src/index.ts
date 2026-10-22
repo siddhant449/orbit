@@ -6,3 +6,4 @@ export * from "./embed";
 export * from "./usage-limits";
 export * from "./moderation";
 export * from "./models";
+export * from "./style";

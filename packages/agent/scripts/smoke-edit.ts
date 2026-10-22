@@ -65,6 +65,7 @@ async function main() {
         },
         selectedKnowledgeBaseIds: [],
         selectedWritingStyleId: null,
+        selectedFormatId: null,
         webSearchEnabled: false,
         documentContext: { id: before.id, version: before.version },
       },

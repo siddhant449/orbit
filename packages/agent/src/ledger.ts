@@ -79,6 +79,7 @@ export function nextActiveTask(prev: ActiveTask | null, turn: TurnOutcome, newId
     completedActions: actions.slice(-MAX_ACTIONS),
     recentDirections: directions.slice(-MAX_DIRECTIONS),
     pendingQuestion,
+    missingFacts: needsInput ? [...new Set(turn.handoffs.flatMap((h) => h.missingFacts))].slice(0, 5) : [],
     flow: turn.flow,
     pendingPicker: turn.picker,
     updatedAt: turn.now.toISOString(),
@@ -96,6 +97,7 @@ export function renderActiveTask(task: ActiveTask | null): string {
     `latest request: ${task.latestRequest || "(none)"}`,
   ];
   if (task.pendingQuestion) lines.push(`pending question: ${task.pendingQuestion}`);
+  if (task.missingFacts.length > 0) lines.push(`missing facts: ${task.missingFacts.join(" | ")}`);
   if (task.pendingPicker) lines.push(`pending picker: ${task.pendingPicker.id} | ${task.pendingPicker.question}`);
   if (task.flow) lines.push(`flow: ${task.flow.id} | step ${task.flow.step}`);
   if (task.handoffs.length > 0) {

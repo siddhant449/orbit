@@ -97,7 +97,7 @@ describe("loadPromptInput", () => {
     const ctx = await testContext({
       profileId,
       userId,
-      selections: { knowledgeIds: [mine.id, theirs.id], writingStyleId: null, webSearchEnabled: false, quickLinkKey: "review-it" },
+      selections: { knowledgeIds: [mine.id, theirs.id], writingStyleId: null, webSearchEnabled: false, quickLinkKey: "review-it", formatId: null },
       documentRef: { current: doc },
     });
 

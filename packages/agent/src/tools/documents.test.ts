@@ -223,6 +223,17 @@ describe("updateDocument", () => {
     expect(types.indexOf("data-document")).toBeGreaterThan(types.lastIndexOf("data-textDelta"));
   });
 
+  it("saves only polished text: an em dash the edit introduced is gone when the rules forbid dashes", async () => {
+    await upsertMemory(ctx.profileId, "writing/rules", "- Don't use em dashes\n- No emojis", "USER");
+    const d = await openPost();
+    ctx.ai = fakeAi({ text: "Short hook \u2014 now.\n\nThe body stays the same \u{1F680}", changeSummary: "Shortened the hook", unmetRequirements: [] });
+    const out = await run(ctx, "updateDocument", edit);
+    expect(out).toMatchObject({ success: true, version: 2 });
+    const saved = (await getDocument(ctx.profileId, d.id))!;
+    expect(saved.text).toBe("Short hook, now.\n\nThe body stays the same");
+    expect(saved.text).not.toMatch(/\u2014|\u{1F680}/u);
+  });
+
   it("reports EDIT_REQUIREMENTS_MISSED after one retry and saves nothing", async () => {
     const d = await openPost();
     const ai = fakeAi({ text: "Whatever", changeSummary: "s", unmetRequirements: ["Add a CTA"] });
@@ -383,6 +394,19 @@ describe("delegateEditing (final review)", () => {
     expect(out.payload.qualityReview.deterministicChecks.find((c) => c.id === "length")!.passed).toBe(false);
     expect(out.sourceRevisions.document).toMatchObject({ version: 1 });
     expect(ctx.handoffs.get("call_r")).toBe(out);
+  });
+
+  it("fails the review on a writing check and keeps the 8 old checks first", async () => {
+    await upsertMemory(ctx.profileId, "writing/rules", "## Don't\n- Don't use em dashes\n- No emojis", "USER");
+    await openPost("Launch day \u2014 finally.\n\nShort body.");
+    ctx.ai = fakeAi(review());
+    const out = (await run(ctx, "delegateEditing", { request: "Review the post before I publish it", specialty: "final-review" })) as HandoffEnvelope<{
+      qualityReview: { passed: boolean; deterministicChecks: { id: string; passed: boolean }[] };
+    }>;
+    const checks = out.payload.qualityReview.deterministicChecks;
+    expect(checks.slice(0, 8).map((c) => c.id)).toEqual(["length", "hook-length", "hashtags", "banned-words", "placeholders", "markdown", "links", "emoji"]);
+    expect(checks.find((c) => c.id === "dashes")).toMatchObject({ passed: false });
+    expect(out.payload.qualityReview.passed).toBe(false);
   });
 
   it("uses banned words from writing rules and tells the reviewer the check results", async () => {

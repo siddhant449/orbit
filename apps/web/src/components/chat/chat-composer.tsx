@@ -6,6 +6,7 @@ import { Button, ComposerShell, cn } from "@brandloop/ui";
 import { SendIcon } from "@brandloop/ui/icons";
 import { VoicePicker, type VoiceOption } from "@/components/home/voice-picker";
 import { ModelPicker, type AiModelInfo } from "./model-picker";
+import { FormatMenu } from "./format-menu";
 import { KnowledgeChip, KnowledgePicker, type KnowledgeChoice } from "./knowledge-picker";
 
 /** Where the home composer sat when the chat started: the docked composer glides from there. */
@@ -46,6 +47,8 @@ export function ChatComposer({
   onKnowledgeChange,
   webSearch,
   onWebSearchChange,
+  formatId = null,
+  onFormatChange,
   fromRect,
   inputRef,
   model,
@@ -61,6 +64,9 @@ export function ChatComposer({
   onKnowledgeChange: (next: KnowledgeChoice[]) => void;
   webSearch: boolean;
   onWebSearchChange: (on: boolean) => void;
+  /** The framework or template picked for the next message (Task W8); omit to hide the Format menu. */
+  formatId?: string | null;
+  onFormatChange?: (id: string | null) => void;
   fromRect?: ComposerRect | null;
   inputRef: RefObject<HTMLTextAreaElement | null>;
   model?: { current: string | null; info: AiModelInfo | null; onChoose: (id: string) => void };
@@ -124,6 +130,7 @@ export function ChatComposer({
             </Button>
             <VoicePicker voices={voices} selectedId={selectedVoiceId} />
             {model && <ModelPicker current={model.current} info={model.info} onChoose={model.onChoose} />}
+            {onFormatChange && <FormatMenu value={formatId} onChange={onFormatChange} disabled={busy} />}
           </div>
           {busy ? (
             <button

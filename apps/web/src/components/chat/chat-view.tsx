@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import useSWR from "swr";
 import { ArrowDown, SquarePen } from "lucide-react";
 import { toast } from "sonner";
-import { toolLabel, type ChatUIMessage, type PanelDoc } from "@brandloop/agent/client";
+import { swapOpening, toolLabel, type ChatUIMessage, type HookCard, type PanelDoc } from "@brandloop/agent/client";
 import { Button, useMediaQuery } from "@brandloop/ui";
 import { PostsIcon } from "@brandloop/ui/icons";
 import type { VoiceOption } from "@/components/home/voice-picker";
@@ -18,6 +18,7 @@ import { distanceFromBottom, followReducer, initialFollow, type FollowEvent } fr
 import { HISTORY_KEY } from "./history-key";
 import { useChatSession } from "./use-chat-session";
 import { DESKTOP_PANEL, DocumentPanel, DocumentPanelContext } from "./document-panel";
+import { HookActionsContext } from "./hook-cards";
 import { QuickLinkChips } from "./quick-link-chips";
 import { useDocument } from "./use-document";
 
@@ -106,6 +107,7 @@ export function ChatView({
   const [knowledge, setKnowledge] = useState<KnowledgeChoice[]>([]);
   const [webSearch, setWebSearch] = useState(true);
   const aiModel = useAiModel();
+  const [formatId, setFormatId] = useState<string | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const initialIds = useMemo(() => new Set(initialMessages.map((m) => m.id)), [initialMessages]);
 
@@ -127,6 +129,7 @@ export function ChatView({
     documentContext: post.context,
   });
   const busy = status === "submitted" || status === "streaming";
+
 
   // The title arrives with the history list (it is written just after the first reply).
   const { data: history } = useSWR<History>(HISTORY_KEY, fetchJson);
@@ -207,7 +210,9 @@ export function ChatView({
     }
     setDraft("");
     jumpToLatest();
-    void send(text);
+    // A picked format applies to this one message: it rides in the request body and the chip clears.
+    void send(text, { formatId });
+    setFormatId(null);
   }
 
   function quickLink(key: string, prompt: string) {
@@ -220,6 +225,25 @@ export function ChatView({
     void sendQuickLink(key, prompt);
   }
 
+  /** "Use this hook": with a post open the opening is swapped and saved as a new version; otherwise a draft starts from it. */
+  async function useHook(card: HookCard) {
+    if (busy) return;
+    if (post.saving) {
+      toast(SAVING_FIRST);
+      return;
+    }
+    const doc = post.state.doc;
+    if (doc && doc.version > 0) {
+      const res = await post.save(swapOpening(doc.text, card.text), doc.version);
+      if (res.ok) toast(`Opening swapped. Saved as version ${res.version}.`);
+      else if ("conflict" in res) toast("This post changed. Reloaded the latest version; pick the hook again.");
+      else toast(res.error);
+      return;
+    }
+    jumpToLatest();
+    void sendQuickLink("use-hook", `Use this opening line: "${card.text}"`);
+  }
+
   const live = liveStatus(messages, status, initialIds);
   const hasPost = Boolean(post.state.doc && post.state.doc.version > 0);
   const panelShown = post.state.open && desktop;
@@ -230,6 +254,7 @@ export function ChatView({
 
   return (
     <DocumentPanelContext.Provider value={post}>
+    <HookActionsContext.Provider value={{ useHook: (c) => void useHook(c), disabled: busy }}>
     <div className="flex h-full min-h-0" data-document-host="" style={{ "--thread-scrollbar": `${scrollbar}px` } as CSSProperties}>
     <div className="relative flex min-w-0 flex-1 flex-col">
       <header className="relative z-10 flex min-h-14 shrink-0 items-center justify-between gap-3 py-3 pl-(--gutter) pr-[calc(var(--gutter)+var(--thread-scrollbar,0px))] md:min-h-(--header-row) md:py-[18px]">
@@ -313,6 +338,8 @@ export function ChatView({
             onKnowledgeChange={setKnowledge}
             webSearch={webSearch}
             onWebSearchChange={setWebSearch}
+            formatId={formatId}
+            onFormatChange={setFormatId}
             fromRect={fromRect}
             inputRef={inputRef}
             model={{ current: aiModel.current, info: aiModel.info, onChoose: (id) => void aiModel.choose(id) }}
@@ -329,6 +356,7 @@ export function ChatView({
     </div>
     <DocumentPanel ctl={post} busy={busy} />
     </div>
+    </HookActionsContext.Provider>
     </DocumentPanelContext.Provider>
   );
 }

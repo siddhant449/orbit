@@ -19,6 +19,8 @@ export type TurnContext = {
   chatId: string;
   runId: string;
   requestMessageId: string;
+  /** The user's own words in this turn. Only this text can unlock a one-turn rule override; tool output never does. */
+  userText: string;
   taskId: string;
   ai: AiClient;
   embedder: Embedder | null;
@@ -27,6 +29,8 @@ export type TurnContext = {
     writingStyleId: string | null;
     webSearchEnabled: boolean;
     quickLinkKey: string | null;
+    /** A framework or template the user picked for this message, or null. */
+    formatId: string | null;
   };
   writer: UIMessageStreamWriter | null;
   /** Specialist envelopes produced this turn, keyed by tool call id. */
@@ -41,4 +45,6 @@ export type TurnContext = {
   /** Image tools are offered only when the app wires this in (VISUALS_ENABLED). */
   visuals?: VisualsToolDeps | null;
   now: () => Date;
+  /** When the turn is aborted. The polish pass skips its model repair in the last 20 s. */
+  deadline: Date;
 };
