@@ -17,24 +17,20 @@ export function PageHeader({
   className?: string;
 }) {
   return (
-    <header
-      className={cn(
-        "flex w-full max-w-[880px] flex-wrap items-end justify-between gap-x-6 gap-y-4 px-5 pt-8 md:px-8 md:pt-[28px]",
-        className,
-      )}
-    >
-      <div className="min-w-0">
-        <h1 className="type-page-title text-text focus-visible:outline-none">{title}</h1>
-        {subtitle && <p className="mt-2.5 max-w-[64ch] text-[15px] leading-[1.55] text-text-2">{subtitle}</p>}
+    <header className={cn("w-full max-w-[880px] px-(--gutter) pt-6 md:pt-8", className)}>
+      {/* Actions sit on the title's line, centred on it (not on the subtitle's last line), and wrap under it when narrow. */}
+      <div className="flex min-h-10 flex-wrap items-center justify-between gap-x-6 gap-y-3">
+        <h1 className="type-page-title min-w-0 text-text focus-visible:outline-none">{title}</h1>
+        {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
       </div>
-      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+      {subtitle && <p className="mt-3 max-w-[64ch] text-[15px] leading-[1.55] text-text-2">{subtitle}</p>}
     </header>
   );
 }
 
 /** Main column under a `PageHeader`: same left edge, `max-width` per screen (forms 760, lists 880, grids 1120). */
 export function PageBody({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn("w-full max-w-[880px] px-5 pb-16 pt-7 md:px-8", className)}>{children}</div>;
+  return <div className={cn("w-full max-w-[880px] px-(--gutter) pb-16 pt-8", className)}>{children}</div>;
 }
 
 /** Section heading inside a page (p14 "Social accounts"): 14 / 500 `text-2`, an optional note after a separator. */
@@ -60,10 +56,13 @@ export function EmptyState({
   className?: string;
 }) {
   return (
-    <section className={cn("orbit-panel flex flex-col items-start gap-3 p-6 md:p-8", className)}>
+    <section
+      data-empty-state=""
+      className={cn("orbit-panel flex flex-col items-center gap-3 px-6 py-10 text-center md:px-8 md:py-12", className)}
+    >
       <h2 className="type-card-title text-text">{title}</h2>
-      <div className="max-w-[60ch] text-[14px] leading-[1.6] text-text-2">{body}</div>
-      {action && <div className="mt-2 flex flex-wrap items-center gap-2">{action}</div>}
+      <div className="max-w-[52ch] text-[14px] leading-[1.6] text-text-2">{body}</div>
+      {action && <div className="mt-3 flex flex-wrap items-center justify-center gap-2">{action}</div>}
     </section>
   );
 }
@@ -78,7 +77,7 @@ export function Upcoming({ title, description, points }: { title: string; descri
     <>
       <PageHeader title={title} subtitle={description} />
       <PageBody>
-        <section aria-labelledby={id} className="rounded-card border border-dashed border-line-3 p-6 md:p-8">
+        <section aria-labelledby={id} className="rounded-card border border-dashed border-line-3 p-5 sm:p-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 id={id} className="type-card-title text-text">
               What&apos;s coming

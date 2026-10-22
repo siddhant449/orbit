@@ -200,9 +200,9 @@ export function DocumentPanel({ ctl, busy }: { ctl: DocumentController; busy: bo
   const duration = reduced ? 0 : durations.hover;
 
   const header = (
-    <header className="flex flex-col gap-4 px-6 pb-4 pt-5">
+    <header className="flex flex-col gap-4 px-6 pb-4 pt-4">
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
+        <div className="min-w-0 pt-1">
           <Dialog.Title asChild>
             <h2 ref={headingRef} tabIndex={-1} className="truncate text-[22px] font-medium leading-tight tracking-[-0.01em] text-text outline-none">
               {title}

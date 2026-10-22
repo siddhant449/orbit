@@ -17,7 +17,7 @@ export function TopBar({
   className?: string;
 }) {
   return (
-    <div className={cn("relative flex min-h-[68px] items-center justify-between gap-4 px-8 py-[18px]", className)}>
+    <div className={cn("relative flex min-h-(--header-row) items-center justify-between gap-4 px-(--gutter) py-[18px]", className)}>
       <div className="flex min-w-0 items-baseline gap-3">
         {crumb && <span className="text-[13px] text-text-3">{crumb}</span>}
         {title}

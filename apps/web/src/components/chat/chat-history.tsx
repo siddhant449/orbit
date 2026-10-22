@@ -153,7 +153,7 @@ export function ChatHistory({ onNavigate }: { onNavigate?: () => void }) {
                     onClick={onNavigate}
                     aria-current={current ? "page" : undefined}
                     className={cn(
-                      "flex min-h-[34px] items-center rounded-[8px] py-2 pl-3 pr-9 text-[13px] transition-colors duration-150",
+                      "flex h-9 items-center rounded-[8px] pl-3 pr-9 text-[13px] transition-colors duration-150",
                       current ? "bg-line-row text-text" : "text-text-soft hover:bg-line-soft hover:text-text",
                     )}
                   >
@@ -167,7 +167,7 @@ export function ChatHistory({ onNavigate }: { onNavigate?: () => void }) {
                         size="icon"
                         aria-label={`Chat options, ${chat.title}`}
                         className={cn(
-                          "history-row__menu absolute right-0.5 top-[1px] !h-8 !w-8 !rounded-[8px] text-text-2 hover:!bg-line-row hover:text-text",
+                          "history-row__menu absolute right-0.5 top-0.5 !h-8 !w-8 !rounded-[8px] text-text-2 hover:!bg-line-row hover:text-text",
                         )}
                       >
                         <MoreHorizontal aria-hidden="true" />

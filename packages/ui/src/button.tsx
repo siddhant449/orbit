@@ -37,7 +37,7 @@ export const buttonVariants = cva(
           "border border-line-4 text-danger hover:border-danger hover:bg-[color-mix(in_oklab,var(--danger)_10%,transparent)]",
         paper: "bg-inverse text-on-inverse hover:bg-inverse-hover hover:text-on-inverse-hover",
         inverse: "bg-inverse text-on-inverse",
-        micro: "h-auto min-h-6 border border-line-4 px-[9px] text-[11px] text-text hover:border-inverse hover:bg-inverse hover:text-on-inverse [&_svg]:size-3",
+        micro: "h-auto min-h-6 border border-line-4 px-2.5 text-[11px] text-text hover:border-inverse hover:bg-inverse hover:text-on-inverse [&_svg]:size-3",
         send: "size-12 rounded-full bg-accent p-0 text-on-accent hover:bg-accent-hover hover:shadow-glow [&_svg]:size-[18px]",
       },
     },

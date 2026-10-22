@@ -17,7 +17,7 @@ const VIEWS: { value: PreviewView; label: string; wide?: boolean }[] = [
 const EMOJI = ["👋", "🚀", "💡", "🎯", "✅", "❌", "👉", "👇", "📈", "📉", "🔥", "✨", "🙌", "🤝", "💬", "🧠", "⚡", "📌", "🛠️", "🎉", "😅", "🙏", "⭐", "➡️"];
 
 const item = cn(
-  "orbit-transition inline-flex h-9 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-pill text-[13px] font-medium",
+  "orbit-transition inline-flex h-9 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-pill text-[13px] font-medium max-sm:h-11",
   "text-on-inverse hover:bg-on-inverse/10 aria-disabled:cursor-default aria-disabled:opacity-35 aria-disabled:hover:bg-transparent",
   "focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent-text",
   "[&_svg]:size-4",
@@ -91,7 +91,7 @@ export function EditorToolbar({
       aria-keyshortcuts={shortcut?.replace("⌘", "Control+")}
       aria-disabled={off || undefined}
       onClick={() => !off && onClick()}
-      className={cn(item, "w-9")}
+      className={cn(item, "w-9 max-sm:w-11")}
     >
       {child}
     </button>
@@ -124,7 +124,7 @@ export function EditorToolbar({
             onClick={(e) => {
               if (editOff) e.preventDefault();
             }}
-            className={cn(item, "w-9")}
+            className={cn(item, "w-9 max-sm:w-11")}
           >
             <EmojiIcon />
           </button>

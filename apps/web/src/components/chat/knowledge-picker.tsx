@@ -82,9 +82,9 @@ export function KnowledgePicker({
       }}
     >
       <Popover.Trigger asChild>
-        <Button type="button" variant="ghost" size="sm" aria-label={selected.length ? `Knowledge, ${selected.length} selected` : "Knowledge"}>
+        <Button type="button" variant="ghost" size="sm" className="h-[var(--composer-control,32px)]" aria-label={selected.length ? `Knowledge, ${selected.length} selected` : "Knowledge"}>
           <BookOpen aria-hidden="true" />
-          <span className="hidden sm:inline">Knowledge</span>
+          <span className="hidden @md:inline">Knowledge</span>
           {selected.length > 0 && <span className="type-micro tabular-nums">{selected.length}</span>}
         </Button>
       </Popover.Trigger>

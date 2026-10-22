@@ -59,7 +59,7 @@ export function ProfileMenu({ iconOnly = false, settingsActive = false }: { icon
             "orbit-transition flex items-center gap-2.5 text-left",
             iconOnly
               ? "size-10 justify-center rounded-full"
-              : "w-full rounded-[12px] px-2.5 pb-1 pt-3 hover:bg-line-soft data-[state=open]:bg-line-soft",
+              : "h-12 w-full rounded-[12px] px-2.5 hover:bg-line-soft data-[state=open]:bg-line-soft",
           )}
           aria-label={iconOnly ? "Profile menu" : undefined}
         >

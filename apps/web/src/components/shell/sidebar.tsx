@@ -33,7 +33,7 @@ export function MainSidebar({
   const pathname = usePathname();
   return (
     <div className="relative flex h-full w-[240px] shrink-0 flex-col px-3 py-[18px]">
-      <div className="flex items-center justify-between gap-2 px-2 pb-4 pt-1">
+      <div className="flex h-8 items-center justify-between gap-2 pl-2">
         <Link href="/" onClick={onNavigate} aria-label="Orbit home" className="rounded-pill">
           <Logo />
         </Link>
@@ -62,20 +62,20 @@ export function MainSidebar({
         </div>
       </div>
 
-      <div className="mb-3.5">
+      <div className="mb-4 mt-4">
         <SprintCard state={SPRINT} active={pathname === "/challenge"} onNavigate={onNavigate} />
       </div>
 
       <MainNav pathname={pathname} onNavigate={onNavigate} indicatorId={indicatorId} />
 
-      <section aria-labelledby={`${indicatorId}-chats`} className="mt-[22px] min-h-0 flex-1 overflow-y-auto" data-lenis-prevent>
+      <section aria-labelledby={`${indicatorId}-chats`} className="-mx-1 mt-6 min-h-0 flex-1 overflow-y-auto px-1 pb-1" data-lenis-prevent>
         <h2 id={`${indicatorId}-chats`} className="sr-only">
           Chats
         </h2>
         <ChatHistory onNavigate={onNavigate} />
       </section>
 
-      <div className="mt-auto pt-3">
+      <div className="mt-auto pt-2">
         <ProfileMenu />
       </div>
     </div>
@@ -89,7 +89,7 @@ export function MainSidebar({
 export function Rail({ onSearch, onExpand }: Handlers & { onExpand?: () => void }) {
   const pathname = usePathname();
   return (
-    <div className="flex h-full w-[72px] shrink-0 flex-col items-center gap-2 py-[18px]">
+    <div className="flex h-full w-[72px] shrink-0 flex-col items-center gap-2 pb-[18px] pt-[14px]">
       <Link href="/" aria-label="Orbit home" className="mb-2 grid size-10 place-items-center rounded-[12px]">
         <LogoMark size={20} />
       </Link>
@@ -130,11 +130,11 @@ export function SectionPanel({ section, onNavigate, className }: { section: Sect
   const pathname = usePathname();
   return (
     <div className={cn("flex h-full w-[220px] shrink-0 flex-col px-3 py-[22px]", className)}>
-      <h2 className="type-card-title px-2.5 text-text">{section.title}</h2>
-      <nav aria-label={section.title} className="mt-5 flex flex-col gap-5 overflow-y-auto" data-lenis-prevent>
+      <h2 className="type-card-title flex h-6 items-center px-2.5 text-text">{section.title}</h2>
+      <nav aria-label={section.title} className="-mx-1 mt-5 flex flex-col gap-5 overflow-y-auto px-1 py-1" data-lenis-prevent>
         {section.groups.map((group) => (
           <div key={group.label ?? "default"} className="flex flex-col gap-1">
-            {group.label && <h3 className="mb-0.5 px-2.5 text-[11px] text-text-3">{group.label}</h3>}
+            {group.label && <h3 className="flex h-6 items-center px-2.5 text-[11px] text-text-3">{group.label}</h3>}
             {group.items.map((item) => (
               <SectionLink key={item.href} item={item} active={isActive(pathname, item.href)} onNavigate={onNavigate} />
             ))}
@@ -142,7 +142,7 @@ export function SectionPanel({ section, onNavigate, className }: { section: Sect
         ))}
       </nav>
       {/* Theme switch at the foot of the Settings sub-nav (system §3, p14). */}
-      {section.id === "settings" && <ThemeSwitch className="mt-auto px-2.5 pt-6" />}
+      {section.id === "settings" && <ThemeSwitch className="mt-auto pt-6" />}
     </div>
   );
 }

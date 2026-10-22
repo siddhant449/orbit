@@ -164,7 +164,7 @@ export function PostChat({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <header className="flex shrink-0 items-center justify-between gap-3 px-5 pb-2 pt-4">
+      <header className="flex min-h-(--header-row) shrink-0 items-center justify-between gap-3 px-5">
         <h2 id="post-chat-title" className="flex items-center gap-2.5 text-[13px] font-medium text-text-2">
           <LogoMark />
           Chat with Orbit
@@ -177,7 +177,7 @@ export function PostChat({
             </span>
           )}
           {onClose && (
-            <Button variant="ghost" size="icon" className="size-9 border border-line-3 lg:hidden" onClick={onClose} aria-label="Close chat">
+            <Button variant="ghost" size="icon" className="size-11 border border-line-3 lg:hidden" onClick={onClose} aria-label="Close chat">
               <CloseIcon />
             </Button>
           )}

@@ -33,7 +33,7 @@ export function NavLink({
       aria-current={active ? "page" : undefined}
       aria-keyshortcuts={item.shortcut ? SHORTCUT_KEYS[item.shortcut] : undefined}
       className={cn(
-        "orbit-transition group/nav relative flex min-h-[38px] items-center gap-3 rounded-[10px] px-2.5 text-[14px]",
+        "orbit-transition group/nav relative flex h-9 items-center gap-3 rounded-[10px] px-2.5 text-[14px]",
         active ? "font-medium text-text" : "text-text-soft hover:bg-line-soft hover:text-text",
       )}
     >
@@ -76,7 +76,7 @@ export function MainNav({
   className?: string;
 }) {
   return (
-    <nav aria-label="Main" className={cn("flex flex-col gap-0.5", className)}>
+    <nav aria-label="Main" className={cn("flex flex-col gap-1", className)}>
       {primaryNav.map((item) => (
         <NavLink
           key={item.href}
@@ -118,7 +118,7 @@ export function SectionLink({ item, active, onNavigate }: { item: NavItem; activ
       onClick={onNavigate}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "orbit-transition flex items-center gap-2.5 rounded-[10px] px-2.5 py-[9px] text-[14px]",
+        "orbit-transition flex h-9 items-center gap-2.5 rounded-[10px] px-2.5 text-[14px]",
         active ? "bg-line-row font-medium text-text" : "text-text-soft hover:bg-line-soft hover:text-text",
       )}
     >

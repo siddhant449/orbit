@@ -7,7 +7,7 @@ export const dialogOverlayClass =
   "fixed inset-0 z-50 bg-[rgba(10,10,11,0.55)] backdrop-blur-[2px] data-[state=closed]:animate-[fade-out_120ms_var(--ease-out)_both] data-[state=open]:animate-[fade-in_180ms_var(--ease-out)_both]";
 
 export const dialogContentClass =
-  "orbit-panel fixed left-1/2 top-1/2 z-50 max-h-[calc(100dvh-32px)] w-[calc(100%-32px)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-[24px] p-6 shadow-[var(--panel-highlight),var(--shadow-draft)] sm:p-7 data-[state=closed]:animate-[fade-out_120ms_var(--ease-out)_both] data-[state=open]:animate-[orbit-pop_200ms_var(--ease-out)_both]";
+  "orbit-panel fixed left-1/2 top-1/2 z-50 max-h-[calc(100dvh-40px)] w-[calc(100%-40px)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-[24px] p-6 shadow-[var(--panel-highlight),var(--shadow-draft)] sm:p-7 data-[state=closed]:animate-[fade-out_120ms_var(--ease-out)_both] data-[state=open]:animate-[orbit-pop_200ms_var(--ease-out)_both]";
 
 export const dialogTitleClass = "type-card-title text-text";
 export const dialogDescriptionClass = "mt-2 text-[14px] leading-[1.55] text-text-2";

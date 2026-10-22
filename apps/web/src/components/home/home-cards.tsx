@@ -7,11 +7,11 @@ import type { LatestChat, StrategySummary } from "@/lib/home-summary";
 const rise = (i: number) => ({ "--rise-delay": `${340 + i * 120}ms` }) as CSSProperties;
 
 const card =
-  "orbit-panel orbit-rise flex flex-col gap-1 !rounded-[16px] p-4 max-md:flex-row max-md:items-center max-md:justify-between max-md:gap-3 md:min-h-[150px] md:gap-4 md:!rounded-[18px] md:p-5";
+  "orbit-panel orbit-rise flex flex-col gap-1 !rounded-[16px] p-4 max-md:flex-row max-md:items-center max-md:justify-between max-md:gap-3 md:min-h-[152px] md:!rounded-[18px] md:p-5";
 
 function Label({ children, end }: { children: ReactNode; end?: ReactNode }) {
   return (
-    <span className="flex items-center justify-between gap-3 text-[12px] text-text-2">
+    <span className="flex min-h-6 items-center justify-between gap-3 text-[12px] text-text-2">
       <span>{children}</span>
       {end}
     </span>
@@ -24,7 +24,7 @@ function OpenPill({ className }: { className?: string }) {
     <span
       aria-hidden="true"
       className={cn(
-        "inline-flex shrink-0 items-center rounded-pill bg-accent px-3.5 text-[12px] font-medium text-on-accent",
+        "inline-flex shrink-0 items-center justify-center rounded-pill bg-accent px-3.5 text-[12px] font-medium text-on-accent",
         className,
       )}
     >
@@ -57,18 +57,18 @@ export function HomeCards({
   now?: Date;
 }) {
   return (
-    <div className="grid w-full max-w-[760px] grid-cols-1 gap-2.5 md:mt-2.5 md:grid-cols-[repeat(auto-fit,minmax(min(220px,100%),1fr))] md:gap-3">
+    <div className="grid w-full max-w-[760px] grid-cols-1 gap-3 md:mt-2 md:grid-cols-[repeat(auto-fit,minmax(min(192px,100%),1fr))] md:gap-3">
       <Link href="/challenge" className={cn(card, "orbit-panel--interactive")} style={rise(0)}>
-        <span className="flex min-w-0 flex-col gap-1 md:flex-1 md:gap-4">
+        <span className="flex min-w-0 flex-col gap-1 md:flex-1 md:gap-3">
           <Label>Today&apos;s post</Label>
           <span className="type-card-title text-text max-md:text-[19px]">Start the 30-day sprint</span>
           <span className="text-[12px] text-text-2 md:mt-auto">One proven format every weekday</span>
         </span>
-        <OpenPill className="h-9 md:hidden" />
+        <OpenPill className="h-8 md:hidden" />
       </Link>
 
       <div className={card} style={rise(1)}>
-        <span className="flex min-w-0 flex-col gap-1 md:flex-1 md:gap-3.5">
+        <span className="flex min-w-0 flex-col gap-1 md:flex-1 md:gap-3">
           <Label>Activities</Label>
           <span className="text-[15px] font-medium leading-snug text-text md:text-[14px] md:font-normal md:text-text-soft">
             Daily goals arrive with Activities
@@ -82,8 +82,8 @@ export function HomeCards({
         style={rise(2)}
       >
         {strategy ? (
-          <span className="flex min-w-0 flex-1 flex-col gap-2.5">
-            <Label end={<OpenPill className="min-h-6 px-[9px] text-[11px]" />}>Your plan</Label>
+          <span className="flex min-w-0 flex-1 flex-col gap-1 md:gap-3">
+            <Label end={<OpenPill className="h-6 px-2.5 text-[11px]" />}>Your plan</Label>
             {strategy.slots.length > 0 ? (
               <span className="flex flex-col gap-2 text-[13px]">
                 {strategy.slots.map((slot) => (
@@ -100,12 +100,12 @@ export function HomeCards({
           </span>
         ) : (
           <>
-            <span className="flex min-w-0 flex-col gap-1 md:flex-1 md:gap-4">
+            <span className="flex min-w-0 flex-col gap-1 md:flex-1 md:gap-3">
               <Label>Your week</Label>
               <span className="type-card-title text-text max-md:text-[19px]">Build your strategy</span>
               <span className="text-[12px] text-text-2 md:mt-auto">Decide what you post each week</span>
             </span>
-            <OpenPill className="h-9 md:hidden" />
+            <OpenPill className="h-8 md:hidden" />
           </>
         )}
       </Link>

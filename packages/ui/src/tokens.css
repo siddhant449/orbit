@@ -494,6 +494,22 @@
     var(--dur-hover-color), var(--dur-hover), var(--dur-hover);
 }
 
+/*
+ * Layout rhythm (UI1, system §5 "Layout grid"). One page gutter for every screen edge (page header and body, home,
+ * chat header, thread and composer dock, mobile header): 20 px under 768, 32 px from 768. Use `px-(--gutter)`.
+ * Shell header rows are 68 px tall with their content centred at 34 px from the top (top bar, sidebar header, rail
+ * logo, section title).
+ */
+:root {
+  --gutter: 20px;
+  --header-row: 68px;
+}
+@media (min-width: 768px) {
+  :root {
+    --gutter: 32px;
+  }
+}
+
 /* Icons: lucide sizes kept until the chrome moves to the Orbit set in O2. */
 @utility icon-sm {
   width: 16px;
@@ -553,6 +569,11 @@
       transition-property: opacity, color, background-color, border-color, box-shadow !important;
       transition-duration: 150ms !important;
       scroll-behavior: auto !important;
+    }
+    /* Scroll reveals render in place (Reveal keeps one markup for server and client; this pins it visible). */
+    [data-reveal] {
+      opacity: 1 !important;
+      transform: none !important;
     }
   }
 }

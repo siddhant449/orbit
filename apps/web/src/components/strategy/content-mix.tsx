@@ -41,8 +41,10 @@ export function ContentMix() {
 
   return (
     <Section title="Content mix" description="How often to post each type.">
-      <div className="grid items-center gap-8 md:grid-cols-[240px_1fr] md:gap-10">
-        <div className="relative mx-auto size-[220px] md:size-[240px]">
+      {/* Side by side only when the section is wide enough (container query, not the viewport). */}
+      <div className="@container">
+      <div className="grid items-center gap-8 @2xl:grid-cols-[240px_minmax(0,1fr)] @2xl:gap-10">
+        <div className="relative mx-auto size-[220px] @2xl:size-[240px]">
           <svg viewBox="0 0 200 200" role="group" aria-label="Content mix chart" className="size-full -rotate-90">
             <circle cx="100" cy="100" r={R} fill="none" stroke="var(--line-2)" strokeWidth="34" />
             {arcs.map(({ i, dash, offset: off }) => (
@@ -101,6 +103,7 @@ export function ContentMix() {
             );
           })}
         </ul>
+      </div>
       </div>
     </Section>
   );
