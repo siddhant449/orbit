@@ -34,6 +34,7 @@ model Team {
   memberships         Membership[]
   profiles            Profile[]
   knowledgeItems      KnowledgeItem[]
+  storageObjects      StorageObject[]
   deletedAt           DateTime?
   deletionRequestedAt DateTime?
   createdAt           DateTime        @default(now())
@@ -80,6 +81,7 @@ model Profile {
   backgroundJobs      BackgroundJob[]
   chats               Chat[]
   documents           Document[]
+  storageObjects      StorageObject[]
   currentFor          User[]          @relation("CurrentProfile")
   deletedAt           DateTime?
   createdAt           DateTime        @default(now())
@@ -333,4 +335,42 @@ model DocumentVersion {
 
   @@unique([documentId, version])
   @@unique([documentId, proposalId])
+}
+
+enum StorageStore {
+  PUBLIC
+  PRIVATE
+}
+
+enum StorageKind {
+  KNOWLEDGE
+  VISUAL
+  REFERENCE
+  LOGO
+  POST_MEDIA
+  CAROUSEL_PDF
+}
+
+/// A file in blob storage. Every put records a row here in the same service call; deleting soft-deletes it, and a
+/// daily job removes the blob once it has been deleted for a week. `url` is set for PUBLIC objects only.
+model StorageObject {
+  id          String       @id @default(cuid())
+  profile     Profile      @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  profileId   String
+  team        Team         @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  teamId      String
+  key         String       @unique
+  store       StorageStore
+  kind        StorageKind
+  contentType String
+  bytes       Int
+  sha256      String
+  width       Int?
+  height      Int?
+  url         String?
+  createdAt   DateTime     @default(now())
+  deletedAt   DateTime?
+
+  @@index([profileId, kind, createdAt])
+  @@index([deletedAt])
 }

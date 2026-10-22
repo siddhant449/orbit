@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { createLocalStore, type BlobStore } from "@brandloop/storage";
 import { DOCUMENT_TYPES, IMAGE_TYPES } from "./limits";
+
+const FLAT_KEY = /^[A-Za-z0-9-]+(\.[a-z0-9]+)?$/;
 
 export type UploadStore = {
   put(buf: Buffer, mime: string): Promise<string>;
@@ -9,27 +10,32 @@ export type UploadStore = {
   delete(key: string): Promise<void>;
 };
 
-const KEY = /^[A-Za-z0-9-]+(\.[a-z0-9]+)?$/;
-
-export function localUploadStore(root = ".data/uploads"): UploadStore {
-  // `turbopackIgnore` on each runtime path: a dynamic root makes Turbopack trace (and bundle) the whole project.
-  const base = resolve(/* turbopackIgnore: true */ root);
-  const pathFor = (key: string) => {
-    if (!KEY.test(key)) throw new Error("Invalid file key");
-    return join(/* turbopackIgnore: true */ base, key);
+/**
+ * Knowledge uploads are private: this wraps a private BlobStore and keeps the old `UploadStore` shape. Keys stay flat
+ * (`<uuid>.<ext>`) under the same root as before, so files stored earlier remain readable.
+ */
+export function uploadStoreFrom(blobs: BlobStore): UploadStore {
+  const flat = (key: string) => {
+    if (!FLAT_KEY.test(key)) throw new Error("Invalid file key");
+    return key;
   };
   return {
     async put(buf, mime) {
       const key = `${randomUUID()}${DOCUMENT_TYPES[mime] ?? IMAGE_TYPES[mime] ?? ""}`;
-      await mkdir(/* turbopackIgnore: true */ base, { recursive: true });
-      await writeFile(/* turbopackIgnore: true */ pathFor(key), buf);
+      await blobs.put(key, buf, { contentType: mime, visibility: "private" });
       return key;
     },
     async get(key) {
-      return readFile(/* turbopackIgnore: true */ pathFor(key));
+      const found = await blobs.get(flat(key));
+      if (!found) throw new Error("File not found");
+      return found.bytes;
     },
     async delete(key) {
-      await rm(/* turbopackIgnore: true */ pathFor(key), { force: true });
+      await blobs.delete(flat(key));
     },
   };
+}
+
+export function localUploadStore(root = ".data/uploads"): UploadStore {
+  return uploadStoreFrom(createLocalStore({ root }));
 }

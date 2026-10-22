@@ -16,6 +16,7 @@
   "dependencies": {
     "@brandloop/ai": "workspace:*",
     "@brandloop/db": "workspace:*",
+    "@brandloop/storage": "workspace:*",
     "@mozilla/readability": "^0.6.0",
     "linkedom": "^0.18.13",
     "mammoth": "^1.13.0",
