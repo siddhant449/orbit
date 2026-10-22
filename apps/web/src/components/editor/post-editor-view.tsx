@@ -17,6 +17,7 @@ import { relativeTime, VersionList } from "@/components/chat/version-list";
 import { Autosave, type AutosaveResult, type AutosaveSnapshot, type SaveOptions } from "./autosave";
 import { inertOthers } from "./inert-others";
 import { EditorToolbar, type PreviewView } from "./editor-toolbar";
+import { PostImage } from "./post-image";
 import { foldPoint, hookOf } from "./fold";
 import { pmText, postExtensions } from "./post-extensions";
 import { offsetToPos, posToOffset, textToDoc, toggleLinePrefix } from "./post-format";
@@ -575,6 +576,7 @@ export function PostEditorView({
                         </p>
                       </div>
                     )}
+                    {view !== "hook" && <PostImage documentId={initialDoc.id} />}
                     <div aria-hidden="true" className="flex justify-between border-t border-line-paper pt-3 text-[13px] text-text-3">
                       <span>Like</span>
                       <span>Comment</span>

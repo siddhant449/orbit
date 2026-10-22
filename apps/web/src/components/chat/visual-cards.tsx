@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { mutate } from "swr";
 import type { EditVisualOutput, ProposeVisualOutput, SuggestVisualsOutput } from "@brandloop/agent";
 import { Button, cn } from "@brandloop/ui";
+import { postMediaKey } from "@/components/editor/post-image";
 import {
   attachVisual, createVisual, decideTheme, pollVisual, VisualsApiError, type ThemeColoursDto, type VisualAspect, type VisualDto, type VisualType,
 } from "@/lib/visuals-api";
@@ -76,6 +78,7 @@ function MakeImage({ documentId, type, aspect, initialPrompt, startOpen }: { doc
       try {
         await attachVisual(visual.id, documentId);
         attached = true;
+        void mutate(postMediaKey(documentId)); // an open editor shows the new image
       } catch {
         attached = false;
       }
