@@ -21,3 +21,4 @@ export {
   type PanelState,
 } from "./document-state";
 export { parseProposal, proposalStatus, type Proposal, type ProposalStatus } from "./proposal";
+export { stripCitations } from "./sanitize";

@@ -1,3 +1,4 @@
+import { stripCitations } from "../client/sanitize";
 import type { AiClient } from "@brandloop/ai";
 import { NoObjectGeneratedError } from "ai";
 import { z } from "zod";
@@ -107,7 +108,7 @@ export async function editDocumentText(
       } else if (unmet.length > 0) {
         missed = unmet;
       } else {
-        return { ok: true, text: out.text, changeSummary: oneLine(out.changeSummary).slice(0, 300) };
+        return { ok: true, text: stripCitations(out.text), changeSummary: oneLine(out.changeSummary).slice(0, 300) };
       }
     } catch (err) {
       if (isAbort(err)) throw err;

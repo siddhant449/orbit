@@ -1,3 +1,4 @@
+import { stripCitations } from "../client/sanitize";
 import {
   createDocumentForChat,
   DocumentError,
@@ -78,8 +79,8 @@ export async function createDocumentFromHandoff(ctx: TurnContext, input: CreateD
   try {
     doc = await createDocumentForChat(ctx.profileId, ctx.chatId, {
       title,
-      text: payload.data.draft,
-      hook: payload.data.hook,
+      text: stripCitations(payload.data.draft),
+      hook: payload.data.hook ? stripCitations(payload.data.hook) : payload.data.hook,
       changeSummary: envelope.summary,
     });
   } catch (err) {
@@ -213,6 +214,7 @@ export async function updateDocumentRun(ctx: TurnContext, input: UpdateDocumentI
       if ("missed" in res) return editRequirementsMissed(res.missed);
       return `Failed: the editor couldn't produce a usable edit (${res.reason}). Ask the user to rephrase or try again.`;
     }
+    res.text = stripCitations(res.text);
     if (res.text === doc.text) return unchanged(doc, res.changeSummary || "No change was needed.");
     const saved = await saveDocumentVersion(ctx.profileId, doc.id, {
       text: res.text,
@@ -296,7 +298,7 @@ export async function proposeDocumentEditsRun(
       `<passage>\n${defuseTags(input.targetText)}\n</passage>`,
     ].join("\n\n");
     const raw = await ctx.ai.json({ model: "generate", system: PROPOSE_SYSTEM, prompt, schema: z.object({ replacement: z.string() }), abortSignal });
-    const replacement = z.object({ replacement: z.string() }).parse(raw).replacement;
+    const replacement = stripCitations(z.object({ replacement: z.string() }).parse(raw).replacement);
     if (replacement.length > LIMITS.proposalChars) return "Failed: the suggested passage came back too long. Try a shorter passage.";
     if (replacement === input.targetText) return "Failed: the suggestion didn't change the passage. Ask the user what they'd like different.";
     return {

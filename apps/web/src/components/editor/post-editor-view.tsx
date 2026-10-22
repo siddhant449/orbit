@@ -1,5 +1,6 @@
 "use client";
 
+import { stripCitations } from "@brandloop/agent/client";
 import Link from "next/link";
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { EditorContent, useEditor, useEditorState, type Editor } from "@tiptap/react";
@@ -156,7 +157,7 @@ export function PostEditorView({
 
   const editor = useEditor({
     extensions: useMemo(() => postExtensions(), []),
-    content: textToDoc(initialDoc.text),
+    content: textToDoc(stripCitations(initialDoc.text)),
     immediatelyRender: false,
     shouldRerenderOnTransaction: false,
     editorProps: {
@@ -175,7 +176,7 @@ export function PostEditorView({
     bridge.bind(ctl.save, editor);
   }, [bridge, ctl.save, editor]);
   // The text as the editor shows it (typing, streams, replacements), for the counters and the hook view.
-  const text = useEditorState({ editor, selector: ({ editor: ed }) => (ed ? pmText(ed.state.doc) : initialDoc.text) }) ?? initialDoc.text;
+  const text = useEditorState({ editor, selector: ({ editor: ed }) => (ed ? pmText(ed.state.doc) : stripCitations(initialDoc.text)) }) ?? stripCitations(initialDoc.text);
 
   const history = useEditorState({
     editor,
@@ -561,7 +562,7 @@ export function PostEditorView({
                   <PostSheet caption={streaming ? "Writing · LinkedIn preview" : updated ? `Edited ${updated} · LinkedIn preview` : "LinkedIn preview"}>
                     <div hidden={view === "hook"}>
                       <EditorContent editor={editor} />
-                      {!editor && <div className="post-editor__text whitespace-pre-wrap">{initialDoc.text}</div>}
+                      {!editor && <div className="post-editor__text whitespace-pre-wrap">{stripCitations(initialDoc.text)}</div>}
                     </div>
                     {view === "hook" && (
                       <div data-hook-view className="text-[15px] leading-[1.5]">
