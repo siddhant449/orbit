@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aggregate, blindOrder, DIMENSIONS, normalizeVerdict, parseKleoReplies, tallyPairwise, unblind, type Verdict } from "./rubric";
+import { aggregate, blindOrder, DIMENSIONS, kleoDraft, normalizeVerdict, parseKleoReplies, tallyPairwise, unblind, type Verdict } from "./rubric";
 
 const verdict = (scores: Record<string, number | null>) =>
   normalizeVerdict({
@@ -85,7 +85,25 @@ describe("parseKleoReplies", () => {
     expect(out.c).toBe("Post text");
   });
 
+  it("accepts '=== (a) USER:' separators and drops stream sequences and the capturer's quality notes", () => {
+    const md = ["# Kleo", "| a | viewMemory |", "=== (a) USER: What do you remember?", "SEQ: start > DONE", "TOOL INPUT x", "ASSISTANT TEXT:", "Hi.", "QUALITY NOTE: the capturer's opinion", "", "=== (b) USER: ideas", "Five."].join("\n");
+    const out = parseKleoReplies(md);
+    expect(out.a).toBe("TOOL INPUT x\nASSISTANT TEXT:\nHi.");
+    expect(out.b).toBe("Five.");
+  });
+
   it("returns an empty map when no prompt headings are found", () => {
     expect(parseKleoReplies("nothing here")).toEqual({});
+  });
+});
+
+describe("kleoDraft", () => {
+  it("pulls the verbatim post out of a captured Kleo section", () => {
+    const section = ["TOOL INPUT x", "POST (draft c, verbatim):", "Line one.", "", "Line two.", "", "ASSISTANT TEXT:", "Here it is."].join("\n");
+    expect(kleoDraft(section)).toBe("Line one.\n\nLine two.");
+  });
+
+  it("returns null when the section has no post", () => {
+    expect(kleoDraft("ASSISTANT TEXT:\nNo post here.")).toBeNull();
   });
 });

@@ -23,7 +23,7 @@ import { runChatTurn } from "../src/turn";
 import { EVAL_FIXTURE, evalRowsLeft, removeEvalUser, seedEvalProfile } from "./fixture";
 import { DRAFT_FROM_C, EVAL_CHATS } from "./prompts";
 import { reportMarkdown, spliceGenerated, transcriptMarkdown, type DocSnapshot, type RunRecord, type TurnRecord } from "./report";
-import { aggregate, blindOrder, judgePairwise, judgeTurn, parseKleoReplies, tallyPairwise, unblind, type PairwiseWinner } from "./rubric";
+import { aggregate, blindOrder, judgePairwise, kleoDraft, judgeTurn, parseKleoReplies, tallyPairwise, unblind, type PairwiseWinner } from "./rubric";
 import { summarizeParts } from "./transcript";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -154,11 +154,22 @@ async function judgeTurns(judge: AiClient, turns: TurnRecord[], run: number, sta
     for (const t of turns) {
       const k = kleo[t.promptId];
       if (!k) continue;
-      const orbit = [t.text, t.documentChange !== "none" && t.documentAfter ? `[Post in the side panel]\n${t.documentAfter.text}` : ""].filter(Boolean).join("\n\n");
+      // A prompt that pastes an earlier draft (f) gave each assistant its own draft: show each reply with the draft it got.
+      const template = EVAL_CHATS.flatMap((c) => c.prompts).find((p) => p.id === t.promptId)?.text ?? t.prompt;
+      const pasted = template.includes(DRAFT_FROM_C);
+      const request = pasted ? template.replace(DRAFT_FROM_C, "(each assistant was given its own earlier draft; it is quoted at the top of its reply)") : t.prompt;
+      const orbitDraft = pasted ? (t.documentBefore?.text ?? t.prompt.slice(template.indexOf(DRAFT_FROM_C))) : null;
+      const kleoPasted = pasted ? kleoDraft(kleo.c ?? "") : null;
+      const orbit = [
+        orbitDraft ? `[Draft the user pasted]\n${orbitDraft}\n[Reply]` : "",
+        t.text,
+        t.documentChange !== "none" && t.documentAfter ? `[Post in the side panel]\n${t.documentAfter.text}` : "",
+      ].filter(Boolean).join("\n\n");
+      const kleoReply = kleoPasted ? `[Draft the user pasted]\n${kleoPasted}\n[Reply]\n\n${k}` : k;
       const order = blindOrder(t.promptId, run);
-      const [a, b] = order === "orbit-first" ? [orbit, k] : [k, orbit];
+      const [a, b] = order === "orbit-first" ? [orbit, kleoReply] : [kleoReply, orbit];
       try {
-        const result = await judgePairwise(judge, { request: t.prompt, a, b });
+        const result = await judgePairwise(judge, { request, a, b });
         const winner = unblind(result.winner, order);
         t.pairwise = { order, result, winner };
         winners.push(winner);

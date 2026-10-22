@@ -5,7 +5,9 @@
 import type { Embedder, Strategy } from "@brandloop/ai";
 import { createKnowledge, ensureAccount, prisma, replaceChunks, saveStrategy, upsertMemory } from "@brandloop/db";
 
-const TEAM_SUFFIX = " (eval)";
+/** Who the eval runs as. The unit tests pass their own identity, so a test run never deletes a live eval's user. */
+export type EvalIdentity = { clerkId: string; email: string; teamSuffix: string };
+export const LIVE_IDENTITY: EvalIdentity = { clerkId: "user_test_eval_quality", email: "eval-quality@example.test", teamSuffix: " (eval)" };
 
 const ABOUT = `- Maya Okafor is a fractional CTO for pre-seed and seed startups
 - Runs Northbeam Labs, a two-person technical advisory studio based in Lisbon
@@ -114,8 +116,6 @@ The most common failure I see is hiring too early, before the product is scoped,
 ] as const;
 
 export const EVAL_FIXTURE = {
-  clerkId: "user_test_eval_quality",
-  email: "eval-quality@example.test",
   profile: {
     fullName: "Maya Okafor",
     jobTitle: "Fractional CTO",
@@ -135,25 +135,24 @@ export const EVAL_FIXTURE = {
   writingStyle: { name: "Maya's voice", tagline: "Blunt, calm, example-first", guide: WRITING_STYLE_GUIDE },
 } as const;
 
-/** Deletes the eval user, its team and (by cascade) its profile and everything under it. */
-export async function removeEvalUser(): Promise<void> {
-  const clerkId = EVAL_FIXTURE.clerkId;
-  await prisma.team.deleteMany({ where: { name: { endsWith: TEAM_SUFFIX }, memberships: { some: { user: { clerkId } } } } });
+/** Deletes the eval user, its team (and any memberless team with its suffix) and, by cascade, everything under them. */
+export async function removeEvalUser(id: EvalIdentity = LIVE_IDENTITY): Promise<void> {
+  const { clerkId, teamSuffix } = id;
+  await prisma.team.deleteMany({ where: { name: { endsWith: teamSuffix }, memberships: { some: { user: { clerkId } } } } });
   await prisma.user.deleteMany({ where: { clerkId } });
+  await prisma.team.deleteMany({ where: { name: { endsWith: teamSuffix }, memberships: { none: {} } } });
 }
 
 /**
  * A fresh eval user with the full fixture. Any previous eval user is removed first. With an embedder the knowledge
  * chunks get embeddings (as the app's ingest job does); without one they are full-text only.
  */
-export async function seedEvalProfile(opts: { embedder?: Embedder | null } = {}): Promise<{ userId: string; profileId: string }> {
-  await removeEvalUser();
-  const acc = await ensureAccount({
-    clerkId: EVAL_FIXTURE.clerkId,
-    email: EVAL_FIXTURE.email,
-    firstName: "Maya",
-    teamNameSuffix: TEAM_SUFFIX,
-  });
+export async function seedEvalProfile(
+  opts: { embedder?: Embedder | null; identity?: EvalIdentity } = {},
+): Promise<{ userId: string; profileId: string }> {
+  const id = opts.identity ?? LIVE_IDENTITY;
+  await removeEvalUser(id);
+  const acc = await ensureAccount({ clerkId: id.clerkId, email: id.email, firstName: "Maya", teamNameSuffix: id.teamSuffix });
   const profileId = acc.currentProfile!.id;
   await prisma.profile.update({ where: { id: profileId }, data: { ...EVAL_FIXTURE.profile, onboardingCompleted: true } });
 
@@ -174,14 +173,14 @@ export async function seedEvalProfile(opts: { embedder?: Embedder | null } = {})
 }
 
 /** Rows that would still belong to the eval user or the given profile. All zero after `removeEvalUser`. */
-export async function evalRowsLeft(profileId: string) {
-  const clerkId = EVAL_FIXTURE.clerkId;
+export async function evalRowsLeft(profileId: string, id: EvalIdentity = LIVE_IDENTITY) {
+  const { clerkId, teamSuffix } = id;
   const byProfile = { where: { profileId } };
   const [users, teams, profiles, memoryDocs, strategies, voiceStyles, knowledgeItems, knowledgeChunks, chats, documents] =
     await Promise.all([
       prisma.user.count({ where: { clerkId } }),
       // Any team named like ours, with or without members, so an orphaned team is caught too.
-      prisma.team.count({ where: { name: { endsWith: TEAM_SUFFIX } } }),
+      prisma.team.count({ where: { name: { endsWith: teamSuffix } } }),
       prisma.profile.count({ where: { id: profileId } }),
       prisma.memoryDoc.count(byProfile),
       prisma.strategy.count(byProfile),
