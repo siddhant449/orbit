@@ -1,3 +1,4 @@
+import { assertTestDatabase } from "../test-db";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "../client";
 import { assertProfileAccess, ensureAccount } from "./account";
@@ -23,6 +24,7 @@ const clerk = (n: number) => ({
 });
 
 async function cleanup() {
+  await assertTestDatabase(prisma);
   await prisma.user.deleteMany({ where: { clerkId: { startsWith: "user_test_" } } });
   await prisma.team.deleteMany({ where: { name: { endsWith: "(test)" } } });
 }

@@ -1,6 +1,7 @@
+import { assertTestDatabase } from "@brandloop/db/test-db";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-// Real Postgres (kleo-clone-db-1); only Clerk is faked.
+// Real Postgres (the isolated test database, TEST_DATABASE_URL); only Clerk is faked.
 const env = vi.hoisted(() => {
   try {
     process.loadEnvFile(new URL("../../../../.env", import.meta.url));
@@ -21,6 +22,7 @@ let theirs: { userId: string; profileId: string };
 
 async function wipe() {
   const users = { clerkId: { startsWith: CLERK } };
+  await assertTestDatabase(prisma);
   await prisma.team.deleteMany({ where: { name: { endsWith: " (test)" }, memberships: { some: { user: users } } } });
   await prisma.user.deleteMany({ where: users });
 }

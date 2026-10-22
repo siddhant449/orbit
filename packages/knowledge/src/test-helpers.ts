@@ -1,8 +1,10 @@
+import { assertTestDatabase } from "@brandloop/db/test-db";
 import { AiUnavailableError, type AiClient } from "@brandloop/ai";
 import { ensureAccount, prisma } from "@brandloop/db";
 import type { UploadStore } from "./upload-store";
 
 export async function cleanupTestData() {
+  await assertTestDatabase(prisma);
   await prisma.user.deleteMany({ where: { clerkId: { startsWith: "user_test_" } } });
   await prisma.team.deleteMany({ where: { name: { endsWith: "(test)" } } });
   await prisma.knowledgeChunk.deleteMany({ where: { sourceId: { startsWith: "test_" } } });

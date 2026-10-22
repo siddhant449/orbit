@@ -7,6 +7,8 @@
  * Reads OPENAI_API_KEY at runtime (the script loads the repo .env) and prints only tool names, the reply
  * length and the model id, never the key. No title call, no web search, no embeddings (keyword search only).
  */
+import "@brandloop/db/use-test-db";
+import { assertTestDatabase } from "@brandloop/db/test-db";
 import { createAiClient, getModel, resolveModel } from "@brandloop/ai";
 import { ensureAccount, getChat, listMessages, prisma, upsertMemory } from "@brandloop/db";
 import { randomUUID } from "node:crypto";
@@ -18,6 +20,7 @@ const TEAM_SUFFIX = " (smoke)";
 const redact = (text: string) => text.replace(/sk-[A-Za-z0-9_*-]+/g, "sk-***");
 
 async function removeSmokeUser() {
+  await assertTestDatabase(prisma);
   await prisma.team.deleteMany({
     where: { name: { endsWith: TEAM_SUFFIX }, memberships: { some: { user: { clerkId: CLERK_ID } } } },
   });

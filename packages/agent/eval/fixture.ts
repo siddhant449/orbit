@@ -2,6 +2,7 @@
  * The quality eval's throwaway user: an invented person with a full set of grounding (identity, voice, writing
  * rules, strategy, two knowledge items and an own writing style). No real creator is named anywhere.
  */
+import { assertTestDatabase } from "@brandloop/db/test-db";
 import type { Embedder, Strategy } from "@brandloop/ai";
 import { createKnowledge, ensureAccount, prisma, replaceChunks, saveStrategy, upsertMemory } from "@brandloop/db";
 
@@ -138,6 +139,7 @@ export const EVAL_FIXTURE = {
 /** Deletes the eval user, its team (and any memberless team with its suffix) and, by cascade, everything under them. */
 export async function removeEvalUser(id: EvalIdentity = LIVE_IDENTITY): Promise<void> {
   const { clerkId, teamSuffix } = id;
+  await assertTestDatabase(prisma);
   await prisma.team.deleteMany({ where: { name: { endsWith: teamSuffix }, memberships: { some: { user: { clerkId } } } } });
   await prisma.user.deleteMany({ where: { clerkId } });
   await prisma.team.deleteMany({ where: { name: { endsWith: teamSuffix }, memberships: { none: {} } } });

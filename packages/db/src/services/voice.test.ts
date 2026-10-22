@@ -1,3 +1,4 @@
+import { assertTestDatabase } from "../test-db";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import type { AiClient } from "@brandloop/ai";
 import { prisma } from "../client";
@@ -7,6 +8,7 @@ import { ensureAccount } from "./account";
 import { createOwnVoice, getSelectedVoice, listVoices, selectVoice } from "./voice";
 
 async function cleanup() {
+  await assertTestDatabase(prisma);
   await prisma.user.deleteMany({ where: { clerkId: { startsWith: "user_test_" } } });
   await prisma.team.deleteMany({ where: { name: { endsWith: "(test)" } } });
 }

@@ -1,3 +1,4 @@
+import { assertTestDatabase } from "../test-db";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "../client";
 import {
@@ -12,11 +13,13 @@ import {
 const clerkUser = { clerkId: "user_test_1", email: "ada@example.test", firstName: "Ada", lastName: "Lovelace" };
 
 beforeEach(async () => {
+  await assertTestDatabase(prisma);
   await prisma.user.deleteMany({ where: { clerkId: { startsWith: "user_test_" } } });
   await prisma.team.deleteMany({ where: { name: { endsWith: "(test)" } } });
 });
 
 afterAll(async () => {
+  await assertTestDatabase(prisma);
   await prisma.user.deleteMany({ where: { clerkId: { startsWith: "user_test_" } } });
   await prisma.$disconnect();
 });

@@ -10,6 +10,7 @@
  * Reads OPENAI_API_KEY at runtime (the script loads the repo .env) and never prints it. No web search, no title
  * calls, never Deepgram. Knowledge chunks are embedded (as the app's ingest does), so retrieval matches production.
  */
+import "@brandloop/db/use-test-db";
 import { createAiClient, createEmbedder, getModel, resolveModel, type AiClient, type ModelAlias } from "@brandloop/ai";
 import { getChat, getChatDocument, listMessages, prisma, strategyThemesMarkdown } from "@brandloop/db";
 import { wrapLanguageModel, type LanguageModel, type LanguageModelMiddleware } from "ai";

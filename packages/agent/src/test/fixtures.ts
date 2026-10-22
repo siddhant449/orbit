@@ -1,3 +1,4 @@
+import { assertTestDatabase } from "@brandloop/db/test-db";
 import type { AiClient } from "@brandloop/ai";
 import { fakeEmbedder } from "@brandloop/ai/testing";
 import { ensureAccount, prisma } from "@brandloop/db";
@@ -19,6 +20,7 @@ export async function testProfile(n = 1): Promise<{ userId: string; profileId: s
 
 export async function cleanup(): Promise<void> {
   const users = { clerkId: { startsWith: CLERK_PREFIX } };
+  await assertTestDatabase(prisma);
   await prisma.team.deleteMany({ where: { name: { endsWith: " (test)" }, memberships: { some: { user: users } } } });
   await prisma.user.deleteMany({ where: users });
 }

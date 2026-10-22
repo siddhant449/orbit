@@ -3,6 +3,8 @@
  *   pnpm --filter @brandloop/knowledge smoke:ingest
  * Reads OPENAI_API_KEY at runtime; never prints it. Cleans up after itself.
  */
+import "@brandloop/db/use-test-db";
+import { assertTestDatabase } from "@brandloop/db/test-db";
 import { createAiClient, createEmbedder } from "@brandloop/ai";
 import { createKnowledge, deleteKnowledge, ensureAccount, getKnowledgeItem, prisma } from "@brandloop/db";
 import { ingestKnowledge } from "../src/ingest";
@@ -47,6 +49,7 @@ async function main() {
     process.exitCode = 1;
   } finally {
     await deleteKnowledge(profileId, item.id, store).catch(() => undefined);
+    await assertTestDatabase(prisma);
     await prisma.user.deleteMany({ where: { clerkId: "user_test_smoke" } });
     await prisma.team.deleteMany({ where: { name: { endsWith: "(test)" }, profiles: { none: {} } } }).catch(() => undefined);
     await prisma.$disconnect();

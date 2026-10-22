@@ -1,3 +1,4 @@
+import { assertTestDatabase } from "../test-db";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "../client";
@@ -11,6 +12,7 @@ const PREFIX = "user_test_progress";
 const clerk = { clerkId: `${PREFIX}1`, email: "progress1@example.test", firstName: "Progress", teamNameSuffix: " (progress test)" };
 
 async function cleanup() {
+  await assertTestDatabase(prisma);
   await prisma.user.deleteMany({ where: { clerkId: { startsWith: PREFIX } } });
   await prisma.team.deleteMany({ where: { name: { endsWith: "(progress test)" } } });
 }

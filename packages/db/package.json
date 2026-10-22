@@ -5,7 +5,10 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./test-db": "./src/test-db.ts",
+    "./use-test-db": "./src/use-test-db.ts",
+    "./vitest-setup": "./src/vitest-setup.ts"
   },
   "scripts": {
     "generate": "prisma generate",

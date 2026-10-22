@@ -1,6 +1,7 @@
+import { assertTestDatabase } from "@brandloop/db/test-db";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-// Real Postgres (kleo-clone-db-1); Clerk and the model are faked.
+// Real Postgres (the isolated test database, TEST_DATABASE_URL); Clerk and the model are faked.
 const env = vi.hoisted(() => {
   try {
     process.loadEnvFile(new URL("../../../../.env", import.meta.url));
@@ -30,6 +31,7 @@ async function wipe() {
   // Other worktrees' suites delete on the same tables at the same time; retry a lock conflict.
   for (let attempt = 1; ; attempt++) {
     try {
+      await assertTestDatabase(prisma);
       await prisma.team.deleteMany({ where: { name: { endsWith: " (webtest)" }, memberships: { some: { user: users } } } });
       await prisma.user.deleteMany({ where: users });
       return;
