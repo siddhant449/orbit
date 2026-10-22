@@ -21,3 +21,16 @@ export {
   type PanelState,
 } from "./document-state";
 export { parseProposal, proposalStatus, type Proposal, type ProposalStatus } from "./proposal";
+export {
+  CHARS_PER_MOBILE_LINE,
+  LINKEDIN_FOLD_CHARS,
+  measureCorpus,
+  measurePost,
+  mobileLines,
+  splitBlocks,
+  type Block,
+  type EndingType,
+  type LayoutTargets,
+  type PostMetrics,
+  type Range,
+} from "../writing/measure";

@@ -116,3 +116,25 @@ Reasons (run 4):
 
 Raw transcripts: `.recon/benchmark/orbit-run-<n>.md` (with `orbit-run-<n>.json`).
 <!-- eval:generated:end -->
+
+<!-- eval:metrics:start -->
+## Formatting metrics
+
+Computed by `measurePost` (packages/agent/src/writing/measure.ts) over Kleo's `post` fences (K) and Orbit's saved drafts (O<run><prompt>); regenerate with `pnpm --filter @brandloop/agent eval --metrics` (no AI calls). Mobile wrap 50 characters per line; fold 210 characters.
+
+| id | words | chars | lines | blocks | avg chars/line | max lines in a block (mobile) | blank-line ratio | one-line share | emoji | hook chars / lines | fold | lists (bullet/numbered) | numbers | ending | hashtags | dashes | links |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| K1 | 147 | 851 | 10 | 7 | 84 | 4 (4) | 0.38 | 0.86 | 0 | 51 / 2 | fits | 1/0 | 0 | statement | 0 | 0 | 0 |
+| K2 | 136 | 806 | 6 | 6 | 133 | 1 (5) | 0.45 | 1 | 0 | 48 / 1 | fits | 0/0 | 0 | statement | 0 | 0 | 0 |
+| K3 | 148 | 874 | 6 | 6 | 144 | 1 (5) | 0.45 | 1 | 0 | 84 / 2 | fits | 0/0 | 0 | rule | 0 | 0 | 0 |
+| K4 | 181 | 1288 | 6 | 6 | 213 | 1 (7) | 0.45 | 1 | 0 | 99 / 3 | fits | 0/0 | 10 | sources | 0 | 0 | 2 |
+| K5 | 97 | 505 | 3 | 3 | 167 | 1 (5) | 0.4 | 1 | 0 | 104 / 3 | fits | 0/0 | 0 | question | 0 | 0 | 0 |
+| K6 | 108 | 596 | 4 | 4 | 148 | 1 (5) | 0.43 | 1 | 0 | 86 / 2 | fits | 0/0 | 0 | rule | 0 | 0 | 0 |
+| K7 | 143 | 858 | 7 | 7 | 121 | 1 (4) | 0.46 | 1 | 1 | 78 / 2 | fits | 0/0 | 0 | rule | 0 | 0 | 0 |
+| K8 | 150 | 847 | 10 | 9 | 83 | 2 (4) | 0.44 | 0.89 | 0 | 43 / 1 | fits | 1/0 | 0 | statement | 0 | 0 | 0 |
+| K9 | 129 | 750 | 10 | 9 | 73 | 2 (3) | 0.44 | 0.89 | 0 | 43 / 1 | fits | 1/0 | 0 | statement | 0 | 0 | 0 |
+| O1 | 232 | 1330 | 14 | 14 | 93 | 1 (4) | 0.48 | 1 | 0 | 63 / 2 | fits | 0/0 | 4 | rule | 0 | 0 | 0 |
+| O2 | 99 | 584 | 6 | 6 | 96 | 1 (3) | 0.45 | 1 | 0 | 47 / 1 | fits | 0/0 | 4 | statement | 0 | 0 | 0 |
+| O4c | 232 | 1330 | 14 | 14 | 93 | 1 (4) | 0.48 | 1 | 0 | 63 / 2 | fits | 0/0 | 4 | rule | 0 | 0 | 0 |
+| O4d | 99 | 584 | 6 | 6 | 96 | 1 (3) | 0.45 | 1 | 0 | 47 / 1 | fits | 0/0 | 4 | statement | 0 | 0 | 0 |
+<!-- eval:metrics:end -->

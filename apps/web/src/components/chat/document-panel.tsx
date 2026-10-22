@@ -10,6 +10,7 @@ import { Button, cn, CountUp, durations, easeOut, Segmented, useMediaQuery, useR
 import { CloseIcon, CopyIcon, ExpandIcon, PencilIcon } from "@brandloop/ui/icons";
 import { useCurrentProfile } from "@/components/shell/account-context";
 import { CharMeter, DocumentEditor } from "./document-editor";
+import { LayoutReadout } from "./layout-readout";
 import type { DocumentController } from "./use-document";
 import { useThreadPlace } from "./thread-context";
 import { VersionList } from "./version-list";
@@ -291,6 +292,7 @@ export function DocumentPanel({ ctl, busy }: { ctl: DocumentController; busy: bo
               <PostText text={shown} caret={revealing} />
             )}
           </PostSheet>
+          {version && <LayoutReadout text={isEditing && ctl.draft?.id === doc?.id ? ctl.draft!.text : (doc?.text ?? "")} />}
           {ctl.reload && (
             <div role={ctl.reload === "loading" ? "status" : "alert"} data-reload className="flex flex-wrap items-center gap-3 text-[13px] text-text-2">
               {ctl.reload === "missing" ? (
