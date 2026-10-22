@@ -2,11 +2,11 @@ import { Logo } from "@/components/shell/logo";
 import { AuthArt } from "./auth-art";
 import { ThemeToggle } from "./theme-toggle";
 
+// Privacy and Terms live on the marketing site; there is no help centre yet, so Help is left out.
+const marketingUrl = (process.env.NEXT_PUBLIC_MARKETING_URL ?? "http://localhost:4321").replace(/\/$/, "");
 const footerLinks = [
-  // No public Privacy, Terms or Help routes exist yet; placeholders until they do.
-  { label: "Privacy", href: "#" },
-  { label: "Terms", href: "#" },
-  { label: "Help", href: "#" },
+  { label: "Privacy", href: `${marketingUrl}/privacy` },
+  { label: "Terms", href: `${marketingUrl}/terms` },
 ];
 
 /**
