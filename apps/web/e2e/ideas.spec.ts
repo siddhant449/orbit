@@ -6,7 +6,8 @@ import { axeCheck, expectNoHorizontalScroll } from "./helpers/shots";
 
 /**
  * Ideas (screens.md B11): "Generate this week's ideas" against the scripted mock (packages/agent/src/mock.ts
- * SCRIPTED_IDEAS), then "Draft this" starts a chat with the idea. Every chat created here is deleted afterwards.
+ * SCRIPTED_IDEAS); a regenerate avoids the ideas already shown; "Draft this" links home with `?prompt=` (ruling A22).
+ * Nothing should start a chat here; any chat that does is deleted afterwards.
  * With SHOTS=1 and SHOTS_DIR, captures ideas-* at 1440 dark/light and 390 dark.
  */
 const email = process.env.E2E_CLERK_USER_EMAIL;
@@ -15,7 +16,6 @@ test.skip(!email, "Set E2E_CLERK_USER_EMAIL to a Clerk dev-instance test user");
 test.skip(!mock, "Needs AI_MOCK_MODEL=1: ideas come from the scripted mock");
 test.setTimeout(300_000);
 
-const CHAT_URL = /\/chat\/([0-9a-f-]{36})$/;
 const FIRST_TITLE = "MVP versus POC";
 const created = new Set<string>();
 const shots = process.env.SHOTS === "1" ? process.env.SHOTS_DIR : undefined;
@@ -80,11 +80,18 @@ test("generates this week's ideas and drafts one in a new chat", async ({ page }
   await shot(page, "390-dark");
   await page.setViewportSize({ width: 1440, height: 900 });
 
-  // Draft this: home starts the chat with the idea as the first message.
-  await cards.first().getByRole("button", { name: "Draft this" }).click();
-  await expect(page.getByText(`Draft a LinkedIn post from this idea: ${FIRST_TITLE}.`).first()).toBeVisible({ timeout: 30_000 });
-  await expect(page).toHaveURL(CHAT_URL, { timeout: 60_000 });
-  expect(created.size).toBe(1);
+  // Draft this (ruling A22): a link home with the idea in ?prompt=; the merge wires it to a prefilled composer that is
+  // never auto-sent. The regenerate avoided the three ideas already shown, so the first card is a new one.
+  await expect(cards.first().getByRole("heading", { name: FIRST_TITLE })).toHaveCount(0);
+  const draft = cards.first().getByRole("link", { name: "Draft this" });
+  const href = (await draft.getAttribute("href"))!;
+  expect(href.startsWith("/?prompt=")).toBe(true);
+  const prompt = decodeURIComponent(href.slice("/?prompt=".length));
+  expect(prompt).toMatch(/^Draft a LinkedIn post from this idea: /);
+  expect([...prompt].length).toBeLessThanOrEqual(2000);
+  await draft.click();
+  await expect(page).toHaveURL(/\/\?prompt=/);
+  expect(created.size).toBe(0);
 
   // Back on Ideas, this tab still has the last set (no regeneration needed).
   await page.goto("/ideas");

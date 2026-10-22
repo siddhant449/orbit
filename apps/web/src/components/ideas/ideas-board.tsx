@@ -1,14 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { toast } from "sonner";
 import { CONTENT_TYPES, FORMATS } from "@brandloop/ai";
 import { Button, Segmented, StatusPill, cn } from "@brandloop/ui";
 import { CheckIcon, CopyIcon } from "@brandloop/ui/icons";
-import { ideaDraftPrompt, PENDING_DRAFT_KEY, type Idea } from "@/lib/ideas";
-import type { IdeasBasis, IdeasResponse } from "@/lib/ideas-api";
+import { ideaDraftHref, parseCachedIdeas, previousFrom, type IdeasBasis, type IdeasResponse, type Idea } from "@/lib/ideas";
 
 type Count = "3" | "5" | "8";
 const COUNTS = [
@@ -31,8 +29,7 @@ const cacheKey = (profileId: string, week: string) => `brandloop:ideas:${profile
 
 function readCache(key: string): IdeasResponse | null {
   try {
-    const raw = sessionStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as IdeasResponse) : null;
+    return parseCachedIdeas(sessionStorage.getItem(key));
   } catch {
     return null;
   }
@@ -63,13 +60,13 @@ function Basis({ basis }: { basis: IdeasBasis }) {
         <StatusPill>{plural(basis.memoryFiles, "memory file", "memory files")}</StatusPill>
       </li>
       <li>
-        <StatusPill>{plural(basis.recentPosts, "recent post", "recent posts")}</StatusPill>
+        <StatusPill>{plural(basis.recentDrafts, "recent draft", "recent drafts")}</StatusPill>
       </li>
     </ul>
   );
 }
 
-function IdeaCard({ idea, index, fresh, onDraft }: { idea: Idea & { id: string }; index: number; fresh: boolean; onDraft: (idea: Idea) => void }) {
+function IdeaCard({ idea, index, fresh }: { idea: Idea & { id: string }; index: number; fresh: boolean }) {
   const [copied, setCopied] = useState(false);
   const titleId = `${idea.id}-title`;
 
@@ -112,14 +109,17 @@ function IdeaCard({ idea, index, fresh, onDraft }: { idea: Idea & { id: string }
         >
           {copied ? <CheckIcon size={14} aria-hidden="true" /> : <CopyIcon size={14} aria-hidden="true" />}
           {copied ? "Copied" : "Copy hook"}
-          <span className="sr-only" aria-live="polite">
-            {copied ? "Hook copied" : ""}
-          </span>
         </button>
-        <Button variant="paper" className="h-9 min-h-9 flex-1 text-[13px]" onClick={() => onDraft(idea)} aria-describedby={titleId}>
-          Draft this
+        {/* Ruling A22: home opens with this prompt in the composer, ready to edit; nothing is sent until the user does. */}
+        <Button asChild variant="paper" className="h-9 min-h-9 flex-1 text-[13px]">
+          <Link href={ideaDraftHref(idea)} aria-describedby={titleId}>
+            Draft this
+          </Link>
         </Button>
       </div>
+      <span className="sr-only" aria-live="polite">
+        {copied ? "Hook copied" : ""}
+      </span>
     </article>
   );
 }
@@ -148,7 +148,6 @@ function SkeletonCard({ index }: { index: number }) {
  * turn any one into a chat with "Draft this". Nothing is stored on the server yet.
  */
 export function IdeasBoard({ profileId, weekOf, basis }: { profileId: string; weekOf: string; basis: IdeasBasis }) {
-  const router = useRouter();
   const [count, setCount] = useState<Count>("5");
   const [state, setState] = useState<State>({ status: "idle" });
   const abort = useRef<AbortController | null>(null);
@@ -172,7 +171,8 @@ export function IdeasBoard({ profileId, weekOf, basis }: { profileId: string; we
       const res = await fetch("/api/ideas", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ count: n }),
+        // On a regenerate, the ideas on screen go along so the next set doesn't repeat them.
+        body: JSON.stringify({ count: n, previous: state.status === "done" ? previousFrom(state.result.ideas) : [] }),
         signal: controller.signal,
       });
       const body = (await res.json().catch(() => ({}))) as Partial<IdeasResponse> & { error?: string };
@@ -188,15 +188,6 @@ export function IdeasBoard({ profileId, weekOf, basis }: { profileId: string; we
     }
   }
 
-  function draft(idea: Idea) {
-    try {
-      sessionStorage.setItem(PENDING_DRAFT_KEY, ideaDraftPrompt(idea));
-    } catch {
-      toast.error("Couldn't start the draft in this browser. Copy the hook into a new chat instead.");
-      return;
-    }
-    router.push("/");
-  }
 
   const loading = state.status === "loading";
   const done = state.status === "done";
@@ -260,10 +251,13 @@ export function IdeasBoard({ profileId, weekOf, basis }: { profileId: string; we
       )}
 
       {(loading || done) && (
+        <h2 className="sr-only">{loading ? "Generating ideas" : `${state.result.ideas.length} ideas for this week`}</h2>
+      )}
+      {(loading || done) && (
         <div aria-busy={loading} className="grid grid-cols-[repeat(auto-fit,minmax(min(300px,100%),1fr))] content-start gap-3">
           {loading
             ? Array.from({ length: state.count }, (_, i) => <SkeletonCard key={i} index={i} />)
-            : state.result.ideas.map((idea, i) => <IdeaCard key={`${state.result.generatedAt}-${idea.id}`} idea={idea} index={i} fresh={state.fresh} onDraft={draft} />)}
+            : state.result.ideas.map((idea, i) => <IdeaCard key={`${state.result.generatedAt}-${idea.id}`} idea={idea} index={i} fresh={state.fresh} />)}
         </div>
       )}
     </div>
