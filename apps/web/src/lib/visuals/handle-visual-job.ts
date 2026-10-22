@@ -1,9 +1,12 @@
 import {
-  completeGenerate, failVisual, getDocument, getTheme, requeueOp, startOp, type Visual,
+  completeEdit, completeGenerate, failEdit, failVisual, getDocument, getTheme, getVisual, requeueOp, startOp, type Visual,
 } from "@brandloop/db";
 import { TransientJobError, type JobContext } from "@brandloop/jobs";
-import { buildVisualPrompt, cropToAspect, ProviderError, sizeFor, type ImageInput } from "@brandloop/visuals";
-import { storeFile } from "@/lib/storage";
+import {
+  buildEditPrompt, buildVisualPrompt, compositeLogo, cropToAspect, LOGO_DEFAULT, ProviderError, rewriteEditInstruction, sizeFor, type ImageInput,
+  type LogoPlacement,
+} from "@brandloop/visuals";
+import { readFile, storeFile } from "@/lib/storage";
 import type { VisualDeps } from "./deps";
 
 export type VisualOp = "generate" | "edit" | "logo";
@@ -19,6 +22,16 @@ export function failureCopy(err: ProviderError): string {
   if (err.code === "refused") return COPY.refused;
   if (err.code === "timeout") return COPY.timeout;
   return COPY.unavailable;
+}
+
+const EDIT_COPY = {
+  refused: "That edit was declined. Try describing it differently.",
+  unavailable: "Editing is unavailable right now. Try again in a moment.",
+  timeout: "That took too long, so we stopped. Try again.",
+} as const;
+
+export function editFailureCopy(err: ProviderError): string {
+  return err.code === "refused" ? EDIT_COPY.refused : err.code === "timeout" ? EDIT_COPY.timeout : EDIT_COPY.unavailable;
 }
 
 /** Whatever went wrong becomes a ProviderError; infrastructure errors (storage, network) count as retryable. */
@@ -71,6 +84,41 @@ async function generate(deps: VisualDeps, visual: Visual): Promise<void> {
   if (!done) throw new ProviderError("bad_output", false); // vanished mid-flight: nothing to record against
 }
 
+async function currentImage(visual: Visual): Promise<{ bytes: Buffer; mediaType: ImageInput["mediaType"] }> {
+  const found = await getVisual(visual.profileId, visual.id);
+  const file = found?.current ? await readFile(visual.profileId, found.current.storageObjectId) : null;
+  if (!file) throw new ProviderError("bad_output", false);
+  return { bytes: file.bytes, mediaType: "image/png" };
+}
+
+async function edit(deps: VisualDeps, visual: Visual): Promise<void> {
+  const instruction = String((visual.opInput as { instruction?: unknown } | null)?.instruction ?? "").trim();
+  if (!instruction) throw new ProviderError("refused", false);
+  const rewritten = deps.ai ? await rewriteEditInstruction(deps.ai, instruction, { userPrompt: visual.userPrompt }) : instruction;
+  const image = await currentImage(visual);
+  const { image: out } = await withDeadline(deps.timeoutMs, (abortSignal) =>
+    deps.provider.edit({ image, prompt: buildEditPrompt(rewritten), quality: deps.quality, abortSignal }),
+  );
+  const cropped = await cropToAspect(out.bytes, visual.aspect);
+  const stored = await storeFile(visual.profileId, visual.teamId, "VISUAL", cropped.bytes, "image/png");
+  const version = await completeEdit(visual.id, { storageObjectId: stored.id, editPrompt: rewritten, kind: "EDIT", width: cropped.width, height: cropped.height });
+  if (version === null) throw new ProviderError("bad_output", false);
+}
+
+async function logo(visual: Visual): Promise<void> {
+  const theme = await getTheme(visual.profileId);
+  const logoFile = theme.logoObjectId ? await readFile(visual.profileId, theme.logoObjectId) : null;
+  if (!logoFile) throw new LogoMissing();
+  const p = { ...LOGO_DEFAULT, ...((visual.opInput as Partial<LogoPlacement> | null) ?? {}) };
+  const base = await currentImage(visual);
+  const out = await compositeLogo(base.bytes, logoFile.bytes, p);
+  const stored = await storeFile(visual.profileId, visual.teamId, "VISUAL", out.bytes, "image/png");
+  const version = await completeEdit(visual.id, { storageObjectId: stored.id, editPrompt: null, kind: "LOGO", width: out.width, height: out.height });
+  if (version === null) throw new ProviderError("bad_output", false);
+}
+
+class LogoMissing extends Error {}
+
 /**
  * The job behind `visual.generate`/`visual.edit`/`visual.logo`. Re-loads the visual by id (the payload is trusted for
  * nothing else), claims it with a compare-and-set, and either completes it, hands it back for a retry
@@ -87,13 +135,23 @@ export async function handleVisualJob(
 
   try {
     if (job.op === "generate") await generate(deps, visual);
-    else throw new ProviderError("bad_output", false); // edit and logo land with V4
+    else if (job.op === "edit") await edit(deps, visual);
+    else await logo(visual);
     return "ok";
   } catch (raw) {
+    if (raw instanceof LogoMissing) {
+      await failEdit(visual.id, "Add your logo in the brand theme first.");
+      return "failed";
+    }
     const err = toProviderError(raw, deps.log);
     if (err.retryable && ctx.attempt < ctx.maxAttempts) {
       await requeueOp(visual.id);
       throw new TransientJobError(err.message);
+    }
+    if (job.op !== "generate") {
+      // A failed edit or logo keeps the current version and costs nothing: no refund, no edit consumed.
+      await failEdit(visual.id, editFailureCopy(err));
+      return "failed";
     }
     if (err.code === "verification_required") deps.log("[visuals] image provider needs organisation verification; generation is refused until it is verified");
     await failVisual(visual.id, failureCopy(err), { refund: true });

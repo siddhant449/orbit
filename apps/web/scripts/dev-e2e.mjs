@@ -23,6 +23,11 @@ const env = {
   APP_URL: process.env.APP_URL ?? `http://localhost:${port}`,
   // e2e never spends Deepgram credits and never publishes to LinkedIn.
   DEEPGRAM_ENABLED: "false",
+  // e2e never calls a live image model: the mock provider, files on local disk, jobs in-process.
+  VISUALS_PROVIDER: "mock",
+  VISUALS_ENABLED: "1",
+  STORAGE_DRIVER: "local",
+  JOBS_DRIVER: "local",
   LINKEDIN_PUBLISH_ENABLED: "",
 };
 console.log(`dev:e2e: next dev on :${port}, database ${databaseNameFromUrl(url)}, AI_MOCK_MODEL=1`);

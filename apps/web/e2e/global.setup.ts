@@ -38,6 +38,14 @@ setup("test database: preset writing styles", async () => {
   });
 });
 
+setup("test user: image credits, visuals and brand theme reset", async () => {
+  setup.skip(!email, "Set E2E_CLERK_USER_EMAIL to a Clerk dev-instance test user");
+  execFileSync("pnpm", ["--filter", "@brandloop/db", "exec", "tsx", "prisma/reset-test-visuals.ts"], {
+    stdio: "inherit",
+    env: { ...process.env, DATABASE_URL: resolveTestDatabaseUrl(), E2E_EMAIL: email },
+  });
+});
+
 setup("clerk testing token", async () => {
   await clerkSetup();
 });

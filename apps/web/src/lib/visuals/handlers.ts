@@ -26,8 +26,9 @@ export async function currentProfile() {
 export function visualJson(v: VisualWithCurrent["visual"], current: VisualWithCurrent["current"]) {
   return {
     id: v.id,
-    status: v.status,
-    imageUrl: v.status === "FAILED" || v.status === "PENDING" ? null : (current?.storageObject.url ?? null),
+    // An edit or logo in flight keeps the image on screen but reads as busy, so one poll loop covers every operation.
+    status: v.activeOp && v.status === "COMPLETED" ? "PROCESSING" : v.status,
+    imageUrl: v.status === "FAILED" || (v.status === "PENDING" && !current) ? null : (current?.storageObject.url ?? null),
     currentVersion: v.currentVersion,
     editCount: v.editCount,
     maxEdits: v.maxEdits,
