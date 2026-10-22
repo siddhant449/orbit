@@ -1,36 +1,10 @@
-import { WAVE_OFFSETS, WAVE_PATHS, WAVE_TIMING } from "./wave-data";
-
 /**
- * Hero background (system §8, ruling A19/A20): Orbit's own SVG wave field and turbulence orb, rendered on the server.
+ * Hero background (system §8, ruling A19/A20): Orbit's own SVG turbulence orb, rendered on the server.
  * Choice: SVG over a WebGL shader. It ships zero JS and no extra dependency, paints in the first frame at its final
- * size (no layout shift), matches the artboard exactly, and every loop is a CSS animation the HeroMotion island can
+ * size (no layout shift), and every loop is a CSS animation the HeroMotion island can
  * pause off-screen / in a hidden tab. The only SMIL animation (turbulence frequency) starts with begin="indefinite",
- * so it never runs under reduced motion or without JS; reduced motion leaves a static frame of both layers.
+ * so it never runs under reduced motion or without JS; reduced motion leaves a static frame.
  */
-export function WaveField() {
-  return (
-    <div className="wave" aria-hidden="true">
-      <svg viewBox="0 0 696 316" preserveAspectRatio="none" fill="none" stroke="#F5F4F0" strokeLinecap="round">
-        {WAVE_OFFSETS.map((dy, band) => (
-          <g key={dy} transform={`translate(0 ${dy})`}>
-            {WAVE_PATHS.map(([d, w, o], i) => {
-              const [dur, begin] = WAVE_TIMING[band][i];
-              return (
-                <path
-                  key={i}
-                  d={d}
-                  strokeWidth={w}
-                  strokeOpacity={o}
-                  style={{ animationDuration: `${dur}s`, animationDelay: `${begin}s` }}
-                />
-              );
-            })}
-          </g>
-        ))}
-      </svg>
-    </div>
-  );
-}
 
 const RINGS: ReadonlyArray<readonly [number, string, number]> = [
   [330, "#F5F4F0", 26],

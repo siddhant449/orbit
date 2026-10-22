@@ -1,6 +1,6 @@
 import { SIGN_UP_URL } from "./links";
 import { HeroMotion } from "./hero-motion";
-import { Orb, WaveField } from "./hero-art";
+import { Orb } from "./hero-art";
 import { RiseLines } from "./ui";
 
 const ROLES = ["Founders", "Consultants", "Recruiters", "Coaches", "Product leads", "Built by operators, for operators"];
@@ -18,12 +18,11 @@ function RoleSet({ hidden }: { hidden?: boolean }) {
   );
 }
 
-/** C2 hero: ink + wave field + grain, h1 in three rising lines, lead, Get started, roles marquee, orb right. */
+/** C2 hero: ink + grain, h1 in three rising lines, lead, Get started, roles marquee, orb right. */
 export function Hero() {
   return (
     <section id="top" className="hero" aria-labelledby="hero-title">
       <div className="grain" aria-hidden="true" />
-      <WaveField />
       <Orb />
       <HeroMotion targetId="top" />
       <div className="wrap hero__body">
