@@ -34,9 +34,9 @@ export async function softDeleteObject(profileId: string, id: string): Promise<S
   return prisma.storageObject.findUnique({ where: { id } });
 }
 
-/** Objects deleted before `olderThan`, for the storage GC to remove from the blob store and then purge. */
+/** Objects deleted before `olderThan` and not referenced by a visual version or a brand logo, for the storage GC to remove and purge. */
 export function listGcCandidates(olderThan: Date, limit = 500): Promise<StorageObject[]> {
-  return prisma.storageObject.findMany({ where: { deletedAt: { lt: olderThan } }, orderBy: { deletedAt: "asc" }, take: limit });
+  return prisma.storageObject.findMany({ where: { deletedAt: { lt: olderThan }, versions: { none: {} }, brandLogoFor: { none: {} } }, orderBy: { deletedAt: "asc" }, take: limit });
 }
 
 /** Removes the row once its blob is gone. */

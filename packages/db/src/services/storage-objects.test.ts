@@ -6,8 +6,9 @@ import { getObject, listGcCandidates, recordObject, softDeleteObject } from "./s
 
 async function cleanup() {
   await assertTestDatabase(prisma);
-  await prisma.user.deleteMany({ where: { clerkId: { startsWith: "user_test_" } } });
-  await prisma.team.deleteMany({ where: { name: { endsWith: "(test)" } } });
+  const users = { clerkId: { startsWith: "vtest_so" } };
+  await prisma.team.deleteMany({ where: { memberships: { some: { user: users } } } });
+  await prisma.user.deleteMany({ where: users });
 }
 beforeEach(cleanup);
 afterAll(async () => {
@@ -16,7 +17,7 @@ afterAll(async () => {
 });
 
 async function account(n: number) {
-  const acc = await ensureAccount({ clerkId: `user_test_so${n}`, email: `so${n}@example.test`, firstName: "S", teamNameSuffix: " (test)" });
+  const acc = await ensureAccount({ clerkId: `vtest_so${n}`, email: `so${n}@example.test`, firstName: "S", teamNameSuffix: " (so)" });
   return { profileId: acc.currentProfile!.id, teamId: acc.team.id };
 }
 const input = (a: { profileId: string; teamId: string }, key: string) => ({

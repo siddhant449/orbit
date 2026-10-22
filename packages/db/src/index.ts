@@ -13,3 +13,6 @@ export * from "./services/chat";
 export * from "./services/documents";
 export * from "./services/progress";
 export * from "./services/storage-objects";
+export * from "./services/credits";
+export * from "./services/visuals";
+export * from "./services/brand-theme";

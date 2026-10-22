@@ -20,7 +20,7 @@ import sharp from "sharp";
 import { deleteFileHandler, getFileHandler, postFileHandler, publicFileHandler } from "./files-api";
 import { readFile, resetStoresForTest, storeFile } from "./storage";
 
-const CLERK = "user_test_webfiles";
+const CLERK = "vtest_webfiles";
 let root: string;
 let mine: { userId: string; profileId: string; teamId: string };
 let theirs: { userId: string; profileId: string; teamId: string };
@@ -28,11 +28,11 @@ let theirs: { userId: string; profileId: string; teamId: string };
 async function wipe() {
   const users = { clerkId: { startsWith: CLERK } };
   await assertTestDatabase(prisma);
-  await prisma.team.deleteMany({ where: { name: { endsWith: " (test)" }, memberships: { some: { user: users } } } });
+  await prisma.team.deleteMany({ where: { name: { endsWith: " (files)" }, memberships: { some: { user: users } } } });
   await prisma.user.deleteMany({ where: users });
 }
 async function account(n: number) {
-  const acc = await ensureAccount({ clerkId: `${CLERK}${n}`, email: `webfiles${n}@example.test`, firstName: "Files", teamNameSuffix: " (test)" });
+  const acc = await ensureAccount({ clerkId: `${CLERK}${n}`, email: `webfiles${n}@example.test`, firstName: "Files", teamNameSuffix: " (files)" });
   return { userId: acc.user.id, profileId: acc.currentProfile!.id, teamId: acc.team.id };
 }
 const as = (a: typeof mine) => void (env.account = { user: { id: a.userId }, currentProfile: { id: a.profileId, teamId: a.teamId } });
