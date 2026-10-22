@@ -48,7 +48,7 @@ function system(scope: EditScope, retry: boolean): string {
 
 # The answer
 - text: the complete edited post (not just the changed part).
-- changeSummary: one short sentence on what you changed, for the version history.
+- changeSummary: one short sentence on what you changed, for the version history. Never state word, character or line counts in it.
 - unmetRequirements: each requirement from <edit_requirements> you could not meet, word for word. Empty when you met them all.
 
 # Skills

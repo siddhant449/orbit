@@ -130,7 +130,7 @@ export function delegateTools(ctx: TurnContext) {
   return {
     delegateWriting: tool({
       description:
-        "Ask the writing specialist to draft a new LinkedIn post. Write a clear brief in `request`: the topic, the angle, the audience, the format if the user named one, and any facts from memory or the knowledge base the post should use. Returns a handoff; then call createDocument with this call's id. Never retype the draft yourself.",
+        "Ask the writing specialist, who already has the user's voice, writing style, rules, identity and strategy, to draft a new LinkedIn post, or a set of short options (hook variations, openings, angles). Write a clear brief in `request`: the topic, the angle, the audience, the format if the user named one, how many options if they asked for options, and the specific facts, stories and numbers from memory or the knowledge base the post should use. Returns a handoff. For a post, then call createDocument with this call's id and never retype the draft. For options, show them to the user in your reply instead of creating a document.",
       inputSchema: z.object({
         request: z.string().min(REQUEST_MIN).max(REQUEST_MAX),
         specialty: z.enum(["post"]),
