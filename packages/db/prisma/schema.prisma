@@ -87,6 +87,7 @@ model Profile {
   storageObjects      StorageObject[]
   visuals             Visual[]
   brandTheme          BrandTheme?
+  referenceImages     ReferenceImage[]
   currentFor          User[]           @relation("CurrentProfile")
   deletedAt           DateTime?
   createdAt           DateTime         @default(now())
@@ -360,12 +361,12 @@ enum StorageKind {
 /// A file in blob storage. Every put records a row here in the same service call; deleting soft-deletes it, and a
 /// daily job removes the blob once it has been deleted for a week. `url` is set for PUBLIC objects only.
 model StorageObject {
-  id           String          @id @default(cuid())
-  profile      Profile         @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  id           String           @id @default(cuid())
+  profile      Profile          @relation(fields: [profileId], references: [id], onDelete: Cascade)
   profileId    String
-  team         Team            @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  team         Team             @relation(fields: [teamId], references: [id], onDelete: Cascade)
   teamId       String
-  key          String          @unique
+  key          String           @unique
   store        StorageStore
   kind         StorageKind
   contentType  String
@@ -374,10 +375,11 @@ model StorageObject {
   width        Int?
   height       Int?
   url          String?
-  createdAt    DateTime        @default(now())
+  createdAt    DateTime         @default(now())
   deletedAt    DateTime?
   versions     VisualVersion[]
   brandLogoFor BrandTheme[]
+  referenceFor ReferenceImage[]
 
   @@index([profileId, kind, createdAt])
   @@index([deletedAt])
@@ -440,8 +442,6 @@ model Visual {
   /// "generate" | "edit" | "logo" while a job runs: one operation at a time.
   activeOp           String?
   activeOpStartedAt  DateTime?
-  /// Input of the operation in flight: `{instruction}` for an edit, `{x, y, sizePercent}` for a logo. Cleared when it ends.
-  opInput            Json?
   /// Input of the operation in flight: `{instruction}` for an edit, `{x, y, sizePercent}` for a logo. Cleared when it ends.
   opInput            Json?
   /// User-safe.
@@ -533,4 +533,20 @@ model BrandTheme {
   /// "manual" | "image" | "default"
   source       String?
   updatedAt    DateTime       @updatedAt
+}
+
+/// An example image the user keeps to steer generation ("match this style"). Stored in the PRIVATE store only.
+model ReferenceImage {
+  id              String        @id @default(cuid())
+  profile         Profile       @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  profileId       String
+  title           String
+  tags            String[]
+  storageObject   StorageObject @relation(fields: [storageObjectId], references: [id], onDelete: Cascade)
+  storageObjectId String
+  width           Int
+  height          Int
+  createdAt       DateTime      @default(now())
+
+  @@index([profileId, createdAt])
 }

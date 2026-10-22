@@ -1,6 +1,8 @@
 import { createAiClient, type AiClient } from "@brandloop/ai";
 import { createImageProvider, type ImageInput, type ImageProvider, type ImageQuality } from "@brandloop/visuals";
+import { getReference } from "@brandloop/db";
 import { isMockMode } from "@/lib/chat-deps";
+import { readFile } from "@/lib/storage";
 
 export type VisualDeps = {
   provider: ImageProvider;
@@ -34,7 +36,12 @@ export function getVisualDeps(): VisualDeps {
     ai: !isMockMode() && process.env.OPENAI_API_KEY ? createAiClient() : null,
     quality: (["low", "medium", "high"] as const).find((q) => q === process.env.VISUALS_QUALITY) ?? "medium",
     timeoutMs: PROVIDER_TIMEOUT_MS,
-    loadReference: async () => null,
+    loadReference: async (profileId, referenceId) => {
+      const ref = await getReference(profileId, referenceId);
+      const file = ref ? await readFile(profileId, ref.storageObjectId) : null;
+      const mediaType = file?.contentType;
+      return file && (mediaType === "image/png" || mediaType === "image/jpeg" || mediaType === "image/webp") ? { bytes: file.bytes, mediaType } : null;
+    },
     log: (m) => console.warn(m),
   });
 }

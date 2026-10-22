@@ -1,5 +1,5 @@
 import {
-  createVisualWithDebit, deleteVisual, getActiveForDocument, getCredits, getTheme, getVisual, listVisuals, OutOfCreditsError, prisma,
+  createVisualWithDebit, getReference, deleteVisual, getActiveForDocument, getCredits, getTheme, getVisual, listVisuals, OutOfCreditsError, prisma,
   updateAltText, VisualError, ALT_TEXT_MAX, type LibraryItem, type VisualWithCurrent,
 } from "@brandloop/db";
 import { checkVisualRequest } from "@brandloop/visuals";
@@ -86,6 +86,10 @@ export async function createVisualHandler(request: Request): Promise<Response> {
     if (theme.decision === "NONE") {
       return fail(409, "Set your brand colours first, or skip them.", { code: "needs_brand_confirmation", proposal: theme });
     }
+  }
+
+  if (input.referenceId && !(await getReference(profile.id, input.referenceId))) {
+    return fail(422, "That reference image isn't available.", { code: "reference_not_found" });
   }
 
   const deps = getVisualDeps();

@@ -7,3 +7,5 @@ export type { EditOptions, GenerateOptions, ImageInput, ImageProvider, ImageQual
 export { mockImageProvider } from "./mock";
 export type { MockOptions } from "./mock";
 export { openAiImageProvider, mapProviderError } from "./openai";
+export * from "./composite";
+export * from "./theme";
