@@ -2,11 +2,10 @@ import { Logo } from "@/components/shell/logo";
 import { AuthArt } from "./auth-art";
 import { ThemeToggle } from "./theme-toggle";
 
-// Privacy and Terms live on the marketing site; there is no help centre yet, so Help is left out.
-const marketingUrl = (process.env.NEXT_PUBLIC_MARKETING_URL ?? "http://localhost:4321").replace(/\/$/, "");
+// Privacy and Terms are served from this origin by the marketing route group; there is no help centre yet, so Help is left out.
 const footerLinks = [
-  { label: "Privacy", href: `${marketingUrl}/privacy` },
-  { label: "Terms", href: `${marketingUrl}/terms` },
+  { label: "Privacy", href: "/privacy" },
+  { label: "Terms", href: "/terms" },
 ];
 
 /**
