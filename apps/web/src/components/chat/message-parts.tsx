@@ -4,6 +4,7 @@ import { lazy, Suspense } from "react";
 import { collapseToolRuns, parseProposal, type ChatUIMessage, type Proposal } from "@brandloop/agent/client";
 import { cn } from "@brandloop/ui";
 import { DraftCard } from "./document-panel";
+import { HookCards, hookCardsOf } from "./hook-cards";
 import { ProposalCard } from "./proposal-card";
 import { ReviewCard, reviewChecksOf } from "./review-card";
 import { MemoryTag, memoryTagOf } from "./memory-tag";
@@ -60,6 +61,7 @@ export function MessageParts({ message, streaming }: { message: ChatUIMessage; s
     const checks = reviewChecksOf(p);
     return checks ? [{ key: p.toolCallId ?? String(i), checks }] : [];
   });
+  const hookSets = hookCardsOf(message.parts as ToolPartLike[]);
   return (
     <>
       {items.map((it, i) => {
@@ -74,6 +76,9 @@ export function MessageParts({ message, streaming }: { message: ChatUIMessage; s
         return null;
       })}
       {draft && <DraftCard fallback={draft} />}
+      {hookSets.map((cards, i) => (
+        <HookCards key={i} cards={cards} />
+      ))}
       {reviews.map(({ key, checks }) => (
         <ReviewCard key={key} checks={checks} />
       ))}

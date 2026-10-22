@@ -15,7 +15,8 @@
     "smoke:draft": "tsx --env-file-if-exists=../../.env scripts/smoke-draft.ts",
     "smoke:edit": "tsx --env-file-if-exists=../../.env scripts/smoke-edit.ts",
     "eval": "tsx --env-file-if-exists=../../.env eval/run.ts",
-    "smoke:style": "tsx --env-file-if-exists=../../.env scripts/smoke-style.ts"
+    "smoke:style": "tsx --env-file-if-exists=../../.env scripts/smoke-style.ts",
+    "smoke:hooks": "tsx --env-file-if-exists=../../.env scripts/smoke-hooks.ts"
   },
   "dependencies": {
     "@brandloop/ai": "workspace:*",

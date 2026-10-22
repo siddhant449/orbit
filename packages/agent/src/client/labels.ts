@@ -55,6 +55,7 @@ export const HIDDEN_OUTPUT_TOOLS: ReadonlySet<string> = new Set([
   "listKB",
   "searchKB",
   "readKB",
+  "generateHooks",
 ]);
 
 const ERROR_TEXT = /^\s*(Failed|Refused|⚠|EDIT_REQUIREMENTS_MISSED:|STALE_DOCUMENT:|STALE_SELECTED_PASSAGE:|EXISTING_POST:)/;

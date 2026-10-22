@@ -35,3 +35,4 @@ export {
   type Range,
 } from "../writing/measure";
 export { enforcedChips } from "../writing/rules";
+export { hookMeta, parseHookCards, swapOpening, type HookCard } from "./hooks";

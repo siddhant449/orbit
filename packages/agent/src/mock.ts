@@ -99,6 +99,12 @@ function openDocumentFirstLine(prompt: Prompt): string | null {
   return body?.split("\n").find((l) => l.trim())?.trim() ?? null;
 }
 
+function openDocumentText(prompt: Prompt): string | null {
+  const system = prompt.find((m) => m.role === "system");
+  const content = typeof system?.content === "string" ? system.content : "";
+  return /<open_document[^>]*>\n([\s\S]*?)\n<\/open_document>/.exec(content)?.[1] ?? null;
+}
+
 const AFTER_TOOL: Record<string, string> = {
   saveMemory: "Saved that to your memory.",
   searchKB: "Here is what I found in your knowledge base.",
@@ -106,6 +112,7 @@ const AFTER_TOOL: Record<string, string> = {
   proposeDocumentEdits: "Here is a punchier opening. Apply it if you like it.",
   updateDocument: "Done. The shorter version is in the panel.",
   delegateEditing: "The review is ready.",
+  generateHooks: "Here are five hook options, each a different kind. Pick the one you like.",
 };
 
 /** A formatted reply for exercising the chat's markdown rendering offline. */
@@ -166,6 +173,19 @@ function route(opts: CallOptions): ScriptStep {
     });
   }
   if (firstLine && /\breview\b/i.test(text)) return call("delegateEditing", { request: text.slice(0, 4_000), specialty: "final-review" });
+  const picked = /Use this opening line: "([^"]+)"/.exec(text)?.[1];
+  if (picked) {
+    return call("delegateWriting", {
+      request: `Write a short LinkedIn post for the user that opens with the line they picked. Their request: ${text.slice(0, 1_000)}`,
+      specialty: "post",
+      personalDetails: null,
+      overrides: null,
+      chosenHook: { text: picked, spine: null },
+    });
+  }
+  if (/\bhook (variations?|options?)\b|\bopening lines\b/i.test(text)) {
+    return call("generateHooks", { topic: "Hiring your first engineer as a founder", draftBody: firstLine ? openDocumentText(opts.prompt) : null, count: 5, excludeHooks: [] });
+  }
   if (/\bdraft\b/i.test(text)) {
     return call("delegateWriting", {
       request: `Write a short LinkedIn post for the user. Their request: ${text.slice(0, 2_000)}`,
@@ -276,6 +296,39 @@ export const SCRIPTED_STYLE = {
 };
 CANNED.push(SCRIPTED_STYLE);
 
+/** One scripted hook per purpose, plain and short, about hiring a first engineer (Task W7). */
+const MOCK_HOOK_TEXTS: Record<string, string> = {
+  claim: "Hiring your first engineer is a product decision.",
+  contrarian: "Stop searching for a rockstar engineer.",
+  mistake: "The costliest first-hire mistake: hiring for speed.",
+  "how-to": "How to brief an engineer before day one.",
+  comparison: "Generalist or specialist? Pick by stage.",
+  curiosity: "What good engineers ask before they say yes.",
+  story: "Last spring, my first hire quit in week two.",
+  proof: "Our first hire shipped on day four.",
+  number: "Three questions to ask before any first hire.",
+  prediction: "Soon, small teams will hire for judgement first.",
+  question: "What if the job post is the real filter?",
+  announcement: "New: a hiring checklist for founders.",
+};
+
+/** The scripted answer to a hooks call: one hook for each purpose named in the prompt's <assignments>. */
+function mockHooks(prompt: string): { hooks: unknown[] } | null {
+  const block = /<assignments>\n([\s\S]*?)\n<\/assignments>/.exec(prompt)?.[1];
+  if (!block) return null;
+  const purposes = [...block.matchAll(/^\d+\. ([a-z-]+) \(/gm)].map((m) => m[1]!);
+  return {
+    hooks: purposes.map((purpose) => ({
+      purpose,
+      text: MOCK_HOOK_TEXTS[purpose] ?? "A plain first line.",
+      claim: `The post makes the ${purpose} point.`,
+      mustDeliver: "One concrete example that backs the line.",
+      bodyShape: "A short lead-in and two to three items",
+      isPersonal: purpose === "story" || purpose === "proof",
+    })),
+  };
+}
+
 /** Keyword routes, tried before CANNED: one schema can return a different canned output per scenario. */
 export const SCRIPTED_QUESTIONS = ["Who was your first hire, and when did you hire them?", "What changed for the team after they joined?"];
 const WALL =
@@ -335,6 +388,11 @@ export function scriptedAi(): AiClient {
       return "Mock chat";
     },
     async json({ schema, prompt }) {
+      const hooks = mockHooks(prompt);
+      if (hooks) {
+        const parsed = schema.safeParse(hooks);
+        if (parsed.success) return parsed.data;
+      }
       for (const route of ROUTES) {
         if (!route.match.test(prompt)) continue;
         const parsed = schema.safeParse(route.output);
@@ -342,7 +400,14 @@ export function scriptedAi(): AiClient {
       }
       for (const candidate of CANNED) {
         const parsed = schema.safeParse(candidate);
-        if (parsed.success) return parsed.data;
+        if (!parsed.success) continue;
+        // A picked hook becomes the opening of the scripted post (the real writer is told the same in its brief).
+        const chosen = /chosenHook: open the post with exactly this hook: "([^"]+)"/.exec(prompt)?.[1];
+        const payload = (parsed.data as { payload?: { blocks?: WriterBlock[] } } | null)?.payload;
+        if (chosen && payload?.blocks?.length) {
+          return { ...parsed.data, payload: { ...payload, blocks: [{ kind: "hook", lines: [chosen] }, ...payload.blocks.slice(1)] } } as typeof parsed.data;
+        }
+        return parsed.data;
       }
       throw new Error("scriptedAi has no canned output for this schema.");
     },

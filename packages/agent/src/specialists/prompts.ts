@@ -1,3 +1,4 @@
+import { CATEGORIES, FRAMEWORKS, HOOK_PURPOSES } from "../library";
 import type { SpecialistKind } from "./envelope";
 
 /**
@@ -57,22 +58,12 @@ ${SHARED}
 - parentAction "respond" or "ask-user".`,
 };
 
-/** Short skill notes the specialists include by name. */
+/** Short skill notes the specialists include by name. The hook, format and framework notes are rendered from `library/*`, the single source. */
 export const SKILL_NOTES: Record<string, string> = {
-  "post-formats": `Post formats:
-- Story: a specific moment, the tension, what changed, the lesson in one line.
-- Lesson: the mistake or insight first, then the evidence, then what to do instead.
-- How-to: the outcome first, then 3 to 5 concrete steps, then a closing line.
-- Opinion: the claim in the first line, the reason, the strongest objection and an honest answer.
-- List: a promise in the hook, items that each stand alone, no filler items.
-Pick the format the request and the material suit best; don't announce the format.`,
-  hooks: `Hooks:
-- One or two short lines. Specific beats clever: a number, a named situation, a surprising claim, a cost.
-- No questions that can be answered "no", no "In today's world", no clickbait the post doesn't pay off.
-- The strongest hooks come from the user's own material: a real number, a real mistake, a real client moment from <knowledge> or <identity>.
-- The hook makes a promise the body keeps.`,
+  "post-formats": `Post formats (pick the one the request and the material suit best; don't announce it):\n${CATEGORIES.map((c) => `- ${c.label}: ${c.description}`).join("\n")}`,
+  hooks: `Hooks: one or two short lines; specific beats clever. Types, each with a different approach:\n${HOOK_PURPOSES.map((p) => `- ${p.label}: ${p.explainer}`).join("\n")}\nThe strongest hooks come from the user's own material. The hook makes a promise the body keeps; never imply a story, number or news the user has not supplied.`,
   proofreading: `Proofreading: spelling, grammar, repeated words, inconsistent tense, broken links, placeholders, markdown left in plain text.`,
-  frameworks: `Planning: mix formats across the week; every idea ties to one content pillar; prefer ideas the user can back with their own experience.`,
+  frameworks: `Planning: mix formats across the week; every idea ties to one content pillar; prefer ideas the user can back with their own experience.\nStructures a post can follow:\n${FRAMEWORKS.map((f) => `- ${f.name}: ${f.description}`).join("\n")}`,
 };
 
 export const RETRY_REMINDER = `
