@@ -122,7 +122,7 @@ export function knowledgeTools(ctx: TurnContext) {
     }),
     searchKB: tool({
       description:
-        "Search the user's knowledge base (their notes, documents, links and transcripts). Returns matching items; small items in full, large ones as excerpts.",
+        "Search the user's knowledge base (their notes, documents, links and transcripts). Returns matching items; small items in full, large ones as excerpts marked \"(excerpt; call readKB for the full text)\". An item returned in full needs no readKB.",
       inputSchema: z.object({
         query: z.string().min(1).max(500),
         limit: z.number().int().min(1).max(20).nullable(),
@@ -131,7 +131,7 @@ export function knowledgeTools(ctx: TurnContext) {
         runTool("searchKB", "knowledge base", () => searchKBText(profileId, ctx.embedder, query, limit ?? 10)),
     }),
     readKB: tool({
-      description: "Read the full text of one knowledge base item by id.",
+      description: "Read the full text of one knowledge base item by id. Only needed for items searchKB returned as an excerpt, or that listKB found.",
       inputSchema: z.object({ id: z.string().min(1).max(100) }),
       execute: ({ id }) => runTool("readKB", "knowledge base", () => readKBText(profileId, id), LIMITS.readKBChars + 200),
     }),
