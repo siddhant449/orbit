@@ -118,7 +118,8 @@ test("activities: derived streak, goals, milestones, strip and checklist", async
   await expect(page.getByRole("dialog")).toHaveCount(0);
 
   const draft = page.getByRole("region", { name: /^Today / }).getByRole("link", { name: /^Draft( another)?$/ });
-  await expect(draft).toHaveAttribute("href", /^\/\?prompt=.*30-day\+sprint/);
+  await expect(draft).toHaveAttribute("href", /^\/\?prompt=/);
+  expect(new URL((await draft.getAttribute("href"))!, "http://x").searchParams.get("prompt")).toContain("30-day sprint");
 
   await axeBothThemes(page);
   await page.setViewportSize({ width: 390, height: 844 });
