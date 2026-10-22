@@ -8,7 +8,6 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
-    "db:up": "docker --context default compose up -d db",
     "db:migrate": "pnpm --filter @brandloop/db migrate",
     "db:seed": "pnpm --filter @brandloop/db seed"
   },

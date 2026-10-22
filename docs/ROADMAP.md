@@ -16,7 +16,7 @@ Product name: **Orbit** (packages stay `@brandloop/*`). The design system is `do
   - `apps/web`
   - `apps/marketing`
   - `packages/db`, `packages/ui`, `packages/config`
-- [x] Postgres in Docker on port 5433, Prisma 7 with User / Team / Membership / Profile, and the account service with 8 passing tests
+- [x] Postgres (Neon, Singapore; local Docker retired 2026-10-22), Prisma 7 with User / Team / Membership / Profile, and the account service with 8 passing tests
 - [x] Clerk sign-in through `proxy.ts`; the first visit creates the user, the team and the first profile
 - [x] App shell:
   - sidebar, icon rail and collapse (⌘B)
