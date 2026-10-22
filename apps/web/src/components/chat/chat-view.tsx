@@ -1,10 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import useSWR from "swr";
-import { useLenis } from "lenis/react";
-import { SquarePen } from "lucide-react";
+import { ArrowDown, SquarePen } from "lucide-react";
 import { toast } from "sonner";
 import { toolLabel, type ChatUIMessage, type PanelDoc } from "@brandloop/agent/client";
 import { Button, useMediaQuery } from "@brandloop/ui";
@@ -14,6 +13,7 @@ import { ChatComposer, type ComposerRect } from "./chat-composer";
 import type { KnowledgeChoice } from "./knowledge-picker";
 import { MessageList } from "./message-list";
 import { toolNameOf, toolStateOf, type ToolPartLike } from "./tool-row";
+import { distanceFromBottom, followReducer, initialFollow, type FollowEvent } from "./scroll-follow";
 import { HISTORY_KEY } from "./history-key";
 import { useChatSession } from "./use-chat-session";
 import { DESKTOP_PANEL, DocumentPanel, DocumentPanelContext } from "./document-panel";
@@ -39,6 +39,43 @@ function liveStatus(messages: ChatUIMessage[], status: string, initialIds: Reado
   }
   if (status === "ready" && last?.role === "assistant" && !initialIds.has(last.id)) return "Reply ready.";
   return "";
+}
+
+const noSubscribe = () => () => {};
+
+/** "Today · 3:45 PM", "Yesterday · …", "Oct 21 · …": when the chat last moved. */
+function stamp(iso: string | undefined, now = new Date()): string {
+  const at = iso ? new Date(iso) : now;
+  if (Number.isNaN(at.getTime())) return "";
+  const time = at.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  const day = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const diff = Math.round((day(now) - day(at)) / 86_400_000);
+  const label = diff === 0 ? "Today" : diff === 1 ? "Yesterday" : at.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return `${label} · ${time}`;
+}
+
+/**
+ * Height the on-screen keyboard covers below the layout (phones): the dock lifts by it, less the tab bar the
+ * keyboard already hides, so the composer stays in view while typing.
+ */
+function useKeyboardInset(): number {
+  const [inset, setInset] = useState(0);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => {
+      const covered = window.innerHeight - vv.height - vv.offsetTop;
+      const tabbar = document.querySelector<HTMLElement>('nav[aria-label="Primary"]')?.offsetHeight ?? 0;
+      setInset(covered > 80 ? Math.max(0, Math.round(covered - tabbar)) : 0);
+    };
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+    };
+  }, []);
+  return inset;
 }
 
 export function ChatView({
@@ -104,24 +141,46 @@ export function ChatView({
     return () => clearTimeout(timer);
   }, [initialText, send]);
 
-  // Follow the reply while the reader is at the bottom; a send always jumps there.
-  const lenis = useLenis();
-  const endRef = useRef<HTMLDivElement>(null);
-  const pinned = useRef(true);
-  useEffect(() => {
-    const scroller = endRef.current?.closest<HTMLElement>(".lenis") ?? null;
-    if (!scroller) return;
-    const onScroll = () => {
-      pinned.current = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 120;
-    };
-    scroller.addEventListener("scroll", onScroll, { passive: true });
-    return () => scroller.removeEventListener("scroll", onScroll);
+  // The thread follows the newest words unless the reader has scrolled up; then a "Jump to latest" pill shows.
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  // The ref is the truth for scroll handlers and the resize observer; the state renders the pill.
+  const followRef = useRef(initialFollow);
+  const [follow, setFollow] = useState(initialFollow);
+  const dispatchFollow = useCallback((e: FollowEvent) => {
+    const next = followReducer(followRef.current, e);
+    if (next === followRef.current) return;
+    followRef.current = next;
+    setFollow(next);
   }, []);
+  const toBottom = useCallback(() => {
+    const el = scrollerRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, []);
+  // Open at the newest message; then stay pinned while following, whatever grows (text, steps, cards).
   useEffect(() => {
-    if (!pinned.current || !endRef.current) return;
-    if (lenis) lenis.scrollTo(endRef.current, { immediate: true, force: true });
-    else endRef.current.scrollIntoView({ block: "end" });
-  }, [messages, status, lenis]);
+    toBottom();
+    const content = contentRef.current;
+    if (!content) return;
+    const ro = new ResizeObserver(() => {
+      if (followRef.current.following) toBottom();
+    });
+    ro.observe(content);
+    return () => ro.disconnect();
+  }, [toBottom]);
+  useEffect(() => {
+    if (followRef.current.following) toBottom();
+    else dispatchFollow({ type: "content" });
+  }, [messages, status, toBottom, dispatchFollow]);
+  function onThreadScroll() {
+    const el = scrollerRef.current;
+    if (el) dispatchFollow({ type: "scroll", distance: distanceFromBottom(el) });
+  }
+  function jumpToLatest() {
+    dispatchFollow({ type: "jump" });
+    toBottom();
+  }
+  const keyboard = useKeyboardInset();
 
   function submit() {
     const text = draft.trim();
@@ -132,7 +191,7 @@ export function ChatView({
       return;
     }
     setDraft("");
-    pinned.current = true;
+    jumpToLatest();
     void send(text);
   }
 
@@ -142,7 +201,7 @@ export function ChatView({
       toast(SAVING_FIRST);
       return;
     }
-    pinned.current = true;
+    jumpToLatest();
     void sendQuickLink(key, prompt);
   }
 
@@ -150,54 +209,83 @@ export function ChatView({
   const hasPost = Boolean(post.state.doc && post.state.doc.version > 0);
   const panelShown = post.state.open && desktop;
 
+  const lastAt = messages.at(-1)?.metadata?.createdAt;
+  // Client-only: the server's clock and time zone aren't the reader's.
+  const when = useSyncExternalStore(noSubscribe, () => stamp(lastAt), () => "");
+
   return (
     <DocumentPanelContext.Provider value={post}>
-    <div className="flex min-h-full" data-document-host="">
-    <div className="flex min-w-0 flex-1 flex-col">
-      <header className="sticky top-0 z-10 flex h-14 items-center justify-between gap-3 bg-surface px-6">
-        <h1 className="type-title-2 flex min-w-0 items-center gap-3 focus-visible:outline-none">
-          <span aria-hidden="true" className="rule-draw rule-draw--y h-5 w-px shrink-0 bg-keyline" />
-          <span className="truncate">{liveTitle}</span>
-        </h1>
-        <div className="flex shrink-0 items-center gap-3">
+    <div className="flex h-full min-h-0" data-document-host="">
+    <div className="relative flex min-w-0 flex-1 flex-col">
+      <header className="relative z-10 flex shrink-0 items-center justify-between gap-3 px-4 py-3 sm:px-8 md:py-[18px]">
+        <div className="flex min-w-0 items-baseline gap-3">
+          <h1 className="min-w-0 truncate text-[15px] font-medium text-text focus-visible:outline-none">{liveTitle}</h1>
+          {when && <span className="hidden shrink-0 text-xs text-text-3 sm:inline">{when}</span>}
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5">
           {busy && (
-            <span className="type-caption flex items-center gap-2 text-ink-muted">
-              <span aria-hidden="true" className="live-dot" />
+            <span className="mr-1.5 hidden items-center gap-2 text-xs text-text-3 sm:flex">
+              <span aria-hidden="true" className="steps__mark--active steps__mark" />
               Writing
             </span>
           )}
           {hasPost && !panelShown && (
-            <Button variant="secondary" size="sm" onClick={post.open} aria-haspopup="dialog">
+            <Button variant="secondary" size="sm" onClick={post.open} aria-haspopup="dialog" className="h-8 border-line-2 px-3 text-[13px]">
               <PostsIcon />
               Open post
             </Button>
           )}
-          <Button asChild variant="ghost" size="sm">
+          <Button asChild variant="secondary" size="sm" className="h-8 border-line-2 px-3 text-[13px]">
             <Link href="/" aria-label="New chat">
               <SquarePen aria-hidden="true" />
               <span className="hidden sm:inline">New chat</span>
             </Link>
           </Button>
         </div>
-        <span aria-hidden="true" className="rule-draw absolute inset-x-0 bottom-0 h-px bg-line" />
       </header>
 
-      <div className="mx-auto w-full max-w-[768px] flex-1 px-4 pb-10 pt-10 sm:px-6">
-        <MessageList
-          messages={messages}
-          status={status}
-          initialIds={initialIds}
-          errorText={errorText}
-          onRetry={canRetry ? () => void retry() : undefined}
-          notice={notice}
-        />
-        <div ref={endRef} aria-hidden="true" className="h-px" />
+      <div className="relative min-h-0 flex-1">
+        <div
+          ref={scrollerRef}
+          onScroll={onThreadScroll}
+          data-lenis-prevent
+          data-thread-scroller=""
+          className="thread-scroller absolute inset-0 overflow-y-auto"
+        >
+          <div ref={contentRef} className="px-4 pb-8 pt-3 sm:px-8 sm:pb-10">
+            <div className="mx-auto w-full max-w-[780px]">
+            <MessageList
+              messages={messages}
+              status={status}
+              initialIds={initialIds}
+              errorText={errorText}
+              onRetry={canRetry ? () => void retry() : undefined}
+              notice={notice}
+              followUps={hasPost ? <QuickLinkChips onPick={quickLink} disabled={busy} /> : undefined}
+            />
+            </div>
+          </div>
+        </div>
+        {!follow.following && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center">
+            <button
+              type="button"
+              onClick={jumpToLatest}
+              className="jump-latest orbit-transition pointer-events-auto inline-flex h-9 items-center gap-2 rounded-pill border border-line-3 bg-panel px-3.5 text-[13px] font-medium text-text shadow-elevation-composer hover:border-inverse hover:bg-inverse hover:text-on-inverse focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-text"
+            >
+              <ArrowDown aria-hidden="true" className="size-3.5" />
+              {follow.unseen ? "New reply below" : "Jump to latest"}
+            </button>
+          </div>
+        )}
       </div>
 
-      <div className="sticky bottom-0 z-10 bg-surface">
-        <span aria-hidden="true" className="absolute inset-x-0 top-0 h-px bg-line" />
-        <div className="mx-auto w-full max-w-[768px] px-4 pb-4 pt-4 sm:px-6">
-          {hasPost && <QuickLinkChips className="mb-3" onPick={quickLink} disabled={busy} />}
+      <div
+        className="relative z-10 shrink-0 px-4 pt-2 sm:px-8 md:pb-[max(24px,env(safe-area-inset-bottom))]"
+        style={{ paddingBottom: keyboard ? keyboard + 12 : undefined }}
+        data-composer-dock=""
+      >
+        <div className="mx-auto w-full max-w-[780px] pb-3 sm:pl-11 md:pb-0">
           <ChatComposer
             value={draft}
             onValueChange={setDraft}

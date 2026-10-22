@@ -181,7 +181,11 @@ export function useChatSession({
       sleep: (ms) => sleep(ms, ctrl.signal),
       signal: ctrl.signal,
     });
-    if (result.status === "aborted") return;
+    if (result.status === "aborted") {
+      // Ended by a chat change or unmount (not by a newer recovery, which owns the flag now).
+      if (recoveryRef.current === ctrl) setRecovering(false);
+      return;
+    }
     setRecovering(false);
     turn.finished();
     if (result.status === "idle") adopt(result.chat);
@@ -247,6 +251,7 @@ export function useChatSession({
     const t = text.trim();
     if (!t) return;
     lastErrorRef.current = null;
+    setNotice(null);
     const ctx = docContext.current;
     await chatRef.current.sendMessage(
       { text: t, metadata: { createdAt: new Date().toISOString() } },
@@ -257,6 +262,7 @@ export function useChatSession({
   /** A quick link: a hidden user message that names its key, so the server runs that action on the post. */
   const sendQuickLink = useCallback(async (key: string, prompt: string) => {
     lastErrorRef.current = null;
+    setNotice(null);
     const ctx = docContext.current;
     await chatRef.current.sendMessage(
       {

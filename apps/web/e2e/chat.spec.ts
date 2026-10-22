@@ -56,10 +56,12 @@ test("starts on home, shows tool activity, keeps the history, manages the chat f
   await page.getByLabel("Message", { exact: true }).fill("Search my knowledge for onboarding notes");
   await page.getByLabel("Message", { exact: true }).press("Enter");
 
-  // The landing composer hands over to the chat in place; the reply is live in the margin.
+  // The landing composer hands over to the chat in place; the reply streams beside the Orbit mark.
   await expect(page.getByRole("heading", { name: /What are we putting out there\?/ })).toHaveCount(0);
   await expect(userNotes(page)).toHaveText(["You: Search my knowledge for onboarding notes"]);
-  await expect(page.locator("[data-tool-row]").filter({ hasText: "Searched your knowledge" })).toBeVisible({ timeout: 30_000 });
+  // Tool activity folds into "Worked through N steps" once the run ends; opening it shows each step's label.
+  const steps = page.getByRole("button", { name: /^Worked through 1 step/ });
+  await expect(steps).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText("Here is what I found in your knowledge base.")).toBeVisible();
   await expect(liveReply(page)).toHaveCount(0);
   await expect(page.getByRole("status")).toHaveText("Reply ready.");
@@ -76,9 +78,14 @@ test("starts on home, shows tool activity, keeps the history, manages the chat f
   await expect(row).toHaveAttribute("aria-current", "page");
   // The composer keeps focus through the address change.
   await expect(page.getByLabel("Message", { exact: true })).toBeFocused();
+  await expect(steps).toHaveAttribute("aria-expanded", "false");
+  await steps.click();
+  await expect(steps).toHaveAttribute("aria-expanded", "true");
+  await expect(page.locator("[data-tool-row]").filter({ hasText: "Searched your knowledge" })).toBeVisible();
 
   await page.reload();
   await expect(userNotes(page)).toHaveCount(1);
+  await page.getByRole("button", { name: /^Worked through 1 step/ }).click();
   await expect(page.locator("[data-tool-row]").filter({ hasText: "Searched your knowledge" })).toBeVisible();
   await expect(page.getByText("Here is what I found in your knowledge base.")).toBeVisible();
 
@@ -124,9 +131,10 @@ test("renders markdown safely and streams live", async ({ page }) => {
   // A javascript: link keeps its text and loses its target.
   await expect(page.getByText("this one")).toBeVisible();
   await expect(page.getByRole("link", { name: "this one" })).toHaveCount(0);
-  await expect(page.locator('[data-message="assistant"]').getByText(/^\d+ words$/)).toBeVisible();
+  // A finished reply offers Copy (shown on hover and focus).
+  await expect(page.locator('[data-message="assistant"]').getByRole("button", { name: "Copy reply" })).toHaveCount(1);
 
-  // A second send streams visibly: the reply is live (signal tip, caret) until it ends.
+  // A second send streams visibly: the reply is live (accent caret) until it ends.
   await page.getByLabel("Message", { exact: true }).fill("More markdown please");
   await page.getByLabel("Message", { exact: true }).press("Enter");
   await expect(liveReply(page)).toHaveCount(1);

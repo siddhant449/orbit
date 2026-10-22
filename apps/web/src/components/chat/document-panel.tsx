@@ -415,27 +415,40 @@ export function DocumentPanel({ ctl, busy }: { ctl: DocumentController; busy: bo
  */
 export function DraftCard({ fallback }: { fallback: PanelDoc }) {
   const ctl = useDocumentPanel();
+  const profile = useCurrentProfile();
   const doc = ctl?.state.doc && ctl.state.doc.id === fallback.id && ctl.state.doc.version > 0 ? ctl.state.doc : fallback;
   const paras = doc.text.split(/\n\s*\n/).filter((p) => p.trim());
   const folded = paras.length > 3;
   return (
-    <div className="light my-2 overflow-hidden rounded-card bg-ground text-text shadow-elevation-draft" data-draft-card>
+    <div
+      className="light overflow-hidden rounded-card bg-ground text-text shadow-elevation-draft"
+      data-draft-card
+    >
       <div className="flex items-center justify-between gap-3 border-b border-line-paper bg-panel px-[18px] py-3 text-[13px]">
         <p className="min-w-0 truncate font-medium">{doc.title}</p>
         <span className="shrink-0 text-text-3">
-          Draft · <CharMeter text={doc.text} className="text-[13px]" />
+          Draft · <CharMeter text={doc.text} className="font-sans text-[13px]" />
         </span>
       </div>
-      <div className="flex flex-col gap-2.5 px-[22px] pb-5 pt-4 text-[15px] leading-[1.5]">
-        {paras.slice(0, 3).map((p, i) => (
-          <p key={i} className="line-clamp-3 whitespace-pre-wrap break-words">
-            {p}
-          </p>
-        ))}
-        {folded && <p className="text-text-3">…more</p>}
+      <div className="flex flex-col gap-3.5 px-[22px] pb-[22px] pt-5">
+        <div className="flex items-center gap-2.5">
+          <ProfileOrb src={profile?.avatarUrl} />
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium">{profile?.name ?? "Your profile"}</p>
+            <p className="text-xs text-text-3">Just now · LinkedIn preview</p>
+          </div>
+        </div>
+        <div className="flex flex-col gap-2.5 text-[15px] leading-[1.5]">
+          {paras.slice(0, 3).map((p, i) => (
+            <p key={i} className="line-clamp-3 whitespace-pre-wrap break-words">
+              {p}
+            </p>
+          ))}
+          {folded && <p className="text-text-3">…more</p>}
+        </div>
         {ctl && (
           <div>
-            <Button variant="inverse" size="sm" className="mt-1.5" onClick={ctl.open}>
+            <Button variant="inverse" size="sm" onClick={ctl.open}>
               Open post
             </Button>
           </div>

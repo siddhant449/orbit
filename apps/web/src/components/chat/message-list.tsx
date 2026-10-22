@@ -1,18 +1,21 @@
 "use client";
 
-import { RefreshCw, RotateCcw } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { toast } from "sonner";
 import type { ChatUIMessage } from "@brandloop/agent/client";
 import { Button, cn } from "@brandloop/ui";
-import { MessageParts, wordCount } from "./message-parts";
+import { CheckIcon, CopyIcon } from "@brandloop/ui/icons";
+import { AssistantAvatar } from "./assistant-avatar";
+import { hasVisibleParts, MessageParts, replyText } from "./message-parts";
 
 type Status = "submitted" | "streaming" | "ready" | "error";
 
-/** What the user wrote: a note laid on the sheet, right of the reading column. New ones land on a spring. */
-function UserNote({ message, land }: { message: ChatUIMessage; land: boolean }) {
+/** What the user wrote: a right-aligned bubble (screens.md B2). A message sent here rises in once. */
+function UserBubble({ message, arrive }: { message: ChatUIMessage; arrive: boolean }) {
   const text = message.parts.map((p) => (p.type === "text" ? p.text : "")).join("");
   return (
     <div data-message="user" className="flex justify-end">
-      <div className={cn("user-note", land && "msg-land")}>
+      <div className={cn("user-bubble", arrive && "msg-arrive")}>
         <span className="sr-only">You: </span>
         <p className="whitespace-pre-wrap break-words">{text}</p>
       </div>
@@ -20,36 +23,85 @@ function UserNote({ message, land }: { message: ChatUIMessage; land: boolean }) 
   );
 }
 
-/**
- * A reply, drawn in the margin: a vertical rule grows with the text. While the reply is live its tip carries
- * the signal dot; when it ends, an end tick lands with the reply's measure (its word count).
- */
-function Reply({ message, live, thinking }: { message?: ChatUIMessage; live: boolean; thinking?: boolean }) {
-  const words = message ? wordCount(message) : 0;
+/** Before the first word: three accent dots and a softly lit "Thinking". */
+function Thinking() {
   return (
-    <div data-message="assistant" data-live={live ? "" : undefined} className="reply">
-      <span aria-hidden="true" className="reply__rule" />
-      <span aria-hidden="true" className="reply__start" />
-      <div className="reply__body">
-        <span className="sr-only">Brandloop: </span>
-        {thinking && (
-          <div className="tool-row type-caption text-ink">
-            <span aria-hidden="true" className="tool-row__leader" />
-            <span aria-hidden="true" className="tool-mark--active" />
-            <span className="tool-row__label sweep">Thinking</span>
-          </div>
-        )}
+    <div className="flex h-[23px] items-center gap-2.5 text-[13px]" data-thinking="">
+      <span aria-hidden="true" className="thinking-dots">
+        <span />
+        <span />
+        <span />
+      </span>
+      <span className="thinking-label">Thinking</span>
+    </div>
+  );
+}
+
+/** Copy under a finished reply; shown on hover and focus (always on touch). */
+function ReplyActions({ message }: { message: ChatUIMessage }) {
+  const [copied, setCopied] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(replyText(message));
+      setCopied(true);
+      toast("Reply copied");
+      clearTimeout(timer.current);
+      timer.current = setTimeout(() => setCopied(false), 1600);
+    } catch {
+      toast("Couldn't copy the reply. Select the text and copy it instead.");
+    }
+  }
+  return (
+    <div className="reply-actions -mb-5 -ml-1.5 -mt-1.5 flex items-center gap-1">
+      <button
+        type="button"
+        onClick={() => void copy()}
+        aria-label="Copy reply"
+        title="Copy reply"
+        className="orbit-transition grid size-8 place-items-center rounded-full text-text-3 hover:bg-panel-hover hover:text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-text"
+      >
+        {copied ? <CheckIcon size={15} /> : <CopyIcon size={15} />}
+      </button>
+    </div>
+  );
+}
+
+/** A reply: the Orbit mark, then the prose, steps and cards in one column. */
+function Reply({
+  message,
+  live,
+  arrive,
+  footer,
+}: {
+  message?: ChatUIMessage;
+  live: boolean;
+  arrive?: boolean;
+  footer?: ReactNode;
+}) {
+  const shown = message ? hasVisibleParts(message) : false;
+  const copyable = Boolean(message && !live && replyText(message));
+  return (
+    <div data-message="assistant" data-live={live ? "" : undefined} className={cn("flex items-start gap-3 sm:gap-4", arrive && "msg-arrive")}>
+      <AssistantAvatar />
+      <div className="flex min-w-0 flex-1 flex-col gap-3 pt-0.5">
+        <span className="sr-only">Orbit: </span>
+        {live && !shown && <Thinking />}
         {message && <MessageParts message={message} streaming={live} />}
+        {footer}
+        {copyable && <ReplyActions message={message!} />}
       </div>
-      {live ? (
-        <span aria-hidden="true" className="reply__tip" />
-      ) : (
-        words > 0 && (
-          <span aria-hidden="true" className="reply__end">
-            <span className="reply__measure">{words === 1 ? "1 word" : `${words} words`}</span>
-          </span>
-        )
-      )}
+    </div>
+  );
+}
+
+/** A failed send or an ended recovery, in the reply column: what happened, and the way forward. */
+function Notice({ text, action }: { text: string; action?: ReactNode }) {
+  return (
+    <div role="alert" className="flex flex-wrap items-center gap-3 pl-10 sm:pl-11">
+      <p className="text-[14px] leading-[1.5] text-danger">{text}</p>
+      {action}
     </div>
   );
 }
@@ -61,6 +113,7 @@ export function MessageList({
   errorText,
   onRetry,
   notice,
+  followUps,
 }: {
   messages: ChatUIMessage[];
   status: Status;
@@ -70,53 +123,62 @@ export function MessageList({
   onRetry?: () => void;
   /** Recovery ended without a reply to show, or Stop failed. */
   notice?: { text: string; reload?: boolean } | null;
+  /** Follow-up chips under the newest finished reply (the post's quick links). */
+  followUps?: ReactNode;
 }) {
   const shown = messages.filter((m) => !m.metadata?.hideInUI);
   // Live and waiting read the full list: a hidden quick-link message still starts a turn.
   const last = messages.at(-1);
   const busy = status === "submitted" || status === "streaming";
-  // Waiting on the first chunk: a reply placeholder in the margin.
+  // Waiting on the first chunk: the reply's place, thinking.
   const waiting = busy && last?.role === "user";
+  const lastShown = shown.at(-1);
   return (
-    <ol className="flex flex-col gap-8" aria-label="Messages">
+    <ol className="flex flex-col gap-7" aria-label="Messages">
       {shown.map((m) => (
         <li key={m.id}>
           {m.role === "user" ? (
-            <UserNote message={m} land={!initialIds.has(m.id)} />
+            <UserBubble message={m} arrive={!initialIds.has(m.id)} />
           ) : (
-            <Reply message={m} live={busy && m.id === last?.id} />
+            <Reply
+              message={m}
+              live={busy && m.id === last?.id}
+              footer={!busy && m.id === lastShown?.id ? followUps : undefined}
+            />
           )}
         </li>
       ))}
       {waiting && (
         <li>
-          <Reply live thinking />
+          <Reply live arrive />
         </li>
       )}
       {errorText && !busy && (
         <li>
-          <div role="alert" className="flex flex-wrap items-center gap-3 border-l border-signal pl-4">
-            <p className="type-ui text-signal-ink">{errorText}</p>
-            {onRetry && (
-              <Button variant="secondary" size="sm" onClick={onRetry}>
-                <RotateCcw aria-hidden="true" />
-                Try again
-              </Button>
-            )}
-          </div>
+          <Notice
+            text={errorText}
+            action={
+              onRetry && (
+                <Button variant="secondary" size="sm" onClick={onRetry}>
+                  Try again
+                </Button>
+              )
+            }
+          />
         </li>
       )}
       {notice && !busy && (
         <li>
-          <div role="alert" className="flex flex-wrap items-center gap-3 border-l border-signal pl-4">
-            <p className="type-ui text-signal-ink">{notice.text}</p>
-            {notice.reload && (
-              <Button variant="secondary" size="sm" onClick={() => window.location.reload()}>
-                <RefreshCw aria-hidden="true" />
-                Reload
-              </Button>
-            )}
-          </div>
+          <Notice
+            text={notice.text}
+            action={
+              notice.reload && (
+                <Button variant="secondary" size="sm" onClick={() => window.location.reload()}>
+                  Reload
+                </Button>
+              )
+            }
+          />
         </li>
       )}
     </ol>

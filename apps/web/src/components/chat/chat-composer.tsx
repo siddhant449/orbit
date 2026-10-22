@@ -1,8 +1,9 @@
 "use client";
 
 import { useLayoutEffect, useRef, type RefObject } from "react";
-import { ArrowUp, Globe, Square } from "lucide-react";
-import { Button, cn } from "@brandloop/ui";
+import { Globe, Square } from "lucide-react";
+import { Button, ComposerShell, cn } from "@brandloop/ui";
+import { SendIcon } from "@brandloop/ui/icons";
 import { VoicePicker, type VoiceOption } from "@/components/home/voice-picker";
 import { KnowledgeChip, KnowledgePicker, type KnowledgeChoice } from "./knowledge-picker";
 
@@ -72,63 +73,75 @@ export function ChatComposer({
         e.preventDefault();
         if (canSend) onSend();
       }}
-      className="relative rounded-card border border-line-control bg-surface p-2 shadow-raised focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus"
     >
-      <label htmlFor="chat-composer" className="sr-only">
-        Message
-      </label>
-      {knowledge.length > 0 && (
-        <ul aria-label="Selected knowledge" className="flex flex-wrap gap-1.5 px-2 pt-1">
-          {knowledge.map((k) => (
-            <KnowledgeChip key={k.id} item={k} onRemove={() => onKnowledgeChange(knowledge.filter((x) => x.id !== k.id))} />
-          ))}
-        </ul>
-      )}
-      <textarea
-        id="chat-composer"
-        ref={inputRef}
-        value={value}
-        onChange={(e) => onValueChange(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-            e.preventDefault();
-            if (canSend) onSend();
-          }
-        }}
-        rows={1}
-        data-lenis-prevent
-        placeholder={busy ? "Brandloop is writing…" : "Reply, or ask for a change…"}
-        className="block max-h-[40vh] min-h-12 w-full resize-none bg-transparent px-3 pt-3 type-body text-ink outline-none [field-sizing:content] placeholder:text-ink-faint"
-      />
-      <div className="flex items-center justify-between gap-2 px-1 pb-1 pt-1">
-        <div className="flex min-w-0 items-center gap-1">
-          <KnowledgePicker selected={knowledge} onChange={onKnowledgeChange} />
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            aria-pressed={webSearch}
-            aria-label="Web search"
-            title={webSearch ? "Web search is on" : "Web search is off"}
-            onClick={() => onWebSearchChange(!webSearch)}
-            className={cn(webSearch && "text-ink")}
-          >
-            <Globe aria-hidden="true" />
-            <span className="hidden sm:inline">Web</span>
-            <span aria-hidden="true" className={cn("web-switch", webSearch && "web-switch--on")} />
-          </Button>
-          <VoicePicker voices={voices} selectedId={selectedVoiceId} />
-        </div>
-        {busy ? (
-          <Button type="button" variant="secondary" size="icon-lg" aria-label="Stop" onClick={onStop}>
-            <Square aria-hidden="true" className="!size-3.5 fill-current" />
-          </Button>
-        ) : (
-          <Button type="submit" variant="generate" size="icon-lg" aria-label="Send" disabled={!canSend}>
-            <ArrowUp />
-          </Button>
+      <ComposerShell variant="thread" className="flex flex-col">
+        <label htmlFor="chat-composer" className="sr-only">
+          Message
+        </label>
+        {knowledge.length > 0 && (
+          <ul aria-label="Selected knowledge" className="flex flex-wrap gap-1.5 px-4 pt-3">
+            {knowledge.map((k) => (
+              <KnowledgeChip key={k.id} item={k} onRemove={() => onKnowledgeChange(knowledge.filter((x) => x.id !== k.id))} />
+            ))}
+          </ul>
         )}
-      </div>
+        <textarea
+          id="chat-composer"
+          ref={inputRef}
+          value={value}
+          onChange={(e) => onValueChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              if (canSend) onSend();
+            }
+          }}
+          rows={1}
+          data-lenis-prevent
+          enterKeyHint="send"
+          placeholder={busy ? "Orbit is writing…" : "Reply, or ask for a change…"}
+          className="block max-h-[min(40vh,320px)] min-h-[44px] w-full resize-none bg-transparent px-4 pt-3.5 text-[16px] leading-[1.5] text-text outline-none [field-sizing:content] placeholder:text-text-3 sm:px-5 sm:pt-[18px]"
+        />
+        <div className="flex items-center justify-between gap-2 px-2.5 pb-2.5 pt-2 sm:px-3 sm:pb-3">
+          <div className="flex min-w-0 items-center gap-1">
+            <KnowledgePicker selected={knowledge} onChange={onKnowledgeChange} />
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-pressed={webSearch}
+              aria-label="Web search"
+              title={webSearch ? "Web search is on" : "Web search is off"}
+              onClick={() => onWebSearchChange(!webSearch)}
+              className={cn(webSearch && "text-text")}
+            >
+              <Globe aria-hidden="true" />
+              <span className="hidden sm:inline">Web</span>
+              <span aria-hidden="true" className={cn("web-switch", webSearch && "web-switch--on")} />
+            </Button>
+            <VoicePicker voices={voices} selectedId={selectedVoiceId} />
+          </div>
+          {busy ? (
+            <button
+              type="button"
+              aria-label="Stop"
+              onClick={onStop}
+              className="orbit-transition grid size-10 shrink-0 place-items-center rounded-full border border-line-control text-text hover:border-inverse hover:bg-inverse hover:text-on-inverse"
+            >
+              <Square aria-hidden="true" className="size-3.5 fill-current" />
+            </button>
+          ) : (
+            <button
+              type="submit"
+              aria-label="Send"
+              disabled={!canSend}
+              className="orbit-transition grid h-10 w-[42px] shrink-0 place-items-center rounded-pill bg-accent text-on-accent enabled:hover:bg-accent-hover enabled:hover:shadow-glow motion-safe:enabled:hover:-translate-y-px motion-safe:enabled:active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <SendIcon size={18} />
+            </button>
+          )}
+        </div>
+      </ComposerShell>
     </form>
   );
 }

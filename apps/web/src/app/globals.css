@@ -40,175 +40,210 @@ h1[tabindex="-1"]:focus-visible {
 }
 
 /*
- * Chat (feature 02, task 7). A reply is drawn in the margin: a vertical rule grows with the text, its tip carries
- * the signal dot while the reply is live, and an end tick lands with the reply's measure when it ends. Tool rows
- * draw a leader line, then the label; active steps carry one sweeping hairline. Signal marks live and error only.
+ * Chat thread (screens.md B2, system §6.12-6.14, p03 / p18; O4). The thread fills the page scroller exactly: its own
+ * column scrolls and the composer docks below it. Replies sit beside a 28 px Orbit mark in plain Geist prose; tool
+ * activity folds into "Worked through N steps"; memory changes confirm as a mono data-register tag.
  */
 @layer components {
-  .user-note {
-    max-width: min(85%, 56ch);
-    padding: 10px 14px;
-    border: 1px solid var(--line-strong);
-    border-radius: var(--radius-control);
-    background: var(--paper);
-    color: var(--ink);
+  /* The chat host fills the Lenis wrapper (whose content div is otherwise content-sized), so the composer docks at the bottom. */
+  .lenis > div:has(> [data-document-host]) {
+    height: 100%;
+  }
+
+  .thread-scroller {
+    scrollbar-gutter: stable;
+    overscroll-behavior: contain;
+  }
+
+  .user-bubble {
+    max-width: min(60%, 560px);
+    padding: 14px 18px;
+    border: 1px solid var(--line);
+    border-radius: 18px 18px 4px 18px;
+    background: var(--panel-hover);
+    color: var(--text);
     font-size: 15px;
-    line-height: 1.6;
+    line-height: 1.5;
   }
-  .msg-land {
-    animation: note-land 540ms
-      linear(0, 0.057, 0.19, 0.353, 0.516, 0.662, 0.783, 0.876, 0.944, 0.989, 1.016, 1.031, 1.036, 1.035, 1.031, 1.025, 1.019, 1.014, 1.009, 1.005, 1.003, 1.001, 1)
-      both;
+  @media (max-width: 767px) {
+    .user-bubble {
+      max-width: 85%;
+      padding: 12px 16px;
+    }
+  }
+  /* A new message rises 8 px once, on its own arrival (never on page load or route change). */
+  .msg-arrive {
+    animation: msg-arrive var(--dur-hover) var(--ease-out) both;
   }
 
-  .reply {
-    position: relative;
-    padding-left: 24px;
-    padding-bottom: 4px;
+  .assistant-avatar {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+    border: 1px solid var(--line-2);
+    border-radius: 999px;
+    background: var(--panel);
   }
-  .reply:has(.reply__end) {
-    padding-bottom: 24px;
+
+  /* Copy (and later actions) under a finished reply: shown on hover and focus, always on touch. */
+  .reply-actions {
+    opacity: 0;
+    transition: opacity var(--dur-hover-color) var(--ease-out);
   }
-  .reply__rule {
-    position: absolute;
-    left: 0;
-    top: 6px;
-    bottom: 0;
-    width: 1px;
-    background: var(--line-strong);
-    transform-origin: center top;
-    animation: draw-y 420ms var(--ease-ink) both;
-    transition: background-color 320ms var(--ease-ink);
+  [data-message="assistant"]:hover .reply-actions,
+  .reply-actions:focus-within {
+    opacity: 1;
   }
-  .reply[data-live] .reply__rule {
-    background: var(--ink);
+  @media (hover: none) {
+    .reply-actions {
+      opacity: 1;
+    }
   }
-  .reply__start {
-    position: absolute;
-    left: -4px;
-    top: 6px;
-    width: 9px;
-    height: 1px;
-    background: var(--line-strong);
+
+  /* Thinking, and live step labels: the text itself carries a slow light sweep. */
+  .steps__live,
+  .thinking-label {
+    background: linear-gradient(90deg, var(--text-2) 0%, var(--text-2) 35%, var(--text) 50%, var(--text-2) 65%, var(--text-2) 100%);
+    background-size: 250% 100%;
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
+    animation: text-sweep 1.8s linear infinite;
   }
-  .reply__body {
+  .thinking-dots {
+    display: inline-flex;
+    gap: 4px;
+  }
+  .thinking-dots > span {
+    width: 5px;
+    height: 5px;
+    border-radius: 999px;
+    background: var(--accent-text);
+    animation: dot-pulse 1.2s var(--ease-out) infinite;
+  }
+  .thinking-dots > span:nth-child(2) {
+    animation-delay: 0.15s;
+  }
+  .thinking-dots > span:nth-child(3) {
+    animation-delay: 0.3s;
+  }
+
+  /* "Worked through N steps" (§6.13). */
+  .steps {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--panel);
+    padding: 0 14px;
+  }
+  .steps__summary {
     display: flex;
-    flex-direction: column;
+    width: calc(100% + 28px);
+    margin: 0 -14px;
+    padding: 0 14px;
+    min-height: 38px;
+    align-items: center;
     gap: 10px;
-    min-width: 0;
+    border-radius: 12px;
+    color: var(--text-2);
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+    transition: color var(--dur-hover-color) var(--ease-out);
   }
-  .reply__tip {
-    position: absolute;
-    left: -2.5px;
-    bottom: -3px;
-    width: 6px;
-    height: 6px;
-    border-radius: var(--radius-pill);
-    background: var(--signal);
-    box-shadow: 0 0 0 3px var(--surface);
+  .steps__summary:hover {
+    color: var(--text);
   }
-  .reply__end {
-    position: absolute;
-    left: -4px;
-    bottom: 0;
-    width: 9px;
-    height: 1px;
-    background: var(--line-strong);
-    transform-origin: left center;
-    animation: draw-x 240ms var(--ease-ink) both;
+  .steps__summary:focus-visible {
+    outline: 2px solid var(--accent-text);
+    outline-offset: 2px;
   }
-  .reply__measure {
-    position: absolute;
-    left: 18px;
-    top: -6px;
-    color: var(--ink-muted);
-    font-size: 11px;
-    font-weight: 500;
-    line-height: 1;
-    letter-spacing: 0.02em;
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-    animation: measure-in 320ms var(--ease-ink) 160ms both;
+  .steps__chevron {
+    flex-shrink: 0;
+    transition: rotate var(--dur-hover) var(--ease-out);
   }
-
-  .tool-row {
+  .steps[data-open] .steps__chevron {
+    rotate: 90deg;
+  }
+  .steps__body {
+    display: grid;
+    grid-template-rows: 0fr;
+    visibility: hidden;
+    transition:
+      grid-template-rows var(--dur-hover) var(--ease-out),
+      visibility 0s linear var(--dur-hover);
+  }
+  .steps[data-open] .steps__body {
+    grid-template-rows: 1fr;
+    visibility: visible;
+    transition-delay: 0s;
+  }
+  .steps__body > ol {
+    padding-left: 20px;
+  }
+  .steps__body > ol > li:first-child {
+    margin-top: 2px;
+  }
+  .steps__body > ol > li:last-child {
+    margin-bottom: 12px;
+  }
+  .steps__row {
     display: flex;
     align-items: center;
     gap: 8px;
-    min-height: 28px;
+    font-size: 13px;
+    line-height: 1.6;
+    padding: 2px 0;
   }
-  .tool-row__leader {
-    width: 12px;
-    height: 1px;
+  .steps__mark {
     flex-shrink: 0;
-    background: var(--line-strong);
-    transform-origin: left center;
-    animation: draw-x 240ms var(--ease-ink) both;
   }
-  .tool-row__label {
-    animation: fade-in 200ms var(--ease-ink) 120ms both;
-  }
-  .tool-tick path {
-    stroke-dasharray: 1;
-    stroke-dashoffset: 1;
-    animation: draw-path 320ms var(--ease-ink) 60ms both;
-  }
-  .tool-mark--active,
-  .live-dot {
+  .steps__mark--active,
+  .steps__mark--error {
     width: 6px;
     height: 6px;
-    flex-shrink: 0;
-    margin: 0 4px;
-    border-radius: var(--radius-pill);
-    background: var(--signal);
+    margin: 0 3px;
+    border-radius: 999px;
   }
-  .live-dot {
-    margin: 0;
+  .steps__mark--active {
+    background: var(--accent-text);
+    animation: dot-pulse 1.2s var(--ease-out) infinite;
   }
-  .tool-mark--error {
-    position: relative;
-    width: 14px;
-    height: 14px;
-    flex-shrink: 0;
-  }
-  .tool-mark--error::before,
-  .tool-mark--error::after {
-    content: "";
-    position: absolute;
-    left: 2px;
-    top: 6.5px;
-    width: 10px;
-    height: 1.5px;
-    background: var(--signal);
-    rotate: 45deg;
-  }
-  .tool-mark--error::after {
-    rotate: -45deg;
-  }
-  /* One hairline sweeping under the label of a live step. */
-  .sweep {
-    position: relative;
-    display: inline-block;
-    padding-bottom: 3px;
-    overflow: hidden;
-  }
-  .sweep::after {
-    content: "";
-    position: absolute;
-    left: 0;
-    bottom: 0;
-    width: 32%;
-    height: 1px;
-    background: var(--ink);
-    animation: sweep 1.2s var(--ease-ink) infinite;
+  .steps__mark--error {
+    background: var(--danger);
   }
 
-  /* Markdown inside a reply: Hanken body, hairline dashes for bullets, nothing monospace. */
+  /* Memory confirmation (§6.14): mono data register, the one place it appears in the thread. */
+  .memory-tag {
+    display: inline-flex;
+    align-self: flex-start;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px 6px 8px;
+    border: 1px solid var(--line-4);
+    border-radius: 999px;
+    color: var(--text-soft);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+    font-weight: 400;
+    letter-spacing: 0.04em;
+  }
+  .memory-tag:hover {
+    border-color: var(--line-hover);
+    color: var(--text);
+  }
+  .memory-tag:focus-visible {
+    outline: 2px solid var(--accent-text);
+    outline-offset: 2px;
+  }
+
+  /* Markdown in a reply: Geist body 15/1.55, quiet headings, accent links, plain bullets. Nothing monospace. */
   .md {
     max-width: 68ch;
-    color: var(--ink);
+    color: var(--text);
     font-size: 15px;
-    line-height: 1.6;
+    line-height: 1.55;
     overflow-wrap: anywhere;
   }
   .md > * + * {
@@ -218,53 +253,69 @@ h1[tabindex="-1"]:focus-visible {
   .md ol {
     padding-left: 22px;
   }
-  .md li + li {
-    margin-top: 4px;
+  .md ul {
+    list-style: disc;
   }
-  .md ul > li {
-    position: relative;
-    list-style: none;
-  }
-  .md ul > li::before {
-    content: "";
-    position: absolute;
-    left: -16px;
-    top: 0.8em;
-    width: 8px;
-    height: 1px;
-    background: var(--line-strong);
+  .md ul > li::marker {
+    color: var(--text-3);
   }
   .md ol {
     list-style: decimal;
     font-variant-numeric: tabular-nums;
   }
   .md ol > li::marker {
-    color: var(--ink-muted);
+    color: var(--text-3);
   }
+  .md li {
+    padding-left: 4px;
+  }
+  .md li + li,
   .md li > ul,
   .md li > ol {
-    margin-top: 4px;
+    margin-top: 6px;
   }
   .md .md-h {
-    margin-top: 20px;
+    margin-top: 22px;
+    color: var(--text);
     font-size: 16px;
     font-weight: 600;
-    line-height: 1.3;
+    line-height: 1.35;
+    letter-spacing: -0.01em;
+  }
+  .md h4.md-h {
+    font-size: 15px;
   }
   .md > .md-h:first-child {
     margin-top: 0;
   }
+  .md > .md-h + * {
+    margin-top: 8px;
+  }
+  .md strong {
+    color: var(--text);
+    font-weight: 600;
+  }
+  .md a {
+    color: var(--accent-text);
+    text-decoration: underline;
+    text-decoration-color: var(--accent-wash-line);
+    text-underline-offset: 3px;
+    transition: text-decoration-color var(--dur-hover-color) var(--ease-out);
+  }
+  .md a:hover {
+    text-decoration-color: currentColor;
+  }
   .md code {
-    padding: 1px 4px;
-    border-radius: var(--radius-control);
-    background: var(--surface-sunk);
+    padding: 1px 6px;
+    border-radius: 6px;
+    background: var(--panel-hover);
     font-size: 14px;
   }
   .md pre {
-    padding: 12px;
+    padding: 12px 14px;
     border: 1px solid var(--line);
-    border-radius: var(--radius-control);
-    background: var(--surface-sunk);
+    border-radius: 12px;
+    background: var(--panel);
     overflow-x: auto;
     white-space: pre;
   }
@@ -273,9 +324,9 @@ h1[tabindex="-1"]:focus-visible {
     background: none;
   }
   .md blockquote {
-    padding-left: 16px;
-    border-left: 1px solid var(--keyline);
-    color: var(--ink-muted);
+    padding-left: 14px;
+    border-left: 2px solid var(--accent-wash-line);
+    color: var(--text-soft);
   }
   .md hr {
     border: 0;
@@ -292,17 +343,21 @@ h1[tabindex="-1"]:focus-visible {
   }
   .md th,
   .md td {
-    padding: 6px 16px 6px 0;
+    padding: 8px 16px 8px 0;
     border-bottom: 1px solid var(--line);
     text-align: left;
     vertical-align: top;
   }
   .md th {
-    border-bottom-color: var(--line-strong);
+    border-bottom-color: var(--line-3);
+    color: var(--text-2);
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 500;
   }
-  /* The caret: a graphite bar after the newest words while the reply is live. */
+  /* Streaming: each new block fades in as it lands; an accent caret follows the newest words. */
+  .md--streaming > * {
+    animation: block-in 360ms var(--ease-out) both;
+  }
   .md--streaming > :last-child:not(ul, ol, pre, table, div, blockquote)::after,
   .md--streaming > :is(ul, ol):last-child > li:last-child::after {
     content: "";
@@ -311,17 +366,19 @@ h1[tabindex="-1"]:focus-visible {
     height: 1.05em;
     margin-left: 3px;
     vertical-align: -0.18em;
-    background: var(--ink);
+    border-radius: 1px;
+    background: var(--accent-text);
+    animation: caret-blink 1s steps(1) infinite;
   }
 
-  /* Web search switch inside its button: a small square track, graphite when on. */
+  /* Web search switch inside its button: a tiny pill track, accent when on. */
   .web-switch {
     position: relative;
-    width: 16px;
+    width: 18px;
     height: 10px;
     flex-shrink: 0;
-    border: 1px solid var(--line-strong);
-    border-radius: var(--radius-control);
+    border: 1px solid var(--line-control);
+    border-radius: 999px;
   }
   .web-switch::after {
     content: "";
@@ -330,15 +387,21 @@ h1[tabindex="-1"]:focus-visible {
     top: 1px;
     width: 6px;
     height: 6px;
-    background: var(--line-strong);
-    transition: translate 160ms var(--ease-ink), background-color 160ms var(--ease-ink);
+    border-radius: 999px;
+    background: var(--text-2);
+    transition: translate var(--dur-hover) var(--ease-out), background-color var(--dur-hover-color) var(--ease-out);
   }
   .web-switch--on {
-    border-color: var(--ink);
+    border-color: var(--accent-text);
   }
   .web-switch--on::after {
-    background: var(--ink);
-    translate: 6px 0;
+    background: var(--accent-text);
+    translate: 8px 0;
+  }
+
+  /* Jump to latest: a pill floating over the bottom of the thread. */
+  .jump-latest {
+    animation: block-in var(--dur-hover) var(--ease-out) both;
   }
 
   /* Sidebar chat rows: the options button shows on hover, focus and the open chat; always on touch. */
@@ -358,48 +421,60 @@ h1[tabindex="-1"]:focus-visible {
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .msg-land,
-    .reply__rule,
-    .reply__end,
-    .reply__measure,
-    .tool-row__leader,
-    .tool-row__label,
-    .tool-tick path {
+    .msg-arrive,
+    .md--streaming > *,
+    .jump-latest {
       animation: none;
     }
-    .tool-tick path {
-      stroke-dashoffset: 0;
+    .steps__chevron,
+    .steps__body {
+      transition: none;
     }
-    .sweep::after {
-      display: none;
+    .steps__live,
+    .thinking-label {
+      animation: none;
+      background: none;
+      color: var(--text-2);
+    }
+    .thinking-dots > span,
+    .steps__mark--active,
+    .md--streaming > :last-child::after,
+    .md--streaming > :is(ul, ol):last-child > li:last-child::after {
+      animation: none;
     }
   }
 }
 
-@keyframes note-land {
+@keyframes msg-arrive {
   from {
     opacity: 0;
-    translate: 0 16px;
-  }
-  20% {
-    opacity: 1;
-  }
-  to {
-    opacity: 1;
-    translate: 0 0;
+    translate: 0 8px;
   }
 }
-@keyframes measure-in {
+@keyframes block-in {
   from {
     opacity: 0;
-    translate: -4px 0;
   }
 }
-@keyframes sweep {
+@keyframes text-sweep {
   from {
-    translate: -100% 0;
+    background-position: 100% 0;
   }
   to {
-    translate: 320% 0;
+    background-position: -150% 0;
+  }
+}
+@keyframes dot-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+@keyframes caret-blink {
+  50% {
+    opacity: 0;
   }
 }

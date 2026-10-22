@@ -1,12 +1,12 @@
 export type ToolGroup<P> = { type: "tool-group"; parts: P[] };
 
-const isTool = (p: { type: string }) => p.type.startsWith("tool-");
+const isTool = (p: { type: string }) => p.type.startsWith("tool-") || p.type === "dynamic-tool";
 
 /**
- * Collapses 3 or more consecutive `tool-*` parts into one group ("Worked through N steps"). `step-start`
+ * Collapses `min` (default 3) or more consecutive tool parts into one group ("Worked through N steps"). `step-start`
  * markers between tool parts don't break a run; inside a collapsed run they are dropped (they render nothing).
  */
-export function collapseToolRuns<P extends { type: string }>(parts: P[]): (P | ToolGroup<P>)[] {
+export function collapseToolRuns<P extends { type: string }>(parts: P[], min = 3): (P | ToolGroup<P>)[] {
   const out: (P | ToolGroup<P>)[] = [];
   let i = 0;
   while (i < parts.length) {
@@ -26,7 +26,7 @@ export function collapseToolRuns<P extends { type: string }>(parts: P[]): (P | T
       }
       j++;
     }
-    if (tools.length >= 3) out.push({ type: "tool-group", parts: tools });
+    if (tools.length >= min) out.push({ type: "tool-group", parts: tools });
     else out.push(...parts.slice(i, end + 1));
     i = end + 1;
   }

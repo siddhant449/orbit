@@ -10,12 +10,11 @@ import { safeUrl } from "./chat-logic";
  * are dropped, and links keep only http, https and mailto targets, opening in a new tab without an opener.
  */
 
-
 const components: Components = {
   p: ({ children }) => <p>{children}</p>,
   a: ({ href, children }) =>
     href ? (
-      <a href={href} target="_blank" rel="noopener noreferrer" className="underline decoration-line-strong underline-offset-[3px] hover:decoration-ink">
+      <a href={href} target="_blank" rel="noopener noreferrer">
         {children}
       </a>
     ) : (
@@ -28,7 +27,6 @@ const components: Components = {
   h4: ({ children }) => <h4 className="md-h">{children}</h4>,
   h5: ({ children }) => <h4 className="md-h">{children}</h4>,
   h6: ({ children }) => <h4 className="md-h">{children}</h4>,
-  strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
   table: ({ children }) => (
     <div className="md-table" data-lenis-prevent>
       <table>{children}</table>

@@ -123,6 +123,13 @@ describe("collapseToolRuns", () => {
     expect(collapseToolRuns([t(1), t(2), text])).toEqual([t(1), t(2), text]);
     expect(collapseToolRuns([t(1), step, t(2), step, t(3)])).toEqual([{ type: "tool-group", parts: [t(1), t(2), t(3)] }]);
   });
+
+  it("takes a smaller minimum, so a single step groups too, and dynamic tools count as tools", () => {
+    const text = { type: "text" };
+    const dyn = { type: "dynamic-tool" };
+    expect(collapseToolRuns([text, t(1), text], 1)).toEqual([text, { type: "tool-group", parts: [t(1)] }, text]);
+    expect(collapseToolRuns([dyn, t(2)], 1)).toEqual([{ type: "tool-group", parts: [dyn, t(2)] }]);
+  });
 });
 
 describe("QUICK_LINKS", () => {
