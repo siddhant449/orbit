@@ -478,3 +478,34 @@ h1[tabindex="-1"]:focus-visible {
     opacity: 0;
   }
 }
+
+/* Ideas (screens.md B11): freshly generated idea cards rise in one after another (an answer to "Generate", so it plays
+   on every generation, not only on first paint). Reduced motion keeps a short fade. */
+@layer components {
+  .idea-arrive {
+    animation: idea-arrive var(--dur-reveal) var(--ease-out) both;
+    animation-delay: var(--arrive-delay, 0ms);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .idea-arrive {
+      animation: block-in 150ms linear both;
+    }
+  }
+}
+@keyframes idea-arrive {
+  from {
+    opacity: 0;
+    translate: 0 18px;
+  }
+}
+
+/* The idea's first line, set as a pull-quote in the display face (between card-title and body). */
+@utility type-idea-hook {
+  font-family: var(--font-display);
+  font-variation-settings: "opsz" 48, "wdth" 90;
+  font-weight: 460;
+  font-size: 20px;
+  line-height: 1.22;
+  letter-spacing: -0.02em;
+  text-wrap: pretty;
+}

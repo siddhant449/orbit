@@ -2,7 +2,7 @@ import { z } from "zod";
 import { describe, expect, it } from "vitest";
 import { EditResultSchema } from "./specialists/editing";
 import { FinalReviewPayload, PostWritingPayload, specialistOutputSchema } from "./specialists/envelope";
-import { createScriptedChatModel, SCRIPTED_DRAFT, scriptedAi, scriptedModel } from "./mock";
+import { createScriptedChatModel, SCRIPTED_DRAFT, SCRIPTED_IDEAS, scriptedAi, scriptedModel } from "./mock";
 
 type Prompt = { role: string; content: unknown }[];
 
@@ -146,5 +146,17 @@ describe("scriptedAi", () => {
     await expect(
       ai.json({ model: "generate", system: "s", prompt: "p", schema: z.object({ impossible: z.literal("never") }) }),
     ).rejects.toThrow(/no canned output/i);
+  });
+
+  it("returns the canned weekly ideas for an ideas-shaped schema", async () => {
+    const ai = scriptedAi();
+    const schema = z.object({
+      ideas: z.array(
+        z.object({ title: z.string(), angle: z.string(), hook: z.string(), format: z.string(), contentType: z.string(), why: z.string() }),
+      ),
+    });
+    const out = await ai.json({ model: "generate", system: "s", prompt: "p", schema });
+    expect(out.ideas).toHaveLength(SCRIPTED_IDEAS.length);
+    expect(out.ideas[0]!.hook).toBeTruthy();
   });
 });

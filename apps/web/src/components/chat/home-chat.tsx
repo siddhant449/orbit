@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, type ComponentProps } from "react";
 import { Composer } from "@/components/home/composer";
+import { takePendingDraft } from "@/lib/ideas";
 import type { ComposerRect } from "./chat-composer";
 
 const loadChatView = () => import("./chat-view").then((m) => m.ChatView);
@@ -26,6 +27,17 @@ export function HomeChat(props: Omit<ComponentProps<typeof Composer>, "onSend">)
     const idle = window.requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 1200));
     const handle = idle(() => void loadChatView());
     return () => (window.cancelIdleCallback ?? window.clearTimeout)(handle);
+  }, []);
+
+  // "Draft this" on Ideas hands a prompt over through sessionStorage: start the chat with it once, on arrival.
+  useEffect(() => {
+    let pending: string | null = null;
+    try {
+      pending = takePendingDraft(window.sessionStorage);
+    } catch {}
+    // Storage is only readable after mount, so the hand-off can't be initial state.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (pending) setStarted({ id: crypto.randomUUID(), text: pending, from: null });
   }, []);
 
   // "New chat" (or the home link) while the first turn still runs on "/": the address doesn't change, so a
