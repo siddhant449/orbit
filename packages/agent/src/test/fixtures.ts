@@ -64,7 +64,7 @@ export async function testContext(over: Partial<TurnContext> = {}): Promise<Turn
     taskId: "task_test",
     ai: fakeAi(),
     embedder: fakeEmbedder(),
-    selections: { knowledgeIds: [], writingStyleId: null, webSearchEnabled: true, quickLinkKey: null },
+    selections: { knowledgeIds: [], writingStyleId: null, webSearchEnabled: true, quickLinkKey: null, formatId: null },
     writer: null,
     handoffs: new Map(),
     documentRef: { current: null },

@@ -97,7 +97,7 @@ describe("loadPromptInput", () => {
     const ctx = await testContext({
       profileId,
       userId,
-      selections: { knowledgeIds: [mine.id, theirs.id], writingStyleId: null, webSearchEnabled: false, quickLinkKey: "review-it" },
+      selections: { knowledgeIds: [mine.id, theirs.id], writingStyleId: null, webSearchEnabled: false, quickLinkKey: "review-it", formatId: null },
       documentRef: { current: doc },
     });
 
@@ -107,7 +107,7 @@ describe("loadPromptInput", () => {
     expect(got.strategy!.goal).not.toBe("build_authority");
     expect(got.memoryIndex).toContain("identity/about.md");
     expect(got.memoryIndex).not.toContain("Runs a design studio");
-    expect(got.selections).toEqual({ knowledge: [{ id: mine.id, title: "Pricing notes" }], webSearchEnabled: false, quickLinkKey: "review-it" });
+    expect(got.selections).toEqual({ knowledge: [{ id: mine.id, title: "Pricing notes" }], webSearchEnabled: false, quickLinkKey: "review-it", formatId: null });
     expect(got.document).toEqual(doc);
     expect(got.writingStyleName).toBeNull();
     expect(got.skills).toEqual([]);

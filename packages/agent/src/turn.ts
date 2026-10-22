@@ -438,6 +438,7 @@ export async function runChatTurn(
         writingStyleId: body.selectedWritingStyleId,
         webSearchEnabled: body.webSearchEnabled,
         quickLinkKey: body.quickLinkKey ?? null,
+        formatId: body.selectedFormatId,
       },
       writer: null,
       handoffs: new Map(),

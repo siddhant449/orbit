@@ -36,3 +36,4 @@ export {
 } from "../writing/measure";
 export { enforcedChips } from "../writing/rules";
 export { hookMeta, parseHookCards, swapOpening, type HookCard } from "./hooks";
+export { CATEGORIES, FRAMEWORKS, TEMPLATES } from "../library";

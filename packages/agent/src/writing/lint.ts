@@ -21,6 +21,8 @@ export type LintContext = {
   /** ISO dates of the research items: every date in the post must be one of them or appear in the grounding. Null skips the check. */
   researchDates: string[] | null;
   personalDetails: "allowed" | "none";
+  /** The chosen block plan has a list (Task W8): a missing list is then a target violation, not just advice. */
+  expectList?: boolean;
 };
 
 const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
@@ -99,7 +101,10 @@ export function lintPost(text: string, rules: EffectiveRules, ctx: LintContext):
   if (m.chars > MAX_LENGTH) add("post-length", "hard", `${m.chars.toLocaleString("en-US")} characters (limit 3,000)`);
   else if (m.chars > 0 && (m.chars < targets.postChars.low * 0.85 || m.chars > targets.postChars.high * 1.15))
     add("post-length", "target", `${m.chars} characters; this style runs ${targets.postChars.low}-${targets.postChars.high}`);
-  if ((ctx.postType === "framework" || ctx.postType === "how-to") && m.bulletLists + m.numberedLists === 0) add("list-expected", "advice", "A framework or how-to post reads best with a list");
+  if (m.bulletLists + m.numberedLists === 0) {
+    if (ctx.expectList) add("list-expected", "target", "The chosen format has a list, and the post has none");
+    else if (ctx.postType === "framework" || ctx.postType === "how-to") add("list-expected", "advice", "A framework or how-to post reads best with a list");
+  }
 
   // Provenance.
   if (ctx.groundingText !== null) {

@@ -21,6 +21,8 @@ export type TurnContext = {
     writingStyleId: string | null;
     webSearchEnabled: boolean;
     quickLinkKey: string | null;
+    /** A framework or template the user picked for this message, or null. */
+    formatId: string | null;
   };
   writer: UIMessageStreamWriter | null;
   /** Specialist envelopes produced this turn, keyed by tool call id. */

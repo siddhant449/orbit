@@ -59,6 +59,7 @@ function body(text: string, over: { messageId?: string; runId?: string; id?: str
     },
     selectedKnowledgeBaseIds: [],
     selectedWritingStyleId: null,
+    selectedFormatId: null,
     webSearchEnabled: false,
   };
 }

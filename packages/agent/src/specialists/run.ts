@@ -99,12 +99,14 @@ export async function runSpecialist<K extends SpecialistKind>(
     abortSignal?: AbortSignal;
     /** How the post writer's blocks are rendered (the style's bullet glyph). */
     render?: { bullet: "-" | "•"; numbered: boolean };
+    /** The block plan to follow (Task W8), as rendered by renderFormatBlock. */
+    format?: string;
   },
 ): Promise<SpecialistResult<OutputOf<K>>> {
   const signal = input.abortSignal;
   const strict = specialistOutputSchema(PAYLOADS[kind]);
   const asked = specialistOutputSchema(MODEL_PAYLOADS[kind]);
-  const prompt = [`<request>\n${defuseTags(input.request)}\n</request>`, input.grounding, documentBlock(input.document)].join("\n\n");
+  const prompt = [`<request>\n${defuseTags(input.request)}\n</request>`, input.format ? `<format>\n${defuseTags(input.format)}\n</format>` : "", input.grounding, documentBlock(input.document)].filter(Boolean).join("\n\n");
 
   let reason = "the AI request failed";
   for (let attempt = 0; attempt < 2; attempt++) {

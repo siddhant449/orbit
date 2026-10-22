@@ -5,6 +5,7 @@ import { Globe, Square } from "lucide-react";
 import { Button, ComposerShell, cn } from "@brandloop/ui";
 import { SendIcon } from "@brandloop/ui/icons";
 import { VoicePicker, type VoiceOption } from "@/components/home/voice-picker";
+import { FormatMenu } from "./format-menu";
 import { KnowledgeChip, KnowledgePicker, type KnowledgeChoice } from "./knowledge-picker";
 
 /** Where the home composer sat when the chat started: the docked composer glides from there. */
@@ -45,6 +46,8 @@ export function ChatComposer({
   onKnowledgeChange,
   webSearch,
   onWebSearchChange,
+  formatId = null,
+  onFormatChange,
   fromRect,
   inputRef,
 }: {
@@ -59,6 +62,9 @@ export function ChatComposer({
   onKnowledgeChange: (next: KnowledgeChoice[]) => void;
   webSearch: boolean;
   onWebSearchChange: (on: boolean) => void;
+  /** The framework or template picked for the next message (Task W8); omit to hide the Format menu. */
+  formatId?: string | null;
+  onFormatChange?: (id: string | null) => void;
   fromRect?: ComposerRect | null;
   inputRef: RefObject<HTMLTextAreaElement | null>;
 }) {
@@ -120,6 +126,7 @@ export function ChatComposer({
               <span aria-hidden="true" className={cn("web-switch", webSearch && "web-switch--on")} />
             </Button>
             <VoicePicker voices={voices} selectedId={selectedVoiceId} />
+            {onFormatChange && <FormatMenu value={formatId} onChange={onFormatChange} disabled={busy} />}
           </div>
           {busy ? (
             <button

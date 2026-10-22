@@ -105,6 +105,7 @@ export function ChatView({
   const [draft, setDraft] = useState("");
   const [knowledge, setKnowledge] = useState<KnowledgeChoice[]>([]);
   const [webSearch, setWebSearch] = useState(true);
+  const [formatId, setFormatId] = useState<string | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const initialIds = useMemo(() => new Set(initialMessages.map((m) => m.id)), [initialMessages]);
 
@@ -125,6 +126,7 @@ export function ChatView({
     documentContext: post.context,
   });
   const busy = status === "submitted" || status === "streaming";
+
 
   // The title arrives with the history list (it is written just after the first reply).
   const { data: history } = useSWR<History>(HISTORY_KEY, fetchJson);
@@ -193,7 +195,9 @@ export function ChatView({
     }
     setDraft("");
     jumpToLatest();
-    void send(text);
+    // A picked format applies to this one message: it rides in the request body and the chip clears.
+    void send(text, { formatId });
+    setFormatId(null);
   }
 
   function quickLink(key: string, prompt: string) {
@@ -319,6 +323,8 @@ export function ChatView({
             onKnowledgeChange={setKnowledge}
             webSearch={webSearch}
             onWebSearchChange={setWebSearch}
+            formatId={formatId}
+            onFormatChange={setFormatId}
             fromRect={fromRect}
             inputRef={inputRef}
           />

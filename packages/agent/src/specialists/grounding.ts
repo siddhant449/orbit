@@ -1,4 +1,4 @@
-import { StyleProfileSchema, type Embedder } from "@brandloop/ai";
+import { StyleProfileSchema, type Embedder, type StyleProfile } from "@brandloop/ai";
 import { getSelectedVoice, hybridSearch, listMemory, prisma } from "@brandloop/db";
 import { defuseTags, oneLine } from "../data";
 import { renderStyleBlock, STYLE_BUDGET } from "../writing/inject";
@@ -15,6 +15,8 @@ export type Grounding = {
   style: { block: string; ref: { voiceStyleId: string; profileVersion: number } | null; bullet: "-" | "•" };
   /** The rules in force this turn: the user's hard rules, soft rules, the style's targets, and what was dropped. */
   rules: EffectiveRules;
+  /** The compiled profile behind `style`, when there is one. */
+  styleProfile: StyleProfile | null;
   writingRules: string;
   identity: string;
   strategy: string;
@@ -122,6 +124,7 @@ export async function buildGrounding(input: {
       bullet: profile?.referencePosts.some((r) => /^\s*•/m.test(r.text)) ? "•" : "-",
     },
     rules,
+    styleProfile: profile,
     writingRules: memory("writing/rules"),
     identity: IDENTITY_KEYS.map(memory).filter(Boolean).join("\n\n"),
     strategy: memory("strategy/themes"),

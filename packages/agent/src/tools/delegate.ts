@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { TurnContext } from "../context";
 import { frameData, type DataSource } from "../data";
 import { bannedWordsFromRules, mergeChecks, runDeterministicChecks, runWritingChecks } from "../specialists/checks";
+import { planHasList, renderFormatBlock, selectFormat } from "../writing/format";
 import { lintPost, type Violation } from "../writing/lint";
 import { polishDraft, polishSummary, polishText } from "../writing/polish";
 import { acceptOverrides, resolveRules, type TurnOverrides } from "../writing/rules";
@@ -86,6 +87,7 @@ export async function delegateWritingRun(
       turn: accepted,
     });
     const request = briefFor(input, personal, accepted);
+    const format = selectFormat({ selectedFormatId: ctx.selections.formatId, postType: null, style: grounding.styleProfile, request: input.request });
     // A new post: there is no open document (see the short-circuit above), so no source revision either.
     const res = await runSpecialist(ctx.ai, "post-writing", {
       request,
@@ -94,6 +96,7 @@ export async function delegateWritingRun(
       skills: WRITING_SKILLS,
       abortSignal,
       render: { bullet: grounding.style.bullet, numbered: true },
+      format: renderFormatBlock(format),
     });
     if (!res.ok) {
       return `Failed: the writing specialist couldn't produce a usable draft (${res.reason}). Ask the user to rephrase or try again.`;
@@ -107,6 +110,7 @@ export async function delegateWritingRun(
         groundingText: provenanceText(grounding, input.request),
         researchDates: null,
         personalDetails: personal,
+        expectList: format.source === "picked" && planHasList(format.plan),
       };
       const common = { rules: grounding.rules, lintCtx, request: input.request, grounding: renderGrounding(grounding), deadline: ctx.deadline, abortSignal, render: { bullet: grounding.style.bullet, numbered: true } };
       const started = Date.now();

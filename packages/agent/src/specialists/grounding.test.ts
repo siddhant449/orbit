@@ -20,6 +20,7 @@ const empty: Grounding = {
   voice: "",
   style: { block: "", ref: null, bullet: "-" },
   rules: resolveRules({ userRulesMarkdown: "", style: null, turn: {} }),
+  styleProfile: null,
   writingRules: "",
   identity: "",
   strategy: "",

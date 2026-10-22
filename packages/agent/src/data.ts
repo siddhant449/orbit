@@ -5,7 +5,7 @@
  * Spaces are tolerated anywhere (`< /profile>`, `</ profile >`).
  */
 const TAG =
-  /<(\s*\/?\s*)(profile|memory_index|active_task|composer|open_document|skills|skill|flow|context|voice|style|research|chosen_hook|writing_rules|identity|strategy|knowledge|knowledge_item|request|edit_requirements|missed_requirements|passage)\b/gi;
+  /<(\s*\/?\s*)(profile|memory_index|active_task|composer|open_document|skills|skill|flow|context|voice|style|research|chosen_hook|format|writing_rules|identity|strategy|knowledge|knowledge_item|request|edit_requirements|missed_requirements|passage)\b/gi;
 
 /** Neutralise anything shaped like one of our tags, so data can't close (or open) a block. */
 export function defuseTags(text: string): string {

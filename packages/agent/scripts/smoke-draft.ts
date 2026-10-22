@@ -68,6 +68,7 @@ async function main() {
         },
         selectedKnowledgeBaseIds: [],
         selectedWritingStyleId: null,
+        selectedFormatId: null,
         webSearchEnabled: false,
       },
     );

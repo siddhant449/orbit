@@ -281,6 +281,7 @@ async function main() {
             message: { id: randomUUID(), role: "user", parts: [{ type: "text", text }], metadata: { createdAt: new Date().toISOString() } },
             selectedKnowledgeBaseIds: [],
             selectedWritingStyleId: null,
+        selectedFormatId: null,
             webSearchEnabled: false,
             ...(chat.openDocument && openDoc ? { documentContext: { id: openDoc.id, version: openDoc.version } } : {}),
           });

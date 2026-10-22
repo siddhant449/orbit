@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { FORMAT_IDS } from "./writing/format";
 import { LIMITS } from "./limits";
 
 export const ATTACHMENT_MEDIA_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp", "application/pdf"] as const;
@@ -40,6 +41,8 @@ export const ChatRequestSchema = z.object({
   selectedKnowledgeBaseIds: z.array(z.string().min(1)).max(LIMITS.knowledgeSelections).default([]),
   selectedWritingStyleId: z.string().min(1).nullable().default(null),
   webSearchEnabled: z.boolean().default(true),
+  /** A framework or template picked in the composer for this message only (Task W8). */
+  selectedFormatId: z.string().min(1).nullable().default(null).refine((id) => id === null || FORMAT_IDS.has(id), "Unknown format."),
   documentContext: z.object({ id: z.string().min(1), version: z.number().int().min(1) }).optional(),
   quickLinkKey: z.string().min(1).optional(),
   flowType: z.string().min(1).nullable().optional(),

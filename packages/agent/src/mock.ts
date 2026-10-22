@@ -346,6 +346,31 @@ export const EMOJI_REPAIRED_BLOCKS: WriterBlock[] = [
 ];
 const ROUTES: { match: RegExp; output: unknown }[] = [
   {
+    // A format picked in the composer (Task W8): the scripted writer follows a plan with a numbered list.
+    match: /The user picked this format \("Myth, truth, proof"\)/,
+    output: {
+      summary: "A myth-truth-proof post.",
+      findings: [],
+      recommendation: "Create the post.",
+      missingInput: [],
+      confidence: "medium",
+      parentAction: "create-document",
+      payload: {
+        readiness: "ready",
+        title: "MVP myths",
+        postType: "framework",
+        blocks: [
+          { kind: "hook", lines: ["An MVP is not a small version of the product."] },
+          { kind: "numbered", lines: ["Three things an MVP actually is:", "A test of one risky assumption", "A way to hear from real users", "A reason to stop building early"] },
+          { kind: "close", lines: ["Build the smallest thing that can prove you wrong."] },
+        ],
+        facts: [],
+        missingFacts: [],
+        clarifyingQuestion: null,
+      },
+    },
+  },
+  {
     match: /\[e2e:emoji-draft\]/,
     output: {
       summary: "A short post.",
