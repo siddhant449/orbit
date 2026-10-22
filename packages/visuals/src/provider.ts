@@ -37,12 +37,13 @@ export type ProviderEnv = Partial<
 >;
 
 /**
- * VISUALS_PROVIDER = openai | mock (gemini is not built yet). Default: the mock outside production, OpenAI in
- * production. The mock is refused in production, and OpenAI needs OPENAI_API_KEY.
+ * VISUALS_PROVIDER = openai | mock (gemini is not built yet). Default: OpenAI whenever OPENAI_API_KEY is set (dev
+ * included, so the app never shows placeholder art where real images are possible); without a key, the mock outside
+ * production. Tests and the offline e2e server ask for the mock explicitly. The mock is refused in production.
  */
 export function createImageProvider(env: ProviderEnv = process.env): ImageProvider {
   const production = env.NODE_ENV === "production";
-  const requested = env.VISUALS_PROVIDER?.trim() || (production ? "openai" : "mock");
+  const requested = env.VISUALS_PROVIDER?.trim() || (production || env.OPENAI_API_KEY?.trim() ? "openai" : "mock");
   switch (requested) {
     case "mock":
       if (production) throw new Error("VISUALS_PROVIDER=mock is not allowed in production");

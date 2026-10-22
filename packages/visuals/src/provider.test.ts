@@ -2,8 +2,9 @@ import { describe, expect, it } from "vitest";
 import { createImageProvider } from "./provider";
 
 describe("createImageProvider", () => {
-  it("is the mock outside production unless told otherwise", () => {
-    expect(createImageProvider({ NODE_ENV: "development", OPENAI_API_KEY: "sk" }).id).toBe("mock");
+  it("uses OpenAI whenever a key exists, in dev too; the mock only when asked for or with no key outside production", () => {
+    expect(createImageProvider({ NODE_ENV: "development", OPENAI_API_KEY: "sk" }).id).toBe("openai:gpt-image-2.5-flare");
+    expect(createImageProvider({ NODE_ENV: "development", OPENAI_API_KEY: "sk", VISUALS_PROVIDER: "mock" }).id).toBe("mock");
     expect(createImageProvider({}).id).toBe("mock");
   });
 

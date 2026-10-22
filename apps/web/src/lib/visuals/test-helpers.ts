@@ -43,6 +43,8 @@ export async function installVisualsEnv(provider: ImageProvider = mockImageProvi
   vi.stubEnv("JOBS_DRIVER", "local");
   vi.stubEnv("JOBS_RETRY_DELAY_MS", "0");
   vi.stubEnv("VISUALS_ENABLED", "1");
+  // Never a real provider in tests, even if the shell has OPENAI_API_KEY set.
+  vi.stubEnv("VISUALS_PROVIDER", "mock");
   resetStoresForTest();
   resetJobsForTest();
   setVisualDepsForTest({ provider, ai: null, quality: "low", timeoutMs: 5_000, loadReference: async () => null, log: () => {}, ...over });
