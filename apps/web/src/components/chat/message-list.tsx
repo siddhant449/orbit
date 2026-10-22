@@ -141,25 +141,30 @@ export function MessageList({
   const keys = useMemo(() => messageKeys(messages), [messages]);
   return (
     <ol className="flex flex-col gap-7" aria-label="Messages">
-      {shown.map((m) => (
-        <li key={keys.get(m.id) ?? m.id}>
-          {m.role === "user" ? (
-            <UserBubble message={m} arrive={!initialIds.has(m.id)} />
-          ) : (
-            <Reply
-              message={m}
-              live={busy && m.id === last?.id}
-              arrive={!initialIds.has(m.id)}
-              footer={!busy && m.id === lastShown?.id ? followUps : undefined}
-            />
-          )}
-        </li>
-      ))}
-      {waiting && (
-        <li key={waitingKey(messages) ?? "waiting"}>
-          <Reply live arrive />
-        </li>
-      )}
+      {/* One array, so the thinking row and its reply (same key) are reconciled as one element. */}
+      {[
+        ...shown.map((m) => (
+          <li key={keys.get(m.id) ?? m.id}>
+            {m.role === "user" ? (
+              <UserBubble message={m} arrive={!initialIds.has(m.id)} />
+            ) : (
+              <Reply
+                message={m}
+                live={busy && m.id === last?.id}
+                arrive={!initialIds.has(m.id)}
+                footer={!busy && m.id === lastShown?.id ? followUps : undefined}
+              />
+            )}
+          </li>
+        )),
+        ...(waiting
+          ? [
+              <li key={waitingKey(messages) ?? "waiting"}>
+                <Reply live arrive />
+              </li>,
+            ]
+          : []),
+      ]}
       {errorText && !busy && (
         <li>
           <Notice
