@@ -35,7 +35,7 @@ export function MainSidebar({
     <div className="relative flex h-full w-[240px] shrink-0 flex-col px-3 py-[18px]">
       <div className="flex h-8 items-center justify-between gap-2 pl-2">
         <Link href="/" onClick={onNavigate} aria-label="Orbit home" className="rounded-pill">
-          <Logo />
+          <Logo size={28} />
         </Link>
         <div className="flex items-center gap-1.5">
           <button

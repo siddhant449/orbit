@@ -24,7 +24,7 @@ export function AuthScreen({ title, lead, children }: { title: string; lead: str
 
         <div className="flex w-full max-w-[400px] flex-1 flex-col justify-center py-8 lg:py-14">
           <div className="flex flex-col items-center text-center">
-            <Logo size={22} />
+            <Logo size={40} />
             <h1 className="type-greeting mt-10 text-text">{title}</h1>
             <p className="mt-3 max-w-[40ch] text-[15px] leading-[1.55] text-text-2">{lead}</p>
           </div>

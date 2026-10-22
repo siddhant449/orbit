@@ -29,11 +29,16 @@ export function LogoMark({ size = 18, className }: { size?: number; className?: 
   );
 }
 
+// The wordmark grows with the mark (20px at the default 18px mark) so larger lockups keep the same proportions.
 export function Logo({ size = 18, withWordmark = true, className }: { size?: number; withWordmark?: boolean; className?: string }) {
   return (
-    <span className={cn("inline-flex items-center gap-2 text-text", className)}>
+    <span className={cn("inline-flex items-center text-text", className)} style={{ gap: Math.max(8, Math.round(size * 0.32)) }}>
       <LogoMark size={size} />
-      {withWordmark && <span className="type-wordmark">orbit</span>}
+      {withWordmark && (
+        <span className="type-wordmark" style={{ fontSize: Math.max(20, Math.round(size * 0.92)) }}>
+          orbit
+        </span>
+      )}
     </span>
   );
 }

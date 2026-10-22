@@ -24,7 +24,7 @@ export function MobileHeader({
   return (
     <header className="relative flex shrink-0 items-center justify-between gap-3 px-(--gutter) pb-2 pt-[calc(env(safe-area-inset-top)+8px)] md:hidden">
       <Link href="/" aria-label="Orbit home" className="rounded-pill">
-        <Logo />
+        <Logo size={24} />
       </Link>
       <div className="flex items-center gap-2">
         <SprintPill state={sprint} />
