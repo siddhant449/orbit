@@ -34,6 +34,10 @@ model Team {
   memberships         Membership[]
   profiles            Profile[]
   knowledgeItems      KnowledgeItem[]
+  storageObjects      StorageObject[]
+  visuals             Visual[]
+  creditAccount       CreditAccount?
+  creditLedger        CreditLedger[]
   deletedAt           DateTime?
   deletionRequestedAt DateTime?
   createdAt           DateTime        @default(now())
@@ -54,10 +58,10 @@ model Membership {
 
 /// A LinkedIn persona the user writes as. Language and timezone live here, not on User.
 model Profile {
-  id                  String          @id @default(cuid())
-  team                Team            @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  id                  String           @id @default(cuid())
+  team                Team             @relation(fields: [teamId], references: [id], onDelete: Cascade)
   teamId              String
-  owner               User            @relation("ProfileOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  owner               User             @relation("ProfileOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
   ownerUserId         String
   name                String
   fullName            String?
@@ -65,25 +69,29 @@ model Profile {
   company             String?
   bio                 String?
   avatarUrl           String?
-  language            String          @default("en-US")
-  timezone            String          @default("UTC")
-  generationDayOfWeek Int             @default(1)
-  onboardingCompleted Boolean         @default(false)
-  memoryVersion       Int             @default(0)
+  language            String           @default("en-US")
+  timezone            String           @default("UTC")
+  generationDayOfWeek Int              @default(1)
+  onboardingCompleted Boolean          @default(false)
+  memoryVersion       Int              @default(0)
   voiceStyleId        String?
-  voiceStyle          VoiceStyle?     @relation("SelectedVoice", fields: [voiceStyleId], references: [id], onDelete: SetNull)
+  voiceStyle          VoiceStyle?      @relation("SelectedVoice", fields: [voiceStyleId], references: [id], onDelete: SetNull)
   memoryDocs          MemoryDoc[]
   strategy            Strategy?
-  voiceStyles         VoiceStyle[]    @relation("ProfileVoices")
+  voiceStyles         VoiceStyle[]     @relation("ProfileVoices")
   knowledgeItems      KnowledgeItem[]
   knowledgeChunks     KnowledgeChunk[]
   backgroundJobs      BackgroundJob[]
   chats               Chat[]
   documents           Document[]
-  currentFor          User[]          @relation("CurrentProfile")
+  storageObjects      StorageObject[]
+  visuals             Visual[]
+  brandTheme          BrandTheme?
+  referenceImages     ReferenceImage[]
+  currentFor          User[]           @relation("CurrentProfile")
   deletedAt           DateTime?
-  createdAt           DateTime        @default(now())
-  updatedAt           DateTime        @updatedAt
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
 
   @@index([teamId])
 }
@@ -208,8 +216,8 @@ enum ChunkSource {
 }
 
 model KnowledgeChunk {
-  id         String                 @id @default(cuid())
-  profile    Profile                @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  id         String                       @id @default(cuid())
+  profile    Profile                      @relation(fields: [profileId], references: [id], onDelete: Cascade)
   profileId  String
   sourceType ChunkSource
   sourceId   String
@@ -218,7 +226,7 @@ model KnowledgeChunk {
   text       String
   embedding  Unsupported("vector(1536)")?
   tsv        Unsupported("tsvector")?
-  createdAt  DateTime               @default(now())
+  createdAt  DateTime                     @default(now())
 
   @@unique([sourceType, sourceId, ordinal])
   @@index([profileId, sourceType])
@@ -314,6 +322,8 @@ model Document {
   deletedAt DateTime?
   versions  DocumentVersion[]
   chat      Chat?
+  visuals   Visual[]
+  media     PostMedia[]
 
   @@index([profileId, deletedAt, updatedAt])
 }
@@ -333,4 +343,241 @@ model DocumentVersion {
 
   @@unique([documentId, version])
   @@unique([documentId, proposalId])
+}
+
+enum StorageStore {
+  PUBLIC
+  PRIVATE
+}
+
+enum StorageKind {
+  KNOWLEDGE
+  VISUAL
+  REFERENCE
+  LOGO
+  POST_MEDIA
+  CAROUSEL_PDF
+}
+
+/// A file in blob storage. Every put records a row here in the same service call; deleting soft-deletes it, and a
+/// daily job removes the blob once it has been deleted for a week. `url` is set for PUBLIC objects only.
+model StorageObject {
+  id           String           @id @default(cuid())
+  profile      Profile          @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  profileId    String
+  team         Team             @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  teamId       String
+  key          String           @unique
+  store        StorageStore
+  kind         StorageKind
+  contentType  String
+  bytes        Int
+  sha256       String
+  width        Int?
+  height       Int?
+  url          String?
+  createdAt    DateTime         @default(now())
+  deletedAt    DateTime?
+  versions     VisualVersion[]
+  brandLogoFor BrandTheme[]
+  referenceFor ReferenceImage[]
+  postMedia    PostMedia[]
+
+  @@index([profileId, kind, createdAt])
+  @@index([deletedAt])
+}
+
+enum VisualStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum VisualType {
+  INFOGRAPHIC
+  BEFORE_AFTER
+  QUOTE
+  GENERAL
+}
+
+enum VisualAspect {
+  SQUARE
+  PORTRAIT_4_5
+  PORTRAIT_2_3
+  LANDSCAPE_3_2
+}
+
+enum VisualVersionKind {
+  GENERATED
+  EDIT
+  LOGO
+  REVERT
+}
+
+/// An AI image made for a post (or from the library). Versions are immutable files; `currentVersion` points at one.
+model Visual {
+  id                 String          @id @default(cuid())
+  profile            Profile         @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  profileId          String
+  team               Team            @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  teamId             String
+  document           Document?       @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  documentId         String?
+  createdByUserId    String
+  /// Client UUID: the idempotency key, unique per team.
+  requestId          String
+  status             VisualStatus    @default(PENDING)
+  type               VisualType
+  aspect             VisualAspect    @default(PORTRAIT_4_5)
+  userPrompt         String
+  /// What was sent to the provider; kept for debugging, never shown raw to other users.
+  builtPrompt        String?
+  customInstructions String?
+  useBrandColours    Boolean         @default(true)
+  referenceId        String?
+  /// "openai:<model>" | "gemini:<model>" | "mock"
+  provider           String?
+  currentVersion     Int             @default(0)
+  editCount          Int             @default(0)
+  maxEdits           Int             @default(5)
+  /// "generate" | "edit" | "logo" while a job runs: one operation at a time.
+  activeOp           String?
+  activeOpStartedAt  DateTime?
+  /// Input of the operation in flight: `{instruction}` for an edit, `{x, y, sizePercent}` for a logo. Cleared when it ends.
+  opInput            Json?
+  /// User-safe.
+  error              String?
+  altText            String?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  deletedAt          DateTime?
+  versions           VisualVersion[]
+  postMedia          PostMedia[]
+
+  @@unique([teamId, requestId])
+  @@index([profileId, deletedAt, createdAt])
+  @@index([documentId])
+}
+
+model VisualVersion {
+  id              String            @id @default(cuid())
+  visual          Visual            @relation(fields: [visualId], references: [id], onDelete: Cascade)
+  visualId        String
+  version         Int
+  kind            VisualVersionKind
+  storageObject   StorageObject     @relation(fields: [storageObjectId], references: [id], onDelete: Cascade)
+  storageObjectId String
+  editPrompt      String?
+  width           Int
+  height          Int
+  createdAt       DateTime          @default(now())
+
+  @@unique([visualId, version])
+  @@index([storageObjectId])
+}
+
+/// One per team: the cached balance. The ledger is the audit trail.
+model CreditAccount {
+  team              Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  teamId            String   @id
+  balance           Int      @default(30)
+  monthlyAllocation Int      @default(30)
+  /// Refill (a reset, not cumulative) once now >= periodStartedAt + 30 days.
+  periodStartedAt   DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+enum CreditReason {
+  MONTHLY_RESET
+  GENERATE
+  REFUND
+  ADJUSTMENT
+  ADDON
+}
+
+model CreditLedger {
+  id           String       @id @default(cuid())
+  team         Team         @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  teamId       String
+  profileId    String?
+  delta        Int
+  balanceAfter Int
+  reason       CreditReason
+  visualId     String?
+  createdAt    DateTime     @default(now())
+
+  /// One GENERATE and at most one REFUND per visual.
+  @@unique([visualId, reason])
+  @@index([teamId, createdAt])
+}
+
+enum BrandDecision {
+  NONE
+  CONFIRMED
+  SKIPPED
+}
+
+/// A profile's brand colours (8 roles, #RRGGBB) and logo. No row means the Orbit default palette with decision NONE.
+model BrandTheme {
+  profile      Profile        @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  profileId    String         @id
+  background   String
+  accent       String
+  headline     String
+  bodyText     String
+  caption      String
+  line         String
+  bar          String
+  highlightBar String
+  logoObject   StorageObject? @relation(fields: [logoObjectId], references: [id], onDelete: SetNull)
+  logoObjectId String?
+  decision     BrandDecision  @default(NONE)
+  /// "manual" | "image" | "default"
+  source       String?
+  updatedAt    DateTime       @updatedAt
+}
+
+/// An example image the user keeps to steer generation ("match this style"). Stored in the PRIVATE store only.
+model ReferenceImage {
+  id              String        @id @default(cuid())
+  profile         Profile       @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  profileId       String
+  title           String
+  tags            String[]
+  storageObject   StorageObject @relation(fields: [storageObjectId], references: [id], onDelete: Cascade)
+  storageObjectId String
+  width           Int
+  height          Int
+  createdAt       DateTime      @default(now())
+
+  @@index([profileId, createdAt])
+}
+
+enum PostMediaKind {
+  IMAGE
+  DOCUMENT
+}
+
+/// A file attached to a post. For an attached visual, `storageObjectId` follows the visual's current version while the post
+/// is a draft; once the post is published the publisher sets `frozenAt` and the row stays on the published file.
+model PostMedia {
+  id               String        @id @default(cuid())
+  document         Document      @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  documentId       String
+  kind             PostMediaKind
+  position         Int
+  visual           Visual?       @relation(fields: [visualId], references: [id], onDelete: SetNull)
+  visualId         String?
+  storageObject    StorageObject @relation(fields: [storageObjectId], references: [id], onDelete: Cascade)
+  storageObjectId  String
+  altText          String?
+  /// LinkedIn's asset id for the uploaded file; cleared whenever the file changes.
+  linkedinAssetUrn String?
+  frozenAt         DateTime?
+  createdAt        DateTime      @default(now())
+
+  @@unique([documentId, visualId])
+  @@index([documentId, position])
+  @@index([visualId])
 }

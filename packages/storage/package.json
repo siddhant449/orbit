@@ -1,0 +1,26 @@
+{
+  "name": "@brandloop/storage",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "smoke": "tsx --env-file-if-exists=../../.env scripts/smoke.ts"
+  },
+  "dependencies": {
+    "@upstash/blob": "0.0.11",
+    "sharp": "0.35.5"
+  },
+  "devDependencies": {
+    "@brandloop/config": "workspace:*",
+    "@types/node": "^20.19.43",
+    "tsx": "^4.23.15",
+    "typescript": "5.9.3",
+    "vitest": "^5.0.5"
+  }
+}

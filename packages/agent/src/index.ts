@@ -1,6 +1,6 @@
 export { LIMITS } from "./limits";
 export * from "./types";
-export type { OpenDocument, TurnContext } from "./context";
+export type { OpenDocument, TurnContext, VisualsToolDeps } from "./context";
 export { checkMemoryFact, FACT_MAX_CHARS, FACT_MIN_CHARS, type FactCheck } from "./guard";
 export { buildSystemPrompt, loadPromptInput, STATIC_PREFIX, type PromptInput } from "./prompt";
 export { OMITTED_OUTPUT, windowHistory } from "./history";
@@ -70,3 +70,6 @@ export {
 export { applyProposal, ProposalError, type ProposalErrorCode } from "./proposals";
 export { chatError, chatErrorResponse, runChatTurn, STREAM_ERROR_TEXT, type ChatDeps } from "./turn";
 export { UI_MESSAGE_STREAM_HEADERS } from "ai";
+
+export { visualTools, suggestVisualsRun, ConceptSchema, VISUAL_TYPES, VISUAL_ASPECTS, NEEDS_POST as NEEDS_POST_FOR_VISUALS } from "./tools/visuals";
+export type { SuggestVisualsOutput, ProposeVisualOutput, EditVisualOutput, VisualConcept } from "./tools/visuals";

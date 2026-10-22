@@ -15,6 +15,8 @@ export type PromptInput = {
   selections: { knowledge: { id: string; title: string }[]; webSearchEnabled: boolean; quickLinkKey: string | null };
   document: { id: string; title: string; version: number; text: string } | null;
   skills: { name: string; description: string }[];
+  /** True when the image tools are offered this turn. */
+  visuals?: boolean;
 };
 
 /**
@@ -99,6 +101,11 @@ function composerBlock(input: PromptInput): string {
   }
   lines.push(webSearchEnabled ? "Web search is on." : "Web search is off. Don't search the web or offer to.");
   if (quickLinkKey) lines.push(`Quick link: ${quickLinkKey}`);
+  if (input.visuals) {
+    lines.push(
+      "Images: suggest ideas with suggestVisuals first and add one short line of text. Making an image costs the user a credit and is their click on a card, never yours. Edits to an existing image are free up to five.",
+    );
+  }
   return lines.join("\n");
 }
 
@@ -176,5 +183,6 @@ export async function loadPromptInput(ctx: TurnContext, activeTask: ActiveTask |
     },
     document: ctx.documentRef.current,
     skills: [],
+    visuals: Boolean(ctx.visuals),
   };
 }

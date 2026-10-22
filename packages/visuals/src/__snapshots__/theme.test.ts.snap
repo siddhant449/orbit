@@ -1,0 +1,40 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`extractTheme > dark: eight #RRGGBB roles, deterministic, text roles meet AA against the background 1`] = `
+{
+  "accent": "#FE7B1A",
+  "background": "#0B1330",
+  "bar": "#FE7B1A",
+  "bodyText": "#C2C3C6",
+  "caption": "#93969F",
+  "headline": "#F6EDE3",
+  "highlightBar": "#74DAB3",
+  "line": "#2C334B",
+}
+`;
+
+exports[`extractTheme > light: eight #RRGGBB roles, deterministic, text roles meet AA against the background 1`] = `
+{
+  "accent": "#294FE6",
+  "background": "#F4EFE6",
+  "bar": "#294FE6",
+  "bodyText": "#3D3C3B",
+  "caption": "#6C6A67",
+  "headline": "#0C0E18",
+  "highlightBar": "#E8B63E",
+  "line": "#D3CFC8",
+}
+`;
+
+exports[`extractTheme > saturated: eight #RRGGBB roles, deterministic, text roles meet AA against the background 1`] = `
+{
+  "accent": "#E5198A",
+  "background": "#0A0A0B",
+  "bar": "#E5198A",
+  "bodyText": "#C1C1BE",
+  "caption": "#929290",
+  "headline": "#F4E7EA",
+  "highlightBar": "#FFE402",
+  "line": "#2B2B2B",
+}
+`;

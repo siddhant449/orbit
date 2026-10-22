@@ -35,6 +35,10 @@ export const TOOL_LABELS: Record<string, ToolLabel> = {
   generateHooks: L("Writing hook options", "Hook options ready", "Couldn't write hooks"),
   analyzePost: L("Analyzing this post", "Analyzed the post", "Couldn't analyze the post"),
   runSkill: L("Loading a writing guide", "Loaded a writing guide", "Couldn't load that guide"),
+  // Images (F5)
+  suggestVisuals: L("Thinking up images", "Image ideas ready", "Couldn't suggest images"),
+  proposeVisual: L("Preparing an image", "Image ready to make", "Couldn't prepare the image"),
+  editVisual: L("Editing the image", "Started the edit", "Couldn't edit the image"),
   // Web (Task 11)
   web_search: L("Searching the web", "Searched the web", "Couldn't reach the web"),
 };
