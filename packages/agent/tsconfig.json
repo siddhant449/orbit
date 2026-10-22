@@ -1,5 +1,5 @@
 {
   "extends": "@brandloop/config/tsconfig.base.json",
   "compilerOptions": { "noEmit": true },
-  "include": ["src", "scripts", "vitest.config.ts"]
+  "include": ["src", "scripts", "eval", "vitest.config.ts"]
 }
