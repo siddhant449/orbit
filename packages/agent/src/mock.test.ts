@@ -2,7 +2,7 @@ import { z } from "zod";
 import { describe, expect, it } from "vitest";
 import { EditResultSchema } from "./specialists/editing";
 import { FinalReviewPayload, PostWritingPayload, specialistOutputSchema } from "./specialists/envelope";
-import { createScriptedChatModel, SCRIPTED_DRAFT, scriptedAi, scriptedModel } from "./mock";
+import { createScriptedChatModel, SCRIPTED_DRAFT, SCRIPTED_SLIDES, scriptedAi, scriptedModel } from "./mock";
 
 type Prompt = { role: string; content: unknown }[];
 
@@ -146,5 +146,11 @@ describe("scriptedAi", () => {
     await expect(
       ai.json({ model: "generate", system: "s", prompt: "p", schema: z.object({ impossible: z.literal("never") }) }),
     ).rejects.toThrow(/no canned output/i);
+  });
+
+  it("returns canned carousel slides for a slides schema", async () => {
+    const schema = z.object({ slides: z.array(z.object({ title: z.string().min(1), body: z.string() })).min(3).max(10) });
+    const out = await scriptedAi().json({ model: "generate", system: "s", prompt: "p", schema });
+    expect(out.slides).toEqual(SCRIPTED_SLIDES);
   });
 });

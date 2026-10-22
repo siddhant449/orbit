@@ -30,6 +30,7 @@ export {
   SCRIPTED_DRAFT,
   SCRIPTED_HOOK,
   SCRIPTED_SHORT,
+  SCRIPTED_SLIDES,
   SCRIPTED_TITLE,
   scriptedAi,
   scriptedModel,
