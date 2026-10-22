@@ -3,6 +3,7 @@
 import { lazy, Suspense } from "react";
 import { collapseToolRuns, parseProposal, type ChatUIMessage, type Proposal } from "@brandloop/agent/client";
 import { cn } from "@brandloop/ui";
+import { AnalysisCard, analysisOf } from "./analysis-card";
 import { DraftCard } from "./document-panel";
 import { HookCards, hookCardsOf } from "./hook-cards";
 import { ProposalCard } from "./proposal-card";
@@ -62,6 +63,10 @@ export function MessageParts({ message, streaming }: { message: ChatUIMessage; s
     return checks ? [{ key: p.toolCallId ?? String(i), checks }] : [];
   });
   const hookSets = hookCardsOf(message.parts as ToolPartLike[]);
+  const analyses = (message.parts as ToolPartLike[]).flatMap((p) => {
+    const a = analysisOf(p);
+    return a ? [a] : [];
+  });
   return (
     <>
       {items.map((it, i) => {
@@ -76,6 +81,9 @@ export function MessageParts({ message, streaming }: { message: ChatUIMessage; s
         return null;
       })}
       {draft && <DraftCard fallback={draft} />}
+      {analyses.map((a, i) => (
+        <AnalysisCard key={i} analysis={a} />
+      ))}
       {hookSets.map((cards, i) => (
         <HookCards key={i} cards={cards} />
       ))}

@@ -112,6 +112,7 @@ const AFTER_TOOL: Record<string, string> = {
   proposeDocumentEdits: "Here is a punchier opening. Apply it if you like it.",
   updateDocument: "Done. The shorter version is in the panel.",
   delegateEditing: "The review is ready.",
+  analyzePost: "Here is the analysis. Fix the first item before anything else.",
   generateHooks: "Here are five hook options, each a different kind. Pick the one you like.",
 };
 
@@ -173,6 +174,10 @@ function route(opts: CallOptions): ScriptStep {
     });
   }
   if (firstLine && /\breview\b/i.test(text)) return call("delegateEditing", { request: text.slice(0, 4_000), specialty: "final-review" });
+  if (/\banalyze\b/i.test(text) && has.has("analyzePost")) {
+    const pasted = text.includes("\n") ? text.slice(text.indexOf("\n") + 1).trim() : "";
+    return call("analyzePost", { postContent: pasted.length >= 20 ? pasted : null });
+  }
   const picked = /Use this opening line: "([^"]+)"/.exec(text)?.[1];
   if (picked) {
     return call("delegateWriting", {
@@ -295,6 +300,14 @@ export const SCRIPTED_STYLE = {
   postTypes: ["story", "opinion", "short"],
 };
 CANNED.push(SCRIPTED_STYLE);
+
+/** The mock post analysis (Task W10): six good ratings and one cosmetic note, which belongs under "Optional". */
+export const SCRIPTED_ANALYSIS = {
+  criteria: ["hook", "fold-layout", "flow", "voice-rules", "accuracy", "audience-clarity"].map((id) => ({ id, rating: "good", note: `The ${id} reads well.` })),
+  issues: [{ quote: "", problem: "The closing line could be a little warmer.", rewrite: "", impact: "nit" }],
+  optional: [],
+};
+CANNED.push(SCRIPTED_ANALYSIS);
 
 /** One scripted hook per purpose, plain and short, about hiring a first engineer (Task W7). */
 const MOCK_HOOK_TEXTS: Record<string, string> = {
