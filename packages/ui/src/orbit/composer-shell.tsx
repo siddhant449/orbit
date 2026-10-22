@@ -11,5 +11,7 @@ export function ComposerShell({
   className,
   ...props
 }: ComponentProps<"div"> & { variant?: "home" | "thread" }) {
-  return <div className={cn("orbit-composer", variant === "thread" && "orbit-composer--thread", className)} {...props} />;
+  // A size container: the footer drops its text labels by the composer's own width (the post editor's 400 px chat
+  // column is narrow at any viewport), not by the viewport.
+  return <div className={cn("orbit-composer @container", variant === "thread" && "orbit-composer--thread", className)} {...props} />;
 }
