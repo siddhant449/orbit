@@ -34,14 +34,17 @@ const components: Components = {
   ),
 };
 
+const remarkPlugins = [remarkGfm];
+const disallowed = ["img"];
+
 export default function MarkdownText({ text, streaming = false }: { text: string; streaming?: boolean }) {
   return (
     <div className={cn("md", streaming && "md--streaming")}>
       <Markdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={remarkPlugins}
         components={components}
         skipHtml
-        disallowedElements={["img"]}
+        disallowedElements={disallowed}
         unwrapDisallowed
         urlTransform={safeUrl}
       >
