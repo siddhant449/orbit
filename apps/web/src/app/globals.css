@@ -572,3 +572,47 @@ h1[tabindex="-1"]:focus-visible {
   letter-spacing: -0.02em;
   text-wrap: pretty;
 }
+
+/*
+ * Navigation (S1). Routes switch instantly; the new screen fades in over 180 ms, opacity only, in the main region only
+ * (the sidebar, mobile header and tab bar stay still). Hard loads keep their own first-paint entrance. A route skeleton
+ * (`loading.tsx`) stays invisible for its first 120 ms, so a fast load never flashes one, then fades in; the content
+ * that replaces a visible skeleton fades in too (RouteView). Reduced motion: no fades, the skeleton still waits.
+ */
+@layer components {
+  .route-view--enter {
+    /* No fill: once done, no lingering opacity stacking context. */
+    animation: route-enter 180ms var(--ease-out);
+  }
+  .route-loading {
+    animation: route-loading-in 220ms var(--ease-out) var(--skeleton-delay, 120ms) both;
+  }
+  /* Full-height screens (the chat thread, the post editor and their skeletons) fill the Lenis wrapper through the view. */
+  .lenis > div:has(> .route-view > :is([data-document-host], [data-route-fill])) {
+    height: 100%;
+  }
+  .route-view:has(> :is([data-document-host], [data-route-fill])) {
+    height: 100%;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .route-view--enter {
+      animation: none;
+    }
+    .route-loading {
+      animation: route-loading-in 1ms steps(1, end) var(--skeleton-delay, 120ms) both;
+    }
+  }
+}
+@keyframes route-enter {
+  from {
+    opacity: 0.25;
+  }
+}
+@keyframes route-loading-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

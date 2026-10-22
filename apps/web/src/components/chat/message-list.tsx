@@ -1,17 +1,18 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import type { ChatUIMessage } from "@brandloop/agent/client";
 import { Button, cn } from "@brandloop/ui";
 import { CheckIcon, CopyIcon } from "@brandloop/ui/icons";
 import { AssistantAvatar } from "./assistant-avatar";
 import { hasVisibleParts, MessageParts, replyText } from "./message-parts";
+import { messageKeys, waitingKey } from "./reply-keys";
 
 type Status = "submitted" | "streaming" | "ready" | "error";
 
 /** What the user wrote: a right-aligned bubble (screens.md B2). A message sent here rises in once. */
-function UserBubble({ message, arrive }: { message: ChatUIMessage; arrive: boolean }) {
+const UserBubble = memo(function UserBubble({ message, arrive }: { message: ChatUIMessage; arrive: boolean }) {
   const text = message.parts.map((p) => (p.type === "text" ? p.text : "")).join("");
   return (
     <div data-message="user" className="flex justify-end">
@@ -21,7 +22,7 @@ function UserBubble({ message, arrive }: { message: ChatUIMessage; arrive: boole
       </div>
     </div>
   );
-}
+});
 
 /** Before the first word: three accent dots and a softly lit "Thinking". */
 function Thinking() {
@@ -68,8 +69,11 @@ function ReplyActions({ message }: { message: ChatUIMessage }) {
   );
 }
 
-/** A reply: the Orbit mark, then the prose, steps and cards in one column. */
-function Reply({
+/**
+ * A reply: the Orbit mark, then the prose, steps and cards in one column. Memoised: while one reply streams, the
+ * finished ones above it (same message objects from `useChat`) don't re-render or re-parse their markdown.
+ */
+const Reply = memo(function Reply({
   message,
   live,
   arrive,
@@ -94,7 +98,7 @@ function Reply({
       </div>
     </div>
   );
-}
+});
 
 /** A failed send or an ended recovery, in the reply column: what happened, and the way forward. */
 function Notice({ text, action }: { text: string; action?: ReactNode }) {
@@ -133,26 +137,34 @@ export function MessageList({
   // Waiting on the first chunk: the reply's place, thinking.
   const waiting = busy && last?.role === "user";
   const lastShown = shown.at(-1);
+  // The thinking row and the reply that follows it share a key, so the row turns into the reply in place.
+  const keys = useMemo(() => messageKeys(messages), [messages]);
   return (
     <ol className="flex flex-col gap-7" aria-label="Messages">
-      {shown.map((m) => (
-        <li key={m.id}>
-          {m.role === "user" ? (
-            <UserBubble message={m} arrive={!initialIds.has(m.id)} />
-          ) : (
-            <Reply
-              message={m}
-              live={busy && m.id === last?.id}
-              footer={!busy && m.id === lastShown?.id ? followUps : undefined}
-            />
-          )}
-        </li>
-      ))}
-      {waiting && (
-        <li>
-          <Reply live arrive />
-        </li>
-      )}
+      {/* One array, so the thinking row and its reply (same key) are reconciled as one element. */}
+      {[
+        ...shown.map((m) => (
+          <li key={keys.get(m.id) ?? m.id}>
+            {m.role === "user" ? (
+              <UserBubble message={m} arrive={!initialIds.has(m.id)} />
+            ) : (
+              <Reply
+                message={m}
+                live={busy && m.id === last?.id}
+                arrive={!initialIds.has(m.id)}
+                footer={!busy && m.id === lastShown?.id ? followUps : undefined}
+              />
+            )}
+          </li>
+        )),
+        ...(waiting
+          ? [
+              <li key={waitingKey(messages) ?? "waiting"}>
+                <Reply live arrive />
+              </li>,
+            ]
+          : []),
+      ]}
       {errorText && !busy && (
         <li>
           <Notice

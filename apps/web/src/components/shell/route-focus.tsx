@@ -24,10 +24,31 @@ export function RouteFocus() {
       return;
     }
     const main = document.querySelector("main");
-    const target = (main?.querySelector("h1") ?? main) as HTMLElement | null;
-    if (!target) return;
-    if (!target.hasAttribute("tabindex")) target.setAttribute("tabindex", "-1");
-    target.focus({ preventScroll: true });
+    if (!main) return;
+    const focus = (target: HTMLElement) => {
+      if (!target.hasAttribute("tabindex")) target.setAttribute("tabindex", "-1");
+      target.focus({ preventScroll: true });
+    };
+    const h1 = main.querySelector("h1");
+    if (h1 || !main.querySelector("[data-route-loading]")) {
+      focus((h1 ?? main) as HTMLElement);
+      return;
+    }
+    // A loading skeleton is up: hold focus on the main landmark, then hand it to the heading once the screen arrives,
+    // unless the reader has moved focus on in the meantime.
+    focus(main);
+    const mo = new MutationObserver(() => {
+      const heading = main.querySelector("h1");
+      if (!heading) return;
+      mo.disconnect();
+      if (document.activeElement === main || document.activeElement === document.body) focus(heading);
+    });
+    mo.observe(main, { childList: true, subtree: true });
+    const stop = window.setTimeout(() => mo.disconnect(), 10_000);
+    return () => {
+      mo.disconnect();
+      window.clearTimeout(stop);
+    };
   }, [pathname]);
   return null;
 }

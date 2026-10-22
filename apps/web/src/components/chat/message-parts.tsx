@@ -1,6 +1,6 @@
 "use client";
 
-import { lazy, Suspense } from "react";
+import { lazy, memo, Suspense } from "react";
 import { collapseToolRuns, parseProposal, type ChatUIMessage, type Proposal } from "@brandloop/agent/client";
 import { cn } from "@brandloop/ui";
 import { DraftCard } from "./document-panel";
@@ -25,13 +25,14 @@ function PlainText({ text, streaming }: { text: string; streaming: boolean }) {
   );
 }
 
-export function TextBlock({ text, streaming }: { text: string; streaming: boolean }) {
+/** Memoised on its text: a block that stopped growing isn't parsed again while later blocks stream. */
+export const TextBlock = memo(function TextBlock({ text, streaming }: { text: string; streaming: boolean }) {
   return (
     <Suspense fallback={<PlainText text={text} streaming={streaming} />}>
       <Markdown text={text} streaming={streaming} />
     </Suspense>
   );
-}
+});
 
 const isToolPart = (p: { type: string }) => p.type.startsWith("tool-") || p.type === "dynamic-tool";
 
