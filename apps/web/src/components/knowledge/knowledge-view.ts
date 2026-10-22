@@ -30,3 +30,9 @@ export function knowledgePayload(fields: AddFields): AddPayload {
   if (fields.kind === "link") return { type: "URL", url: fields.url.trim() };
   return { type: "TEXT", title: fields.title.trim(), content: fields.content.trim() };
 }
+
+/** The API's note minimum (packages/db KNOWLEDGE_MIN_WORDS), mirrored here so the client bundle skips the db package. */
+export const KNOWLEDGE_MIN_WORDS = 100;
+
+/** Words as the API counts them: whitespace-separated runs. */
+export const wordCount = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;

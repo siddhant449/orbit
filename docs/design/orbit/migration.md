@@ -99,6 +99,7 @@ writing styles", "Ways to start", memories/voice/strategy names, toasts).
 | E11 | Settings sub-nav label | "Billing" | "Billing and subscription" | Orbit [p14]; no spec asserts it | O3 |
 | E12 | Ideas sub-nav labels | "Inspiration", "Templates", "Images" | "Swipe file", "Hooks", "Created by you" (group "Carousels") | Orbit [p13]; `shell.spec.ts:39` navigates the palette with "templates": keep the palette keyword "templates" as an alias of "Hooks" so the spec passes unchanged | O3 |
 | E13 | Chat-history group labels | Task 7: "Previous 7 days", "Previous 30 days" | keep Task 7 labels (Orbit "Last 7 days" / "Last 30 days" is a copy-only difference); `chat.spec.ts:94` "Pinned" unchanged | stability (decision D8) | — |
+| E14 | Strategy "Goal" (no spec asserts it) | native `<select>` labelled "Goal" | `radiogroup` named "Goal" (Segmented: one tab stop, arrow keys; the save is debounced 500 ms and flushed on blur / unmount, so arrowing writes once) | Orbit segmented control [screens.md B14] | O3 |
 
 The composer's accessible name stays **"Message"** (Orbit's hidden label is the placeholder sentence "Give Orbit a thought, a
 link or a voice note"; we use it as the placeholder only). This avoids 15 spec edits and keeps a short screen-reader label

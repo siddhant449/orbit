@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { knowledgePayload, knowledgeStatus, knowledgeTypeLabel } from "./knowledge-view";
+import { knowledgePayload, knowledgeStatus, knowledgeTypeLabel, wordCount } from "./knowledge-view";
 
 describe("knowledgeStatus", () => {
   it("maps each ingest status to an honest pill", () => {
@@ -36,5 +36,13 @@ describe("knowledgePayload", () => {
       title: "Pricing",
       content: "body",
     });
+  });
+});
+
+describe("wordCount", () => {
+  it("counts whitespace-separated words like the API does", () => {
+    expect(wordCount("")).toBe(0);
+    expect(wordCount("   ")).toBe(0);
+    expect(wordCount(" one  two\nthree\tfour ")).toBe(4);
   });
 });

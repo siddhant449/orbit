@@ -1,8 +1,9 @@
-import { listKnowledge } from "@brandloop/db";
+import { KNOWLEDGE_PAGE_SIZE, listKnowledge } from "@brandloop/db";
 import { StatusPill } from "@brandloop/ui";
 import { getAccount } from "@/lib/account";
 import { EmptyState, PageBody, PageHeader } from "@/components/page";
 import { AddKnowledge, RefreshWhileIndexing } from "@/components/knowledge/add-knowledge";
+import { DeleteKnowledge } from "@/components/knowledge/delete-knowledge";
 import { knowledgeStatus, knowledgeTypeLabel } from "@/components/knowledge/knowledge-view";
 
 export const metadata = { title: "Knowledge" };
@@ -61,14 +62,23 @@ export default async function Page() {
                 <p className="line-clamp-3 flex-1 text-[13px] leading-[1.55] text-text-2">
                   {item.status === "FAILED" ? (item.error ?? "Orbit couldn't read this one.") : (item.summary ?? item.sourceUrl ?? "")}
                 </p>
-                <p className="text-[11px] text-text-2">
-                  {knowledgeTypeLabel(item.type)} · Added {fmt.format(item.createdAt)}
-                </p>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-[11px] text-text-2">
+                    {knowledgeTypeLabel(item.type)} · Added {fmt.format(item.createdAt)}
+                  </p>
+                  {/* No retry route exists for failed ingests yet, so a failed item can only be deleted and re-added. */}
+                  <DeleteKnowledge id={item.id} title={item.title} />
+                </div>
               </li>
             );
           })}
         </ul>
-        {hasMore && <p className="mt-4 text-[13px] text-text-2">Showing the 50 most recent items.</p>}
+        {/* Paging and search over older items arrive with AI Task 17. */}
+        {hasMore && (
+          <p className="mt-4 text-[13px] text-text-2">
+            Showing the {KNOWLEDGE_PAGE_SIZE} most recent items. Browsing older ones arrives in a later release.
+          </p>
+        )}
       </PageBody>
     </>
   );

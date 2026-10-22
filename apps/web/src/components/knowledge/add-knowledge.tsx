@@ -14,7 +14,9 @@ import {
   dialogTitleClass,
   textareaClass,
 } from "@/components/dialog-classes";
-import { knowledgePayload, type AddFields } from "./knowledge-view";
+import { KNOWLEDGE_MIN_WORDS, knowledgePayload, wordCount, type AddFields } from "./knowledge-view";
+
+export const NETWORK_ERROR = "Couldn't reach Orbit. Check your connection and try again.";
 
 const KINDS = [
   { value: "link", label: "Link" },
@@ -34,11 +36,18 @@ export function AddKnowledge() {
     if (!ready) return;
     setSubmitting(true);
     try {
-      const res = await fetch("/api/knowledge-base", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(knowledgePayload(fields)),
-      });
+      let res: Response;
+      try {
+        res = await fetch("/api/knowledge-base", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(knowledgePayload(fields)),
+        });
+      } catch {
+        // Network failure: keep the dialog and what was typed so the person can try again.
+        toast.error(NETWORK_ERROR);
+        return;
+      }
       const body = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) {
         toast.error(body.error || "Couldn't add that");
@@ -74,7 +83,7 @@ export function AddKnowledge() {
         <Dialog.Content className={`${dialogContentClass} max-w-lg`}>
           <Dialog.Title className={dialogTitleClass}>Add knowledge</Dialog.Title>
           <Dialog.Description className={dialogDescriptionClass}>
-            Orbit reads it, summarises it and uses it when it writes for this profile.
+            Orbit reads it and draws on it when it writes for this profile.
           </Dialog.Description>
           <form onSubmit={submit} className="mt-5 flex flex-col gap-4">
             <Segmented
@@ -120,7 +129,9 @@ export function AddKnowledge() {
                     aria-describedby="knowledge-text-hint"
                     className={textareaClass}
                   />
-                  <Hint id="knowledge-text-hint">At least 100 words.</Hint>
+                  <Hint id="knowledge-text-hint" aria-live="polite">
+                    At least {KNOWLEDGE_MIN_WORDS} words ({wordCount(fields.content)} so far).
+                  </Hint>
                 </div>
               </>
             )}
