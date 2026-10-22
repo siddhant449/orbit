@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getStyleProfile } from "@brandloop/db";
+import { deleteOwnStyle, getStyleProfile } from "@brandloop/db";
 import { getAccount } from "@/lib/account";
 import { layoutLine, pickReferencePost, type StyleSummary } from "@/lib/style-summary";
 
@@ -24,4 +24,17 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
       : null,
   };
   return NextResponse.json(body);
+}
+
+/** Removes the profile's own style (a preset or someone else's is a 404). */
+export async function DELETE(_request: Request, ctx: { params: Promise<{ id: string }> }) {
+  const { currentProfile } = await getAccount();
+  if (!currentProfile) return NextResponse.json({ error: "Create a profile first" }, { status: 400 });
+  const { id } = await ctx.params;
+  try {
+    await deleteOwnStyle(currentProfile.id, id);
+  } catch {
+    return NextResponse.json({ error: "Writing style not found" }, { status: 404 });
+  }
+  return new NextResponse(null, { status: 204 });
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { WhatHelps } from "./what-helps";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Dialog } from "radix-ui";
@@ -85,6 +86,7 @@ export function AddKnowledge() {
           <Dialog.Description className={dialogDescriptionClass}>
             Orbit reads it and draws on it when it writes for this profile.
           </Dialog.Description>
+          <WhatHelps className="mt-3" />
           <form onSubmit={submit} className="mt-5 flex flex-col gap-4">
             <Segmented
               label="What to add"

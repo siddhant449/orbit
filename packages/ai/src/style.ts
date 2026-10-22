@@ -79,3 +79,20 @@ export type StyleProfile = z.infer<typeof StyleProfileSchema>;
 export const StyleDescriptionSchema = StyleProfileSchema.pick({ language: true, voiceTarget: true, rules: true, signatureMoves: true, finalChecks: true });
 export type StyleDescription = z.infer<typeof StyleDescriptionSchema>;
 export { ENDINGS as ENDING_TYPES };
+
+/**
+ * What the extraction call returns: only the parts code cannot measure. Every key is required (nullable, never optional,
+ * for OpenAI strict mode). Layout numbers are not here on purpose: they are measured, never estimated by a model.
+ */
+export const ExtractedStyleSchema = z.object({
+  language: z.string().min(2).max(20),
+  voiceTarget: z.string().min(1).max(600),
+  rules: StyleRulesSchema,
+  signatureMoves: z.array(SignatureMoveSchema).max(8),
+  finalChecks: z.array(z.string().min(1).max(200)).max(10),
+  /** Indexes (0-based) of 3 to 5 of the numbered posts that show the style best. */
+  referencePostIndexes: z.array(z.number().int().min(0)).min(3).max(5),
+  /** One post type per chosen reference post, in the same order. */
+  postTypes: z.array(PostTypeSchema).min(3).max(5),
+});
+export type ExtractedStyle = z.infer<typeof ExtractedStyleSchema>;

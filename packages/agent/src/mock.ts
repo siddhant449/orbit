@@ -250,6 +250,19 @@ export const SCRIPTED_IDEAS = [
 
 CANNED.push({ ideas: SCRIPTED_IDEAS });
 
+/** The mock own-style extraction (Task W4): the descriptive parts of a style; the layout is measured by the server. */
+const MOCK_RULES = (t: string) => ({ do: [`Keep ${t} short and plain.`], dont: [`Pad the ${t}.`] });
+export const SCRIPTED_STYLE = {
+  language: "en-GB",
+  voiceTarget: "Write plainly, in short blocks, with one concrete detail per post.",
+  rules: { hooks: MOCK_RULES("hooks"), rhythm: MOCK_RULES("rhythm"), formatting: MOCK_RULES("formatting"), diction: MOCK_RULES("word choice"), closings: MOCK_RULES("closings"), global: MOCK_RULES("posts") },
+  signatureMoves: [{ label: "Plain open", pattern: "[A flat claim about the work].", useWhen: "opening any post" }],
+  finalChecks: ["Is the hook one short line?", "Is there one concrete detail?"],
+  referencePostIndexes: [0, 1, 2],
+  postTypes: ["story", "opinion", "short"],
+};
+CANNED.push(SCRIPTED_STYLE);
+
 /** A specialist client for mock mode: `text` names chats, `json` returns the first canned output the schema accepts. */
 export function scriptedAi(): AiClient {
   return {

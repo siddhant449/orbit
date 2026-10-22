@@ -6,7 +6,7 @@ import { assertTestDatabase } from "../test-db";
 import { PRESET_PROFILE_VERSION, PRESET_VOICES } from "../../prisma/presets";
 import { seedPresets } from "../../prisma/seed";
 import { ensureAccount } from "./account";
-import { getStyleProfile, listStyleVersions, renderProfileGuide, restoreStyleVersion, saveStyleProfile } from "./style-profile";
+import { deleteOwnStyle, getStyleProfile, listStyleVersions, renderProfileGuide, restoreStyleVersion, saveStyleProfile } from "./style-profile";
 
 // Names that must appear in no preset field: Kleo's nine preset labels (recon) and a few well-known creators. Test-only.
 const REAL_CREATOR_DENYLIST = ["justin welsh", "jasmin alic", "george blackman", "lara acosta", "dan koe", "alex hormozi", "gary vaynerchuk", "sahil bloom", "kleo"];
@@ -161,6 +161,22 @@ describe("style profile storage", () => {
 
   it("the schema rejects layout supplied by a model without numbers", () => {
     expect(StyleProfileSchema.safeParse({ ...preset.profile, layout: {} }).success).toBe(false);
+  });
+
+  it("deletes an own style with its history, and nothing else", async () => {
+    const a = await account(9);
+    const b = await account(10);
+    const style = await ownStyle(a.profileId);
+    await saveStyleProfile(style.id, ownProfile("x"), "h");
+    await prisma.profile.update({ where: { id: a.profileId }, data: { voiceStyleId: style.id } });
+    await expect(deleteOwnStyle(b.profileId, style.id)).rejects.toThrow(/not found/i);
+    await deleteOwnStyle(a.profileId, style.id);
+    expect(await prisma.voiceStyle.count({ where: { id: style.id } })).toBe(0);
+    expect(await prisma.voiceStyleVersion.count({ where: { voiceStyleId: style.id } })).toBe(0);
+    expect((await prisma.profile.findUniqueOrThrow({ where: { id: a.profileId } })).voiceStyleId).toBeNull();
+    await seedPresets(prisma);
+    const presetRow = await prisma.voiceStyle.findUniqueOrThrow({ where: { slug: preset.slug } });
+    await expect(deleteOwnStyle(a.profileId, presetRow.id)).rejects.toThrow(/not found/i);
   });
 
   it("renders a guide from a profile", () => {

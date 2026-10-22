@@ -31,6 +31,17 @@ async function account(n: number) {
   return { userId: acc.user.id, profileId: acc.currentProfile!.id };
 }
 
+const dd = (t: string) => ({ do: [`Do ${t}`], dont: [`Avoid ${t}`] });
+const extractedStyle = {
+  language: "en-GB",
+  voiceTarget: "Write plainly.",
+  rules: { hooks: dd("hooks"), rhythm: dd("rhythm"), formatting: dd("formatting"), diction: dd("diction"), closings: dd("closings"), global: dd("global") },
+  signatureMoves: [],
+  finalChecks: [],
+  referencePostIndexes: [0, 1, 2],
+  postTypes: ["story", "story", "story"],
+};
+
 const post = (n: number) => `Post ${n}. ` + "A sentence about shipping work that matters. ".repeat(6);
 
 describe("presets", () => {
@@ -58,12 +69,13 @@ describe("createOwnVoice", () => {
 
   it("creates an OWN voice and mirrors the guide into voice/style", async () => {
     const { profileId } = await account(2);
-    const ai = fake({ guide: "## Rhythm\nShort.", tagline: "Plain and direct" });
+    const ai = fake(extractedStyle);
     const voice = await createOwnVoice(ai, profileId, [post(1), post(2), post(3)]);
-    expect(voice).toMatchObject({ kind: "OWN", profileId, tagline: "Plain and direct" });
+    expect(voice).toMatchObject({ kind: "OWN", profileId, status: "READY" });
     expect(voice.samplePosts).toHaveLength(3);
     const mem = await prisma.memoryDoc.findUnique({ where: { profileId_key: { profileId, key: "voice/style" } } });
     expect(mem?.content).toContain("## Rhythm");
+    expect(mem?.content).toContain("Write plainly.");
     expect(mem?.source).toBe("MIRRORED");
     // Creating again updates the same row.
     await createOwnVoice(ai, profileId, [post(4), post(5), post(6)]);
@@ -87,7 +99,7 @@ describe("selecting", () => {
     const a = await account(4);
     const b = await account(5);
     expect(await getSelectedVoice(a.profileId)).toBeNull();
-    const own = await createOwnVoice(fake({ guide: "g", tagline: "t" }), a.profileId, [post(1), post(2), post(3)]);
+    const own = await createOwnVoice(fake(extractedStyle), a.profileId, [post(1), post(2), post(3)]);
     expect((await getSelectedVoice(a.profileId))?.id).toBe(own.id);
     await expect(selectVoice(b.userId, b.profileId, own.id)).rejects.toThrow(/not found/i);
   });

@@ -75,3 +75,10 @@ export async function restoreStyleVersion(profileId: string, voiceStyleId: strin
   if (!old) throw new AccountError("That version is no longer kept");
   return saveStyleProfile(voiceStyleId, StyleProfileSchema.parse(old.profile), old.corpusHash);
 }
+
+/** Deletes the profile's own style with its corpus and versions. A preset or another profile's style is not found. */
+export async function deleteOwnStyle(profileId: string, voiceStyleId: string): Promise<void> {
+  if (!(await ownStyle(profileId, voiceStyleId))) throw new AccountError("Writing style not found");
+  await prisma.profile.updateMany({ where: { id: profileId, voiceStyleId }, data: { voiceStyleId: null } });
+  await prisma.voiceStyle.delete({ where: { id: voiceStyleId } });
+}

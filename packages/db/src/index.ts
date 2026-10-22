@@ -13,3 +13,5 @@ export * from "./services/chat";
 export * from "./services/documents";
 export * from "./services/progress";
 export * from "./services/style-profile";
+export * from "./services/style-extract";
+export * from "./services/linkedin-export";

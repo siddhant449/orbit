@@ -3,6 +3,7 @@ import { StatusPill } from "@brandloop/ui";
 import { getAccount } from "@/lib/account";
 import { EmptyState, PageBody, PageHeader } from "@/components/page";
 import { AddKnowledge, RefreshWhileIndexing } from "@/components/knowledge/add-knowledge";
+import { WhatHelps } from "@/components/knowledge/what-helps";
 import { DeleteKnowledge } from "@/components/knowledge/delete-knowledge";
 import { knowledgeStatus, knowledgeTypeLabel } from "@/components/knowledge/knowledge-view";
 
@@ -34,9 +35,10 @@ export default async function Page() {
       <PageBody className="max-w-[1120px]">
         <RefreshWhileIndexing active={items.some((i) => i.status === "PROCESSING")} />
         {items.length === 0 && (
-          <p className="mb-4 max-w-[60ch] text-[14px] leading-[1.6] text-text-2">
-            Nothing here yet. Add a web page or a note and Orbit will use it in your drafts.
-          </p>
+          <div className="mb-4 flex max-w-[60ch] flex-col gap-3">
+            <p className="text-[14px] leading-[1.6] text-text-2">Nothing here yet. Add a web page or a note and Orbit will use it in your drafts.</p>
+            <WhatHelps />
+          </div>
         )}
         <ul
           aria-label="Knowledge items"
