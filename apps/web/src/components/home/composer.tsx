@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { toast } from "sonner";
 import { ComposerShell, pillClass, cn } from "@brandloop/ui";
 import { MicIcon, PlusIcon, SendIcon } from "@brandloop/ui/icons";
@@ -34,6 +34,7 @@ export function Composer({
   voices,
   selectedVoiceId,
   onSend,
+  initialText = "",
 }: {
   greeting: GreetingText;
   /** The home cards, rendered on the server (real data or honest empty states). */
@@ -42,9 +43,19 @@ export function Composer({
   selectedVoiceId: string | null;
   /** Starts the chat with this text. Without it the composer only says chat isn't connected. */
   onSend?: (text: string) => void;
+  /** Prefills the composer (not sent), e.g. Engage's "Draft a reply" via `/?prompt=`. */
+  initialText?: string;
 }) {
-  const [text, setText] = useState("");
+  const [text, setText] = useState(initialText);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // A prefilled prompt is ready to edit: focus it with the caret at the end.
+  useEffect(() => {
+    if (!initialText) return;
+    const el = inputRef.current;
+    el?.focus({ preventScroll: true });
+    el?.setSelectionRange(initialText.length, initialText.length);
+  }, [initialText]);
 
   function applyStarter(prompt: string) {
     setText(prompt);
