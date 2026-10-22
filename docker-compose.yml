@@ -10,5 +10,16 @@ services:
       - "5433:5432"
     volumes:
       - pgdata-pgvector:/var/lib/postgresql/data
+  # Local S3-compatible blob storage (SeaweedFS) for images and carousels until a hosted store exists. No identities
+  # configured, so any access key works locally. Create the bucket once:
+  #   docker compose exec blob sh -c 'echo "s3.bucket.create -name orbit" | weed shell'
+  blob:
+    image: chrislusf/seaweedfs:latest
+    command: ["server", "-dir=/data", "-s3", "-s3.port=8333", "-ip.bind=0.0.0.0"]
+    ports:
+      - "8333:8333"
+    volumes:
+      - blobdata:/data
 volumes:
   pgdata-pgvector:
+  blobdata:
