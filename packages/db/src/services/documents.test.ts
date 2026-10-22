@@ -191,7 +191,7 @@ describe("documents", () => {
     });
   });
 
-  it("lists the profile's posts newest first with the current text, skipping posts whose chat is gone", async () => {
+  it("lists the profile's posts newest first with the current text, keeping posts whose chat is gone", async () => {
     const a = await createDocumentForChat(p, chat, { title: "First", text: "v1 text" });
     await saveDocumentVersion(p, a.id, { text: "v2 text", source: "USER_EDIT", expectedVersion: 1 });
     const userId = uid;
@@ -202,14 +202,16 @@ describe("documents", () => {
     await getOrCreateChat(p, userId, chat3);
     const gone = await createDocumentForChat(p, chat3, { title: "Gone", text: "x" });
     await prisma.chat.update({ where: { id: chat3 }, data: { deletedAt: new Date() } });
+    await prisma.document.update({ where: { id: gone.id }, data: { updatedAt: new Date(Date.now() - 60_000) } });
     await prisma.document.update({ where: { id: a.id }, data: { updatedAt: new Date(Date.now() + 60_000) } });
 
     const { posts, total } = await listPosts(p);
-    expect(total).toBe(2);
-    expect(posts.map((x) => x.id)).toEqual([a.id, b.id]);
+    expect(total).toBe(3);
+    expect(posts.map((x) => x.id)).toEqual([a.id, b.id, gone.id]);
     expect(posts[0]).toMatchObject({ title: "First", status: "DRAFT", version: 2, text: "v2 text", chatId: chat });
     expect(posts[0]!.updatedAt).toBeInstanceOf(Date);
-    expect(posts.some((x) => x.id === gone.id)).toBe(false);
+    // Its chat was deleted: still listed (it opens at /posts/<id>), with no chat.
+    expect(posts[2]).toMatchObject({ id: gone.id, chatId: null });
 
     const s = await ensureAccount(clerk(2));
     expect((await listPosts(s.currentProfile!.id)).posts).toEqual([]);

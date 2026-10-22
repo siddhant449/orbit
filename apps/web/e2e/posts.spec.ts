@@ -4,7 +4,8 @@ import { axeCheck, captureSet, expectNoHorizontalScroll } from "./helpers/shots"
 
 /**
  * Posts board, list and week calendar (screens.md B5 / B6) against a real post written by the scripted mock model.
- * The chat created here is deleted afterwards, which also takes its post off the board.
+ * The chat created here is deleted afterwards; its post stays (posts open at /posts/<id>, chat or not) and simply
+ * drops down the board as newer ones arrive.
  */
 const email = process.env.E2E_CLERK_USER_EMAIL;
 const mock = process.env.AI_MOCK_MODEL === "1";
@@ -58,20 +59,25 @@ async function both(page: Page) {
 test("board, list and calendar show the real post and honest empty columns", async ({ page }) => {
   await signIn(page);
   const chatId = await startDraft(page);
-  const card = () => page.getByRole("main").locator(`a[href="/chat/${chatId}"]`);
+  let postId = "";
+  const href = () => `a[href="/posts/${postId}"]`;
+  const card = () => page.getByRole("main").locator(href());
 
   // Board: the post sits in All posts and Draft once the mock has written it.
   await page.setViewportSize({ width: 1440, height: 900 });
   await expect(async () => {
+    const res = await page.request.get(`/api/chat/${chatId}/messages`);
+    postId = ((await res.json()) as { document?: { id: string } | null }).document?.id ?? "";
+    expect(postId).not.toBe("");
     await page.goto("/posts");
-    await expect(page.getByRole("region", { name: "Board columns" }).locator(`a[href="/chat/${chatId}"]`)).toHaveCount(2, { timeout: 2_000 });
+    await expect(page.getByRole("region", { name: "Board columns" }).locator(href())).toHaveCount(2, { timeout: 2_000 });
   }).toPass({ timeout: 45_000 });
   await expect(page.getByRole("heading", { level: 1, name: /^Posts \d+$/ })).toBeVisible();
   const draft = page.getByRole("region", { name: "Board columns" }).getByRole("region", { name: /^Draft/ });
-  await expect(draft.locator(`a[href="/chat/${chatId}"]`)).toContainText("Draft");
+  await expect(draft.locator(href())).toContainText("Draft");
   // All posts mirrors Draft today, so its cards carry a status chip.
   const all = page.getByRole("region", { name: "Board columns" }).getByRole("region", { name: /^All posts/ });
-  await expect(all.locator(`a[href="/chat/${chatId}"] .rounded-pill`)).toHaveText("Draft");
+  await expect(all.locator(`${href()} .rounded-pill`)).toHaveText("Draft");
   await expect(page.getByText("Scheduling arrives with LinkedIn publishing.", { exact: false })).toBeVisible();
   await expect(page.getByText("Nothing published yet")).toBeVisible();
   await expect(page.getByRole("button", { name: "All labels" })).toHaveAttribute("aria-disabled", "true");
@@ -103,11 +109,11 @@ test("board, list and calendar show the real post and honest empty columns", asy
   // Calendar: the post at its last-edit hour, labelled as such; the week moves and comes back.
   const grid = page.getByRole("grid");
   await expect(grid).toBeVisible();
-  await expect(grid.locator(`a[href="/chat/${chatId}"]`)).toContainText("Last edited");
-  await expect(page.getByRole("complementary", { name: /Drafts/ }).locator(`a[href="/chat/${chatId}"]`)).toBeVisible();
+  await expect(grid.locator(href())).toContainText("Last edited");
+  await expect(page.getByRole("complementary", { name: /Drafts/ }).locator(href())).toBeVisible();
   await page.getByRole("button", { name: "Next week" }).click();
   await expect(page).toHaveURL(/week=\d{4}-\d{2}-\d{2}/);
-  await expect(grid.locator(`a[href="/chat/${chatId}"]`)).toHaveCount(0);
+  await expect(grid.locator(href())).toHaveCount(0);
   await page.getByRole("button", { name: "Today", exact: true }).click();
   await expect(page).toHaveURL(/\/posts\?view=calendar$/);
   await expectNoHorizontalScroll(page);
@@ -118,7 +124,7 @@ test("board, list and calendar show the real post and honest empty columns", asy
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/posts?view=calendar&week=9999-12-31");
   await expect(page.getByRole("grid")).toBeVisible();
-  await expect(grid.locator(`a[href="/chat/${chatId}"]`)).toHaveCount(1);
+  await expect(grid.locator(href())).toHaveCount(1);
   await page.goto("/posts?view=calendar");
 
   // Keyboard: the grid is one tab stop; arrows move to an open slot later this week, Enter plans a post there.
@@ -133,4 +139,11 @@ test("board, list and calendar show the real post and honest empty columns", asy
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/\?prompt=/);
   await expect(page.getByLabel("Message", { exact: true })).toHaveValue(/^Help me draft a LinkedIn post I plan to publish on \w+day, \d{1,2} \w+ \d{4} at \d{1,2}:00 \(.+\)\. It's about $/);
+  // Pre-filled only: nothing was sent, so home is still the landing composer.
+  await expect(page).toHaveURL(/\/\?prompt=/);
+
+  // A card opens the post in its editor.
+  await page.goto("/posts?view=list");
+  await card().click();
+  await expect(page).toHaveURL(new RegExp(`/posts/${postId}$`));
 });

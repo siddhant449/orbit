@@ -91,13 +91,15 @@ test("engage: empty queue and inbox, tabs, draft a reply opens a prefilled chat"
   await draft.click();
   // The first visit to "/" compiles on the dev server; allow for it.
   await expect(page).toHaveURL(/\/\?prompt=/, { timeout: 30_000 });
-  // The prompt rides in `?prompt=` (≤ 2000 code points, closing quote intact); the home composer's prefill comes from
-  // orbit/posts-board's promptParam at merge, after which this spec should also assert the composer value.
+  // The prompt rides in `?prompt=` (≤ 2000 code points, closing quote intact) and pre-fills the home composer.
   const prompt = new URL(page.url()).searchParams.get("prompt") ?? "";
   expect(prompt.startsWith("Help me reply to this comment")).toBe(true);
   expect(prompt).toContain(comment);
   expect(Array.from(prompt).length).toBeLessThanOrEqual(2000);
   expect(prompt.endsWith('"')).toBe(true);
+  await expect(page.getByLabel("Message", { exact: true })).toHaveValue(prompt);
+  // Pre-filled, never sent: still on home, no chat started.
+  await expect(page).toHaveURL(/\/\?prompt=/);
   // Long pastes are cut with an ellipsis inside the quotes.
   await page.goto("/engage");
   await page.getByLabel("Comment to reply to").fill("word ".repeat(600));

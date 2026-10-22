@@ -1,3 +1,5 @@
+import { promptHref } from "@/lib/prompt-param";
+
 /**
  * Posts screen view models (screens.md B5 / B6): pure functions for the board columns, search, the list, and the
  * week calendar's civil-date math in the profile's timezone. Dates cross the server boundary as ISO strings.
@@ -12,7 +14,7 @@ export type PostRow = {
   status: "DRAFT";
   version: number;
   text: string;
-  chatId: string;
+  chatId: string | null;
   updatedAt: string;
 };
 
@@ -215,7 +217,7 @@ export function planPrompt(iso: string, hour: number, timeZone: string): string 
 }
 
 /** Home, with the composer pre-filled: the writer finishes the topic and sends it to start the draft's chat. */
-export const planHref = (iso: string, hour: number, timeZone: string) => `/?prompt=${encodeURIComponent(planPrompt(iso, hour, timeZone))}`;
+export const planHref = (iso: string, hour: number, timeZone: string) => promptHref(planPrompt(iso, hour, timeZone));
 
 export type Slot = { day: number; hour: number };
 

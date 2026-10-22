@@ -77,6 +77,17 @@ test("sprint: 30-day calendar, day selection, draft link starts a chat with the 
   expect(prompt).toContain(`Day ${n} of my 30-day sprint`);
   expect(prompt).toContain(title);
   expect([...prompt].length).toBeLessThanOrEqual(2000);
+  // Following it pre-fills the home composer and sends nothing (no chat request, still on home).
+  let sent = false;
+  page.on("request", (req) => {
+    if (req.method() === "POST" && new URL(req.url()).pathname === "/api/chat") sent = true;
+  });
+  await draft.click();
+  await expect(page).toHaveURL(/\/\?prompt=/, { timeout: 30_000 });
+  await expect(page.getByLabel("Message", { exact: true })).toHaveValue(prompt);
+  await page.waitForTimeout(500);
+  expect(sent).toBe(false);
+  await expect(page).toHaveURL(/\/\?prompt=/);
 });
 
 test("activities: derived streak, goals, milestones, strip and checklist", async ({ page }) => {

@@ -191,7 +191,7 @@ export function Calendar({
                         {here.length > 0 ? (
                           <Link
                             {...slotProps}
-                            href={postHref(here[here.length - 1]!.chatId)}
+                            href={postHref(here[here.length - 1]!.id)}
                             className="orbit-transition flex h-full flex-col gap-0.5 overflow-hidden rounded-[10px] border border-line-3 bg-panel-hover px-2.5 py-1.5 text-text hover:border-line-hover"
                           >
                             <span className="truncate text-[10px] text-text-3">
@@ -246,7 +246,7 @@ export function Calendar({
                   <ul className="mt-2.5 flex flex-col gap-1.5">
                     {dayPosts.map((p) => (
                       <li key={p.id}>
-                        <Link href={postHref(p.chatId)} className="flex flex-col gap-0.5 rounded-[10px] bg-panel-hover px-3 py-2">
+                        <Link href={postHref(p.id)} className="flex flex-col gap-0.5 rounded-[10px] bg-panel-hover px-3 py-2">
                           <span className="text-[11px] text-text-3">Last edited · {editedAt(p, timeZone)}</span>
                           <span className="text-[13px] font-medium text-text">{p.title}</span>
                         </Link>
@@ -286,7 +286,7 @@ export function Calendar({
               {shown.map((p) => (
                 <li key={p.id}>
                   <Link
-                    href={postHref(p.chatId)}
+                    href={postHref(p.id)}
                     className="orbit-transition flex flex-col gap-[5px] rounded-[12px] bg-panel-hover p-3 text-text hover:bg-line-3"
                   >
                     <span className="text-[13px] font-medium leading-[1.3]">{p.title}</span>

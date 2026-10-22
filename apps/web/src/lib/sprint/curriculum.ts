@@ -4,7 +4,7 @@
  * Weekends are rest days and take no format. All wording here is Orbit's own.
  */
 export type SprintFormat = {
-  /** Stable slug, used in links (`/?draft=<id>`) and later as the persisted format key. */
+  /** Stable slug, later used as the persisted format key. */
   id: string;
   title: string;
   /** What to write, in one or two sentences. */

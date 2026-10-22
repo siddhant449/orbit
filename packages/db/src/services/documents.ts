@@ -156,7 +156,8 @@ export type PostSummary = {
   status: "DRAFT";
   version: number;
   text: string;
-  chatId: string;
+  /** The live chat beside the post, or null once it was deleted (the editor links a new one on first send). */
+  chatId: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -164,18 +165,18 @@ export type PostSummary = {
 export const POSTS_PAGE_SIZE = 200;
 
 /**
- * The profile's posts, last edited first. A post is reachable only through its chat today, so a post whose chat was
- * deleted is left out (and not counted) until posts get their own page.
+ * The profile's posts, last edited first. Every post opens in its editor at `/posts/<id>`, so a post whose chat was
+ * deleted stays listed (with a null `chatId`).
  */
 export async function listPosts(profileId: string, opts: { limit?: number } = {}): Promise<{ posts: PostSummary[]; total: number }> {
   const limit = Math.min(Math.max(opts.limit ?? POSTS_PAGE_SIZE, 1), 500);
-  const where = { profileId, deletedAt: null, chat: { is: { deletedAt: null } } };
+  const where = { profileId, deletedAt: null };
   const [rows, total] = await Promise.all([
     prisma.document.findMany({
       where,
       orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
       take: limit,
-      select: { id: true, title: true, status: true, version: true, createdAt: true, updatedAt: true, chat: { select: { id: true } } },
+      select: { id: true, title: true, status: true, version: true, createdAt: true, updatedAt: true, chat: { select: { id: true, deletedAt: true } } },
     }),
     prisma.document.count({ where }),
   ]);
@@ -191,7 +192,7 @@ export async function listPosts(profileId: string, opts: { limit?: number } = {}
     status: r.status,
     version: r.version,
     text: textOf.get(r.id) ?? "",
-    chatId: r.chat!.id,
+    chatId: r.chat && !r.chat.deletedAt ? r.chat.id : null,
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
   }));

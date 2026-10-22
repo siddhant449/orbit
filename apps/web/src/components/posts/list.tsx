@@ -40,7 +40,7 @@ export function List({ posts, now, timeZone, filtered }: { posts: PostRow[]; now
               return (
                 <li key={p.id} className="border-b border-line-row last:border-b-0">
                   <Link
-                    href={postHref(p.chatId)}
+                    href={postHref(p.id)}
                     className="orbit-transition grid gap-x-4 gap-y-1.5 px-5 py-4 hover:bg-panel-hover md:grid-cols-[minmax(0,1fr)_88px_64px_120px] md:items-center"
                   >
                     <span className="flex min-w-0 flex-col gap-1">

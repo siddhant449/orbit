@@ -1,4 +1,5 @@
 import { formatRelativeAge, plural } from "./format";
+import { PROMPT_PARAM_MAX, promptHref } from "@/lib/prompt-param";
 
 /**
  * View models for Engage (screens.md B10, p12): a comment queue of posts by people on the user's lists, and a leads
@@ -130,8 +131,8 @@ export function sessionView(s: SessionStats) {
   };
 }
 
-/** The home composer's `?prompt=` cap (orbit/posts-board `promptParam`), in code points. */
-export const PROMPT_MAX = 2000;
+/** The home composer's `?prompt=` cap (`promptParam`), in code points. */
+export const PROMPT_MAX = PROMPT_PARAM_MAX;
 /** Pasted comment budget inside the reply prompt, so the whole prompt fits PROMPT_MAX with its closing quote. */
 export const REPLY_SOURCE_MAX = 1500;
 const EXCERPT_MAX = 900;
@@ -151,7 +152,7 @@ export function replyPrompt(comment: string): string {
 
 /** A new chat with the reply prompt in the composer (not sent), or null for blank text. */
 export function replyHref(comment: string): string | null {
-  return comment.trim() ? `/?prompt=${encodeURIComponent(replyPrompt(comment))}` : null;
+  return comment.trim() ? promptHref(replyPrompt(comment)) : null;
 }
 
 export type RedraftMode = "draft" | "angle" | "shorter";
@@ -166,5 +167,5 @@ export function redraftHref(p: QueuePost, mode: RedraftMode): string {
       : mode === "angle"
         ? `Give me a different angle for my comment on this LinkedIn post. My current draft:\n\n"${draft}"`
         : `Make my comment on this LinkedIn post shorter without losing the point. My current draft:\n\n"${draft}"`;
-  return `/?prompt=${encodeURIComponent(`${ask}\n\n${source}`)}`;
+  return promptHref(`${ask}\n\n${source}`);
 }

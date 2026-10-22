@@ -6,6 +6,7 @@ import { StatusPill, cn } from "@brandloop/ui";
 import { PlusIcon } from "@brandloop/ui/icons";
 import { boardColumns, excerpt, relativeTime, type ColumnId, type PostRow } from "./posts-view";
 import { postHref } from "./shared";
+import { promptHref } from "@/lib/prompt-param";
 
 const IDEAS_PROMPT = "Give me five post ideas for this week based on my strategy.";
 
@@ -21,7 +22,7 @@ const dot: Record<ColumnId, string> = {
 /** Where a column's "+" starts a post. Scheduled and Published can't take one until scheduling exists. */
 const addHref: Partial<Record<ColumnId, { href: string; label: string }>> = {
   all: { href: "/", label: "New post" },
-  ideas: { href: `/?prompt=${encodeURIComponent(IDEAS_PROMPT)}`, label: "Find ideas with Orbit" },
+  ideas: { href: promptHref(IDEAS_PROMPT), label: "Find ideas with Orbit" },
   draft: { href: "/", label: "New draft" },
 };
 
@@ -117,7 +118,7 @@ export function PostCard({ post, now, showStatus = false }: { post: PostRow; now
   const line = excerpt(post.text, post.title);
   return (
     <Link
-      href={postHref(post.chatId)}
+      href={postHref(post.id)}
       className="orbit-panel orbit-panel--interactive flex flex-col gap-2.5 rounded-card-sm p-4 text-text"
     >
       <span className="text-[14px] font-medium leading-[1.3]">{post.title}</span>

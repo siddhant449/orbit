@@ -5,8 +5,8 @@ import { toast } from "sonner";
 import { cn } from "@brandloop/ui";
 import { ChevronUpIcon } from "@brandloop/ui/icons";
 
-/** Where a post opens today: its chat (the post panel lives there). `/posts/<id>` replaces this when the editor ships. */
-export const postHref = (chatId: string) => `/chat/${chatId}`;
+/** Where a post opens: its editor (O6a). A post whose chat was deleted gets a new chat there on first send. */
+export const postHref = (id: string) => `/posts/${encodeURIComponent(id)}`;
 
 /** Ghost control pill (p08 "All labels", p15 "Today"): `line-control` outline per A17. */
 export const ghostPill =
