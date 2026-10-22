@@ -54,8 +54,39 @@ h1[tabindex="-1"]:focus-visible {
     height: 100%;
   }
 
+  /* Full-height screens never scroll the page: the shell is exactly the viewport and each column scrolls inside itself. */
+  .lenis:has(> div > .route-view > :is([data-document-host], [data-post-editor], [data-route-fill])),
+  .lenis:has(> div > :is([data-document-host], [data-post-editor], [data-fill-screen])) {
+    overflow-y: hidden;
+  }
+
+  /* Thin overlay scrollbars: transparent track, a subtle thumb that shows on hover/scroll/focus-within. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+  *:hover,
+  *:focus-within {
+    scrollbar-color: color-mix(in srgb, var(--text-3, #888) 45%, transparent) transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  *:hover::-webkit-scrollbar-thumb {
+    background-color: color-mix(in srgb, var(--text-3, #888) 45%, transparent);
+  }
+
   .thread-scroller {
-    scrollbar-gutter: stable;
     overscroll-behavior: contain;
   }
 
@@ -588,10 +619,10 @@ h1[tabindex="-1"]:focus-visible {
     animation: route-loading-in 220ms var(--ease-out) var(--skeleton-delay, 120ms) both;
   }
   /* Full-height screens (the chat thread, the post editor and their skeletons) fill the Lenis wrapper through the view. */
-  .lenis > div:has(> .route-view > :is([data-document-host], [data-route-fill])) {
+  .lenis > div:has(> .route-view > :is([data-document-host], [data-post-editor], [data-route-fill])) {
     height: 100%;
   }
-  .route-view:has(> :is([data-document-host], [data-route-fill])) {
+  .route-view:has(> :is([data-document-host], [data-post-editor], [data-route-fill])) {
     height: 100%;
   }
   @media (prefers-reduced-motion: reduce) {
