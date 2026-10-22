@@ -17,9 +17,10 @@ const isReasoning = (p: Part) => p.type === "reasoning" || p.type === "reasoning
 const isToolWithOutput = (p: Part): p is Part & { output: unknown } =>
   (p.type.startsWith("tool-") || p.type === "dynamic-tool") && "output" in p && p.output !== undefined;
 /**
- * Provider-executed tools (OpenAI's hosted `web_search`) keep their structured output: the provider
- * rebuilds its own call item from it (`web_search_call` when `store` is off), and a string in its place
- * makes the search vanish from the request. Their outputs are small (an action and a source list).
+ * Provider-executed tools (OpenAI's hosted `web_search`) are left out of past turns. OpenAI only accepts a
+ * replayed `web_search_call` (or its item reference) together with the reasoning item that produced it, and
+ * reasoning is never replayed, so keeping them made every later message in a chat that once searched fail.
+ * The reply text that used the results stays.
  */
 const isProviderExecuted = (p: Part) => "providerExecuted" in p && p.providerExecuted === true;
 
@@ -39,8 +40,8 @@ function fromFirstUser(messages: ChatUIMessage[]): ChatUIMessage[] {
 
 /**
  * The history window sent to the orchestrator (design §7.2). Pure: returns new messages and never
- * mutates its input. Reasoning is dropped; old tool outputs are replaced by a note (inputs stay);
- * large outputs are truncated (provider-executed tool outputs are exempt from both); then the oldest messages go until the window fits the char budget.
+ * mutates its input. Reasoning and provider-executed steps are dropped; old tool outputs are replaced by a note
+ * (inputs stay); large outputs are truncated; then the oldest messages go until the window fits the char budget.
  * The window always starts at a user message.
  */
 export function windowHistory(messages: ChatUIMessage[], opts: Partial<WindowOpts> = {}): ChatUIMessage[] {
@@ -49,8 +50,8 @@ export function windowHistory(messages: ChatUIMessage[], opts: Partial<WindowOpt
 
   window = window.map((m, i) => {
     const old = i < window.length - o.fullToolOutputs;
-    const parts = m.parts.filter((p) => !isReasoning(p)).map((p) => {
-      if (!isToolWithOutput(p) || isProviderExecuted(p)) return p;
+    const parts = m.parts.filter((p) => !isReasoning(p) && !isProviderExecuted(p)).map((p) => {
+      if (!isToolWithOutput(p)) return p;
       return { ...p, output: old ? OMITTED_OUTPUT : truncateOutput(p.output, o.maxToolOutputChars) } as Part;
     });
     return { ...m, parts };
