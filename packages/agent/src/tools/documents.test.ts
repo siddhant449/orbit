@@ -385,6 +385,19 @@ describe("delegateEditing (final review)", () => {
     expect(ctx.handoffs.get("call_r")).toBe(out);
   });
 
+  it("fails the review on a writing check and keeps the 8 old checks first", async () => {
+    await upsertMemory(ctx.profileId, "writing/rules", "## Don't\n- Don't use em dashes\n- No emojis", "USER");
+    await openPost("Launch day \u2014 finally.\n\nShort body.");
+    ctx.ai = fakeAi(review());
+    const out = (await run(ctx, "delegateEditing", { request: "Review the post before I publish it", specialty: "final-review" })) as HandoffEnvelope<{
+      qualityReview: { passed: boolean; deterministicChecks: { id: string; passed: boolean }[] };
+    }>;
+    const checks = out.payload.qualityReview.deterministicChecks;
+    expect(checks.slice(0, 8).map((c) => c.id)).toEqual(["length", "hook-length", "hashtags", "banned-words", "placeholders", "markdown", "links", "emoji"]);
+    expect(checks.find((c) => c.id === "dashes")).toMatchObject({ passed: false });
+    expect(out.payload.qualityReview.passed).toBe(false);
+  });
+
   it("uses banned words from writing rules and tells the reviewer the check results", async () => {
     await upsertMemory(ctx.profileId, "writing/rules", "## Banned words\n- synergy", "USER");
     await openPost("Real synergy here.");

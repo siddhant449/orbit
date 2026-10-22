@@ -75,6 +75,13 @@ const BULLET = /^\s*[-•*]\s+\S/;
 const NUMBERED = /^\s*\d+[.)]\s+\S/;
 const isBullet = (line: string) => BULLET.test(line);
 const isNumbered = (line: string) => NUMBERED.test(line);
+export const isListLine = (line: string) => BULLET.test(line) || NUMBERED.test(line);
+
+/** Numerals, percentages and amounts as written ("40%", "$1,200"). List numbering ("1.") and "#1" are not numbers. */
+export function extractNumbers(text: string): string[] {
+  const body = text.split("\n").map((l) => l.replace(/^\s*(?:[-•*]|\d+[.)])\s+/, "")).join("\n");
+  return (body.match(NUMBER) ?? []).map((n) => n.trim());
+}
 
 /** Greedy word wrap at CHARS_PER_MOBILE_LINE; a word longer than a line is split by characters. */
 export function mobileLines(line: string): number {
@@ -173,7 +180,7 @@ function countDashes(lines: string[]): number {
 
 const HASHTAG = /(^|\s)#\p{L}[\p{L}\p{N}_]*/gu;
 const LINK = /https?:\/\/\S+|\bwww\.\S+/gi;
-const NUMBER = /[$€£]?\d[\d,]*(?:\.\d+)?(?:\s?(?:%|percent\b|k\b|m\b|x\b|×))?/gi;
+const NUMBER = /(?<![\p{L}\d#])[$€£]?\d[\d,]*(?:\.\d+)?(?:\s?(?:%|percent\b|k\b|m\b|x\b|×))?/giu;
 const CTA = /\b(comment|follow|dm me|repost|share this|subscribe|join|download|reply|book a|sign up|let me know|tell me|drop a|connect with|link in)\b/i;
 const RULE = /\b(never|always|don't|do not|must|should|rule|stop|start|ship|pick|choose|use|build|ask|write|cut|keep)\b/i;
 
@@ -244,8 +251,7 @@ export function measurePost(text: string): PostMetrics {
     close();
   }
 
-  const plain = lines.map((l) => l.replace(/^\s*(?:[-•*]|\d+[.)])\s+/, ""));
-  const numbers = (plain.join("\n").match(NUMBER) ?? []).map((n) => n.trim());
+  const numbers = extractNumbers(lines.join("\n"));
   const sentences = sentenceLengths(lines);
   const last = blocks.at(-1);
 

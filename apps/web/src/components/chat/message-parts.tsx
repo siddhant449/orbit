@@ -5,6 +5,7 @@ import { collapseToolRuns, parseProposal, type ChatUIMessage, type Proposal } fr
 import { cn } from "@brandloop/ui";
 import { DraftCard } from "./document-panel";
 import { ProposalCard } from "./proposal-card";
+import { ReviewCard, reviewChecksOf } from "./review-card";
 import { MemoryTag, memoryTagOf } from "./memory-tag";
 import { StepsDisclosure } from "./steps-disclosure";
 import type { ToolPartLike } from "./tool-row";
@@ -55,6 +56,10 @@ export function MessageParts({ message, streaming }: { message: ChatUIMessage; s
     const tag = memoryTagOf(p);
     return tag ? [{ key: i, ...tag }] : [];
   });
+  const reviews = (message.parts as (ToolPartLike & { toolCallId?: string })[]).flatMap((p, i) => {
+    const checks = reviewChecksOf(p);
+    return checks ? [{ key: p.toolCallId ?? String(i), checks }] : [];
+  });
   return (
     <>
       {items.map((it, i) => {
@@ -69,6 +74,9 @@ export function MessageParts({ message, streaming }: { message: ChatUIMessage; s
         return null;
       })}
       {draft && <DraftCard fallback={draft} />}
+      {reviews.map(({ key, checks }) => (
+        <ReviewCard key={key} checks={checks} />
+      ))}
       {proposals.map(({ toolCallId, proposal }) => (
         <ProposalCard key={toolCallId} toolCallId={toolCallId} proposal={proposal} />
       ))}

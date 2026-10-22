@@ -71,3 +71,23 @@ export function isToolError(output: unknown): boolean {
   }
   return false;
 }
+
+/** Plain names for the final review's checks (the 8 deterministic ones, then the writing checks). */
+export const CHECK_LABELS: Record<string, string> = {
+  length: "Length",
+  "hook-length": "Opening",
+  hashtags: "Hashtags",
+  "banned-words": "Banned words",
+  placeholders: "Placeholders",
+  markdown: "Plain text",
+  links: "Links",
+  emoji: "Emoji",
+  dashes: "Dashes",
+  postscript: "P.S.",
+  "rhetorical-opening": "Rhetorical opening",
+  "block-lines": "Block length",
+  "list-adjacency": "List spacing",
+  "number-provenance": "Numbers",
+  "date-provenance": "Dates",
+  "first-person": "Personal claims",
+};

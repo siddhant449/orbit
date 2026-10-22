@@ -2,7 +2,8 @@ import { tool } from "ai";
 import { z } from "zod";
 import type { TurnContext } from "../context";
 import { frameData, type DataSource } from "../data";
-import { bannedWordsFromRules, runDeterministicChecks } from "../specialists/checks";
+import { bannedWordsFromRules, mergeChecks, runDeterministicChecks, runWritingChecks } from "../specialists/checks";
+import { resolveRules } from "../writing/rules";
 import { stampEnvelope, type FinalReview, type HandoffEnvelope, type PostWriting } from "../specialists/envelope";
 import { buildGrounding, renderGrounding } from "../specialists/grounding";
 import { runSpecialist } from "../specialists/run";
@@ -70,7 +71,7 @@ export async function delegateWritingRun(
 }
 
 /**
- * The final review (design §6.3): the server runs the 8 deterministic checks on the current post first, tells the
+ * The final review (design §6.3): the server runs the 8 deterministic checks, then the writing checks for the user's hard rules, on the current post first, tells the
  * reviewer their results, then overwrites whatever the reviewer reported for them. Any failed check fails the review.
  */
 export async function delegateEditingRun(
@@ -89,7 +90,11 @@ export async function delegateEditingRun(
       writingStyleId: ctx.selections.writingStyleId,
       embedder: ctx.embedder,
     });
-    const checks = runDeterministicChecks(doc.text, { bannedWords: bannedWordsFromRules(grounding.writingRules) });
+    const effective = resolveRules({ userRulesMarkdown: grounding.writingRules, style: null, turn: {} });
+    const checks = mergeChecks(
+      runDeterministicChecks(doc.text, { bannedWords: bannedWordsFromRules(grounding.writingRules) }),
+      runWritingChecks(doc.text, effective, { postType: null, groundingText: null, researchDates: null, personalDetails: "allowed" }),
+    );
     const checkLines = checks.map((c) => `- ${c.id}: ${c.passed ? "passed" : "FAILED"} (${c.detail})`).join("\n");
     const res = await runSpecialist(ctx.ai, "final-review", {
       request: `${input.request}\n\nDeterministic checks, already run by the server (copy them into deterministicChecks as given):\n${checkLines}`,
