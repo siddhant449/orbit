@@ -57,7 +57,7 @@ export function AnalyticsOffline({ byRange, streak }: { byRange: Record<Range, L
           {!wrote && (
             <p className="text-[13px] text-text-2">
               Nothing saved yet. Every draft and edit you save shows up here, including drafts you later delete.{" "}
-              <Link href="/" className="text-accent-text underline-offset-4 hover:underline">
+              <Link href="/" className="text-accent-text underline underline-offset-4">
                 Start a draft
               </Link>
             </p>

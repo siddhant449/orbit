@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { clerk } from "@clerk/testing/playwright";
 import { expect, test } from "@playwright/test";
+import { resolveTestDatabaseUrl } from "../../../packages/db/src/test-db";
 
 const email = process.env.E2E_CLERK_USER_EMAIL;
 
@@ -12,8 +13,10 @@ test("strategy: sections render, mix sums to 100, tagline edit persists", async 
   await clerk.signIn({ page, emailAddress: email! });
   await page.goto("/");
 
+  // Seeds the e2e server's database: the isolated test database, never DATABASE_URL from .env.
   execFileSync("pnpm", ["--filter", "@brandloop/db", "exec", "tsx", "prisma/dev-seed-strategy.ts", email!], {
     stdio: "inherit",
+    env: { ...process.env, DATABASE_URL: resolveTestDatabaseUrl() },
   });
 
   await page.goto("/strategy");

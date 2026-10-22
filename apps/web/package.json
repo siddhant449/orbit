@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:e2e": "node scripts/dev-e2e.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",

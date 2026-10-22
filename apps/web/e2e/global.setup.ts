@@ -1,5 +1,7 @@
+import { execFileSync } from "node:child_process";
 import { clerk, clerkSetup } from "@clerk/testing/playwright";
 import { expect, test as setup } from "@playwright/test";
+import { resolveTestDatabaseUrl } from "../../../packages/db/src/test-db";
 
 /**
  * E2E_CLERK_USER_EMAIL must be a dedicated Clerk dev-instance test user, never a real account: this setup resets it.
@@ -9,11 +11,32 @@ import { expect, test as setup } from "@playwright/test";
  * left by an aborted run are deleted, "E2E profile …" profiles left by shell.spec are deleted, the default profile is
  * the current one, and memory lines left by memories.spec are deleted. Only one suite may use the test user at a time:
  * shell.spec switches the current profile, which every other spec reads. Specs seed anything else they need themselves (strategy.spec seeds its strategy).
+ *
+ * Before any of that, the server must prove it runs on the isolated test database (`pnpm dev:e2e`): the run stops
+ * unless GET /api/dev/db-name names a `_test` database. The test database starts empty, so the preset writing styles
+ * are seeded into it (idempotent); the account itself is created by the first signed-in visit.
  */
 const email = process.env.E2E_CLERK_USER_EMAIL;
 const E2E_PROFILE = /^E2E profile /;
 
 setup.describe.configure({ mode: "serial" });
+
+setup("server uses the isolated _test database", async ({ request }) => {
+  const res = await request.get("/api/dev/db-name");
+  expect(
+    res.ok(),
+    `GET /api/dev/db-name: ${res.status()}. Start the app with \`pnpm --filter @brandloop/web dev:e2e\` (test database, AI_MOCK_MODEL=1), not \`pnpm dev\`.`,
+  ).toBe(true);
+  const { database, isTest } = (await res.json()) as { database: string; isTest: boolean };
+  if (!isTest) throw new Error(`Refusing to run e2e: the app server is connected to "${database}", not a _test database.`);
+});
+
+setup("test database: preset writing styles", async () => {
+  execFileSync("pnpm", ["--filter", "@brandloop/db", "exec", "tsx", "prisma/seed-test.ts"], {
+    stdio: "inherit",
+    env: { ...process.env, DATABASE_URL: resolveTestDatabaseUrl() },
+  });
+});
 
 setup("clerk testing token", async () => {
   await clerkSetup();
