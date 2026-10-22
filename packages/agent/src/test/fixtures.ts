@@ -60,6 +60,7 @@ export async function testContext(over: Partial<TurnContext> = {}): Promise<Turn
     chatId: "chat_test",
     runId: "run_test",
     requestMessageId: "msg_test",
+    userText: "",
     taskId: "task_test",
     ai: fakeAi(),
     embedder: fakeEmbedder(),

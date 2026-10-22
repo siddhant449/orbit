@@ -1,4 +1,5 @@
 import type { AiClient } from "@brandloop/ai";
+import { renderBlocks, type WriterBlock } from "./writing/render";
 import { simulateReadableStream, type LanguageModel } from "ai";
 import { MockLanguageModelV4 } from "ai/test";
 
@@ -139,6 +140,9 @@ function route(opts: CallOptions): ScriptStep {
 
   const last = results.at(-1);
   if (last) {
+    if (last.toolName === "delegateWriting" && /\[e2e:needs-facts\]/.test(text)) {
+      return { text: `Before I write this I need two facts only you have. ${SCRIPTED_QUESTIONS.map((q, i) => `${i + 1}. ${q}`).join(" ")}` };
+    }
     if (last.toolName === "delegateWriting") {
       return call("createDocument", { title: SCRIPTED_TITLE, kind: "text", specialistHandoffToolCallId: last.toolCallId });
     }
@@ -163,7 +167,13 @@ function route(opts: CallOptions): ScriptStep {
   }
   if (firstLine && /\breview\b/i.test(text)) return call("delegateEditing", { request: text.slice(0, 4_000), specialty: "final-review" });
   if (/\bdraft\b/i.test(text)) {
-    return call("delegateWriting", { request: `Write a short LinkedIn post for the user. Their request: ${text.slice(0, 2_000)}`, specialty: "post" });
+    return call("delegateWriting", {
+      request: `Write a short LinkedIn post for the user. Their request: ${text.slice(0, 2_000)}`,
+      specialty: "post",
+      personalDetails: /\b(without|skip|no) personal (details|anecdotes)\b/i.test(text) ? "none" : null,
+      overrides: null,
+      chosenHook: null,
+    });
   }
   if (/\bmarkdown\b/i.test(text)) return { text: MARKDOWN_REPLY, ...(/\bslowly\b/i.test(text) && { chunkDelayMs: SLOW_CHUNK_MS }) };
   return { text: "Mock reply." };
@@ -182,11 +192,12 @@ export function createScriptedChatModel(opts: { chunkDelayMs?: number } = {}): L
 
 /** The post the mock writing specialist always returns. */
 export const SCRIPTED_TITLE = "MVP versus POC";
-export const SCRIPTED_DRAFT = [
-  "Most founders build a proof of concept when they need a minimum viable product.",
-  "A POC answers one question: can this work? An MVP answers a harder one: will anyone use it?",
-  "Build the POC in a week. Ship the MVP to ten real users. Then decide.",
-].join("\n\n");
+export const SCRIPTED_BLOCKS: WriterBlock[] = [
+  { kind: "hook", lines: ["Most founders build a proof of concept when they need a minimum viable product."] },
+  { kind: "bullets", lines: ["A POC and an MVP answer different questions:", "A POC asks: can this work?", "An MVP asks: will anyone use it?"] },
+  { kind: "close", lines: ["Build the POC in a week. Ship the MVP to ten real users. Then decide."] },
+];
+export const SCRIPTED_DRAFT = renderBlocks(SCRIPTED_BLOCKS, { bullet: "-", numbered: true });
 
 /** Canned specialist outputs, tried in order against the requested schema. */
 const CANNED: unknown[] = [
@@ -201,8 +212,10 @@ const CANNED: unknown[] = [
     payload: {
       readiness: "ready",
       title: SCRIPTED_TITLE,
-      hook: "Most founders build a proof of concept when they need a minimum viable product.",
-      draft: SCRIPTED_DRAFT,
+      postType: "framework",
+      blocks: SCRIPTED_BLOCKS,
+      facts: [],
+      missingFacts: [],
       clarifyingQuestion: null,
     },
   },
@@ -263,13 +276,43 @@ export const SCRIPTED_STYLE = {
 };
 CANNED.push(SCRIPTED_STYLE);
 
+/** Keyword routes, tried before CANNED: one schema can return a different canned output per scenario. */
+export const SCRIPTED_QUESTIONS = ["Who was your first hire, and when did you hire them?", "What changed for the team after they joined?"];
+const ROUTES: { match: RegExp; output: unknown }[] = [
+  {
+    match: /\[e2e:needs-facts\]/,
+    output: {
+      summary: "The post needs facts only the author has.",
+      findings: [],
+      recommendation: "Ask the user for the missing facts.",
+      missingInput: SCRIPTED_QUESTIONS,
+      confidence: "low",
+      parentAction: "ask-user",
+      payload: {
+        readiness: "needs-user-input",
+        title: "Your first hire",
+        postType: "story",
+        blocks: [],
+        facts: [],
+        missingFacts: SCRIPTED_QUESTIONS,
+        clarifyingQuestion: SCRIPTED_QUESTIONS[0],
+      },
+    },
+  },
+];
+
 /** A specialist client for mock mode: `text` names chats, `json` returns the first canned output the schema accepts. */
 export function scriptedAi(): AiClient {
   return {
     async text() {
       return "Mock chat";
     },
-    async json({ schema }) {
+    async json({ schema, prompt }) {
+      for (const route of ROUTES) {
+        if (!route.match.test(prompt)) continue;
+        const parsed = schema.safeParse(route.output);
+        if (parsed.success) return parsed.data;
+      }
       for (const candidate of CANNED) {
         const parsed = schema.safeParse(candidate);
         if (parsed.success) return parsed.data;

@@ -3,7 +3,8 @@ import { NoObjectGeneratedError } from "ai";
 import { z } from "zod";
 import { defuseTags } from "../data";
 import { isAbort } from "../tools/run";
-import { PAYLOADS, specialistOutputSchema, type OutputOf, type SpecialistKind } from "./envelope";
+import { renderBlocks, type WriterBlock } from "../writing/render";
+import { PAYLOADS, PostWritingModelPayload, specialistOutputSchema, type OutputOf, type SpecialistKind } from "./envelope";
 import { RETRY_REMINDER, SKILL_NOTES, SPECIALIST_SYSTEM } from "./prompts";
 
 export type SpecialistResult<O> = { ok: true; output: O } | { ok: false; reason: string };
@@ -16,14 +17,29 @@ type SpecialistDocument = { id: string; title: string; version: number; text: st
  */
 const MODEL_PAYLOADS: Record<SpecialistKind, z.ZodTypeAny> = {
   ...PAYLOADS,
-  "post-writing": z.object({
-    readiness: z.enum(["ready", "needs-user-input"]),
-    title: z.string(),
-    hook: z.string(),
-    draft: z.string(),
-    clarifyingQuestion: z.string().nullable(),
-  }),
+  "post-writing": PostWritingModelPayload,
 };
+
+const MAX_BLOCKS = 16;
+const MAX_FACTS = 12;
+const MAX_MISSING = 5;
+
+/**
+ * The server renders the post from the writer's blocks (design §4.1): `draft` is the rendered text and `hook` the first
+ * block, so list items are always adjacent. A payload that already carries `draft` (older posts, tests) is left as it is.
+ */
+function derivePost(raw: unknown, render: { bullet: "-" | "•"; numbered: boolean }): unknown {
+  const out = raw as { payload?: Record<string, unknown> } | null;
+  const p = out?.payload;
+  if (!p || !Array.isArray(p.blocks)) return raw;
+  const blocks = p.blocks as WriterBlock[];
+  if (blocks.length > MAX_BLOCKS || (p.facts as unknown[] | undefined)?.length! > MAX_FACTS || (p.missingFacts as unknown[] | undefined)?.length! > MAX_MISSING) {
+    throw new SoftFailure("too many blocks, facts or missing facts");
+  }
+  if (typeof p.draft === "string" && p.draft) return raw;
+  const first = blocks[0];
+  return { ...out, payload: { ...p, draft: renderBlocks(blocks, render), hook: (first ? first.lines.join("\n").trim() : "").slice(0, 200) } };
+}
 
 const MODEL_ALIAS: Record<SpecialistKind, ModelAlias> = {
   "post-writing": "generate",
@@ -81,6 +97,8 @@ export async function runSpecialist<K extends SpecialistKind>(
     skills: string[];
     /** The tool call's signal: a stop or the turn deadline cancels the call and skips any retry. */
     abortSignal?: AbortSignal;
+    /** How the post writer's blocks are rendered (the style's bullet glyph). */
+    render?: { bullet: "-" | "•"; numbered: boolean };
   },
 ): Promise<SpecialistResult<OutputOf<K>>> {
   const signal = input.abortSignal;
@@ -99,7 +117,8 @@ export async function runSpecialist<K extends SpecialistKind>(
         schema: asked,
         abortSignal: signal,
       });
-      const output = strict.parse(raw) as OutputOf<K>;
+      const prepared = kind === "post-writing" ? derivePost(raw, input.render ?? { bullet: "-", numbered: true }) : raw;
+      const output = strict.parse(prepared) as OutputOf<K>;
       const empty = emptiness(kind, output);
       if (empty) throw new SoftFailure(empty);
       return { ok: true, output };

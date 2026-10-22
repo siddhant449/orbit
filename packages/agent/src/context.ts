@@ -11,6 +11,8 @@ export type TurnContext = {
   chatId: string;
   runId: string;
   requestMessageId: string;
+  /** The user's own words in this turn. Only this text can unlock a one-turn rule override; tool output never does. */
+  userText: string;
   taskId: string;
   ai: AiClient;
   embedder: Embedder | null;

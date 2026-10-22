@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { describe, expect, it } from "vitest";
 import { EditResultSchema } from "./specialists/editing";
-import { FinalReviewPayload, PostWritingPayload, specialistOutputSchema } from "./specialists/envelope";
+import { FinalReviewPayload, PostWritingModelPayload, PostWritingPayload, specialistOutputSchema } from "./specialists/envelope";
+import { renderBlocks, type WriterBlock } from "./writing/render";
 import { ExtractedStyleSchema } from "@brandloop/ai";
 import { createScriptedChatModel, SCRIPTED_DRAFT, SCRIPTED_IDEAS, SCRIPTED_SLIDES, SCRIPTED_STYLE, scriptedAi, scriptedModel } from "./mock";
 
@@ -142,8 +143,10 @@ describe("scriptedAi", () => {
     expect(await ai.text({ model: "extract", system: "s", prompt: "p" })).toBe("Mock chat");
     const out = await ai.json({ model: "generate", system: "s", prompt: "p", schema: z.object({ ok: z.boolean() }) });
     expect(out).toEqual({ ok: true });
-    const post = await ai.json({ model: "generate", system: "s", prompt: "p", schema: specialistOutputSchema(PostWritingPayload) });
-    expect(post.payload).toMatchObject({ readiness: "ready", draft: SCRIPTED_DRAFT });
+    const post = await ai.json({ model: "generate", system: "s", prompt: "p", schema: specialistOutputSchema(PostWritingModelPayload) });
+    expect(post.payload).toMatchObject({ readiness: "ready", postType: "framework" });
+    expect(renderBlocks((post.payload as unknown as { blocks: WriterBlock[] }).blocks, { bullet: "-", numbered: true })).toBe(SCRIPTED_DRAFT);
+    expect(SCRIPTED_DRAFT).toContain("\n- A POC asks");
     await expect(
       ai.json({ model: "generate", system: "s", prompt: "p", schema: z.object({ impossible: z.literal("never") }) }),
     ).rejects.toThrow(/no canned output/i);

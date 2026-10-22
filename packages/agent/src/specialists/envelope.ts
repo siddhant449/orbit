@@ -1,5 +1,6 @@
 import { listMessages } from "@brandloop/db";
 import { createHash } from "node:crypto";
+import { PostTypeSchema } from "@brandloop/ai/style";
 import { z } from "zod";
 import type { TurnContext } from "../context";
 
@@ -14,12 +15,36 @@ export type SpecialistKind = (typeof SPECIALIST_KINDS)[number];
 export const CONFIDENCE = ["low", "medium", "high"] as const;
 export const PARENT_ACTIONS = ["create-document", "update-document", "respond", "ask-user"] as const;
 
+export const BLOCK_KINDS = ["hook", "prose", "bullets", "numbered", "close", "sources"] as const;
+export const FACT_SOURCES = ["request", "knowledge", "memory", "research", "general"] as const;
+const BlockSchema = z.object({ kind: z.enum(BLOCK_KINDS), lines: z.array(z.string()) });
+const FactSchema = z.object({ text: z.string(), source: z.enum(FACT_SOURCES), ref: z.string().nullable() });
+
+/**
+ * What the post writer returns (design §3.2, §4.1): blocks, not text. The server renders `draft` and `hook` from the blocks.
+ * Every key is required and nullable-not-optional for OpenAI strict mode; counts are checked after parsing.
+ */
+export const PostWritingModelPayload = z.object({
+  readiness: z.enum(["ready", "needs-user-input"]),
+  title: z.string(),
+  postType: PostTypeSchema,
+  blocks: z.array(BlockSchema),
+  facts: z.array(FactSchema),
+  missingFacts: z.array(z.string()),
+  clarifyingQuestion: z.string().nullable(),
+});
+
 export const PostWritingPayload = z.object({
   readiness: z.enum(["ready", "needs-user-input"]),
   title: z.string().max(120),
   hook: z.string().max(200),
   draft: z.string().max(3_500),
   clarifyingQuestion: z.string().nullable(),
+  // Added by the writing engine; absent on posts written before it, so optional here.
+  postType: PostTypeSchema.optional(),
+  blocks: z.array(BlockSchema).max(16).optional(),
+  facts: z.array(FactSchema).max(12).optional(),
+  missingFacts: z.array(z.string()).max(5).optional(),
 });
 export type PostWriting = z.infer<typeof PostWritingPayload>;
 
@@ -88,7 +113,7 @@ export type HandoffEnvelope<P = unknown> = SpecialistOutput<P> & {
   taskId: string;
   createdAt: string;
   requestDigest: string;
-  sourceRevisions: { document?: { id: string; version: number } };
+  sourceRevisions: { document?: { id: string; version: number }; style?: { voiceStyleId: string; profileVersion: number } };
 };
 
 /** sha256 of `specialist + "\n" + request`, hex. */
@@ -99,7 +124,14 @@ export function requestDigest(kind: SpecialistKind, request: string): string {
 export function stampEnvelope<P>(
   kind: SpecialistKind,
   output: SpecialistOutput<P>,
-  meta: { toolCallId: string; taskId: string; request: string; document: { id: string; version: number } | null; now: Date },
+  meta: {
+    toolCallId: string;
+    taskId: string;
+    request: string;
+    document: { id: string; version: number } | null;
+    style?: { voiceStyleId: string; profileVersion: number } | null;
+    now: Date;
+  },
 ): HandoffEnvelope<P> {
   return {
     ...output,
@@ -109,7 +141,10 @@ export function stampEnvelope<P>(
     taskId: meta.taskId,
     createdAt: meta.now.toISOString(),
     requestDigest: requestDigest(kind, meta.request),
-    sourceRevisions: meta.document ? { document: { id: meta.document.id, version: meta.document.version } } : {},
+    sourceRevisions: {
+      ...(meta.document ? { document: { id: meta.document.id, version: meta.document.version } } : {}),
+      ...(meta.style ? { style: meta.style } : {}),
+    },
   };
 }
 
@@ -121,7 +156,10 @@ const StoredEnvelopeSchema = specialistOutputSchema(z.unknown()).extend({
   taskId: z.string(),
   createdAt: z.string(),
   requestDigest: z.string(),
-  sourceRevisions: z.object({ document: z.object({ id: z.string(), version: z.number() }).optional() }),
+  sourceRevisions: z.object({
+    document: z.object({ id: z.string(), version: z.number() }).optional(),
+    style: z.object({ voiceStyleId: z.string(), profileVersion: z.number() }).optional(),
+  }),
 });
 
 const DELEGATE_PART = /^tool-delegate[A-Z]\w*$/;

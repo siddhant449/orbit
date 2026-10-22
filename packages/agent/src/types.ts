@@ -65,6 +65,8 @@ const HandoffSummarySchema = z.object({
   parentAction: z.string().nullable(),
   requestDigest: z.string(),
   hasMissingInput: z.boolean(),
+  /** The facts the writer asked for (Task W5); empty for older stored tasks. */
+  missingFacts: z.array(z.string()).default([]),
 });
 
 /** The task ledger stored on every assistant message's context (design §4, §7.1). */
@@ -80,6 +82,8 @@ export const ActiveTaskSchema = z.object({
   completedActions: z.array(z.string()),
   recentDirections: z.array(z.object({ text: z.string(), messageId: z.string() })),
   pendingQuestion: z.string().nullable(),
+  /** Facts the writer is waiting for; cleared once the task moves on. Older stored tasks parse as empty. */
+  missingFacts: z.array(z.string()).default([]),
   flow: z.object({ id: z.string(), step: z.string() }).nullable(),
   pendingPicker: z.object({ id: z.string(), question: z.string() }).nullable(),
   updatedAt: z.string(),

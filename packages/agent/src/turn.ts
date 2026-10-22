@@ -176,6 +176,9 @@ function handoffSummaries(handoffs: TurnContext["handoffs"]): TurnOutcome["hando
       parentAction: h.parentAction,
       requestDigest: h.requestDigest,
       hasMissingInput: h.missingInput.length > 0,
+      missingFacts: Array.isArray((h.payload as { missingFacts?: unknown } | null)?.missingFacts)
+        ? ((h.payload as { missingFacts: unknown[] }).missingFacts.filter((f): f is string => typeof f === "string"))
+        : [],
     };
   });
 }
@@ -425,6 +428,7 @@ export async function runChatTurn(
       chatId,
       runId,
       requestMessageId,
+      userText,
       // Continue the active task's id, so tools and the ledger agree on it.
       taskId: prevTask?.status === "active" ? prevTask.taskId : newId(),
       ai: deps.ai,

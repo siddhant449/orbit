@@ -1,13 +1,20 @@
-import type { Embedder } from "@brandloop/ai";
+import { StyleProfileSchema, type Embedder } from "@brandloop/ai";
 import { getSelectedVoice, hybridSearch, listMemory, prisma } from "@brandloop/db";
 import { defuseTags, oneLine } from "../data";
+import { renderStyleBlock, STYLE_BUDGET } from "../writing/inject";
+import { resolveRules, type EffectiveRules, type TurnOverrides } from "../writing/rules";
 
 /**
  * What a specialist knows about the user (design §6.1, §7.3). The server injects it deterministically,
  * so drafts always carry the voice; the specialist itself has no tools.
  */
 export type Grounding = {
+  /** The style's prose guide (or the voice/style memory): the legacy form, kept for readers without a compiled profile. */
   voice: string;
+  /** The budgeted style block the writer receives, and which compiled profile version it came from (null when none). */
+  style: { block: string; ref: { voiceStyleId: string; profileVersion: number } | null; bullet: "-" | "•" };
+  /** The rules in force this turn: the user's hard rules, soft rules, the style's targets, and what was dropped. */
+  rules: EffectiveRules;
   writingRules: string;
   identity: string;
   strategy: string;
@@ -15,7 +22,7 @@ export type Grounding = {
 };
 
 export const GROUNDING_CAPS = {
-  voice: 6_000,
+  style: STYLE_BUDGET,
   writingRules: 4_000,
   identity: 6_000,
   strategy: 3_000,
@@ -70,18 +77,19 @@ async function searchedKnowledge(profileId: string, request: string, embedder: E
     .map((c) => ({ id: c.sourceId, title: titles.get(c.sourceId)!, text: c.text.slice(0, GROUNDING_CAPS.knowledgeItem) }));
 }
 
-/** The voice guide: the composer's selected style (own or preset), then the profile's saved voice, then voice/style memory. */
-async function voiceGuide(profileId: string, writingStyleId: string | null, memoryVoice: string): Promise<string> {
+type StyleRow = { id: string; guide: string; styleProfile: unknown; profileVersion: number };
+
+/** The composer's selected style (own or preset), then the profile's saved one; null when neither exists. */
+async function styleRow(profileId: string, writingStyleId: string | null): Promise<StyleRow | null> {
   if (writingStyleId) {
     const style = await prisma.voiceStyle.findFirst({
       where: { id: writingStyleId, OR: [{ profileId }, { profileId: null }] },
-      select: { guide: true },
+      select: { id: true, guide: true, styleProfile: true, profileVersion: true },
     });
-    if (style?.guide.trim()) return style.guide;
+    if (style && (style.guide.trim() || style.styleProfile)) return style;
   }
   const saved = await getSelectedVoice(profileId);
-  if (saved?.guide.trim()) return saved.guide;
-  return memoryVoice;
+  return saved && (saved.guide.trim() || saved.styleProfile) ? saved : null;
 }
 
 export async function buildGrounding(input: {
@@ -90,18 +98,30 @@ export async function buildGrounding(input: {
   knowledgeIds: string[];
   writingStyleId: string | null;
   embedder: Embedder | null;
+  /** Overrides already accepted for this turn (see acceptOverrides). */
+  turn?: Partial<TurnOverrides>;
 }): Promise<Grounding> {
   const { profileId } = input;
   const docs = await listMemory(profileId);
   const memory = (key: string) => docs.find((d) => d.key === key)?.content.trim() ?? "";
-  const [voice, knowledge] = await Promise.all([
-    voiceGuide(profileId, input.writingStyleId, memory("voice/style")),
+  const [row, knowledge] = await Promise.all([
+    styleRow(profileId, input.writingStyleId),
     input.knowledgeIds.length > 0
       ? selectedKnowledge(profileId, input.knowledgeIds)
       : searchedKnowledge(profileId, input.request, input.embedder),
   ]);
+  const parsed = row ? StyleProfileSchema.safeParse(row.styleProfile) : null;
+  const profile = parsed?.success ? parsed.data : null;
+  const voice = row?.guide.trim() ? row.guide : memory("voice/style");
+  const rules = resolveRules({ userRulesMarkdown: memory("writing/rules"), style: profile, turn: input.turn ?? {} });
   return {
     voice,
+    style: {
+      block: renderStyleBlock(profile, rules, { postType: null, budget: STYLE_BUDGET, legacyGuide: voice }),
+      ref: row && profile ? { voiceStyleId: row.id, profileVersion: row.profileVersion } : null,
+      bullet: profile?.referencePosts.some((r) => /^\s*•/m.test(r.text)) ? "•" : "-",
+    },
+    rules,
     writingRules: memory("writing/rules"),
     identity: IDENTITY_KEYS.map(memory).filter(Boolean).join("\n\n"),
     strategy: memory("strategy/themes"),
@@ -131,10 +151,18 @@ const block = (tag: string, text: string, max: number) => `<${tag}>\n${defuseTag
 export function renderGrounding(g: Grounding): string {
   return [
     GROUNDING_PREAMBLE,
-    block("voice", g.voice, GROUNDING_CAPS.voice),
+    block("style", g.style.block, GROUNDING_CAPS.style),
     block("writing_rules", g.writingRules, GROUNDING_CAPS.writingRules),
     block("identity", g.identity, GROUNDING_CAPS.identity),
     block("strategy", g.strategy, GROUNDING_CAPS.strategy),
     `<knowledge>\n${knowledgeBlock(g.knowledge)}\n</knowledge>`,
   ].join("\n");
+}
+
+/**
+ * The text a number in the post may be found in: the user's own material and the request, never the style block (its
+ * example posts carry numbers that are not the user's).
+ */
+export function provenanceText(g: Grounding, request: string): string {
+  return [request, g.writingRules, g.identity, g.strategy, ...g.knowledge.map((k) => k.text)].join("\n");
 }

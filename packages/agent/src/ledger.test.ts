@@ -26,6 +26,7 @@ const h = (over: Partial<ActiveTask["handoffs"][number]> = {}): ActiveTask["hand
   parentAction: "create-document",
   requestDigest: "abc",
   hasMissingInput: false,
+  missingFacts: [],
   ...over,
 });
 
@@ -122,5 +123,13 @@ describe("renderActiveTask", () => {
     expect(s).toContain("artifact: d1 | Hiring");
     expect(s).toContain("latest request: Write a post about hiring slowly");
     expect(s).toContain("pending question: Which story?");
+  });
+
+  it("keeps the writer's missing facts while it waits, and clears them afterwards", () => {
+    const waiting = nextActiveTask(null, outcome({ handoffs: [h({ readiness: "needs-user-input", hasMissingInput: true, missingFacts: ["Who?", "When?"] })] }), () => "t1");
+    expect(waiting.missingFacts).toEqual(["Who?", "When?"]);
+    expect(renderActiveTask(waiting)).toContain("missing facts: Who? | When?");
+    const done = nextActiveTask(waiting, outcome({ toolResults: [{ toolName: "createDocument", ok: true }] }), () => "t2");
+    expect(done.missingFacts).toEqual([]);
   });
 });
