@@ -2,9 +2,11 @@
 
 import { lazy, memo, Suspense } from "react";
 import { collapseToolRuns, parseProposal, type ChatUIMessage, type Proposal } from "@brandloop/agent/client";
+import type { EditVisualOutput, ProposeVisualOutput, SuggestVisualsOutput } from "@brandloop/agent";
 import { cn } from "@brandloop/ui";
 import { DraftCard } from "./document-panel";
 import { ProposalCard } from "./proposal-card";
+import { VisualConceptCards, VisualEditStatus, VisualProposalCard } from "./visual-cards";
 import { MemoryTag, memoryTagOf } from "./memory-tag";
 import { StepsDisclosure } from "./steps-disclosure";
 import type { ToolPartLike } from "./tool-row";
@@ -73,6 +75,9 @@ export function MessageParts({ message, streaming }: { message: ChatUIMessage; s
       {proposals.map(({ toolCallId, proposal }) => (
         <ProposalCard key={toolCallId} toolCallId={toolCallId} proposal={proposal} />
       ))}
+      {visualCards(message.parts as Part[]).map(({ key, node }) => (
+        <div key={key}>{node}</div>
+      ))}
       {memories.map(({ key, area, change }) => (
         <MemoryTag key={key} area={area} change={change} />
       ))}
@@ -112,6 +117,20 @@ function proposalsIn(parts: Part[]): { toolCallId: string; proposal: Proposal }[
     if (p.type !== "tool-proposeDocumentEdits" || p.state !== "output-available" || typeof p.toolCallId !== "string") continue;
     const proposal = parseProposal(p.output);
     if (proposal) out.push({ toolCallId: p.toolCallId, proposal });
+  }
+  return out;
+}
+
+
+/** Image cards from completed image tool calls, in order. Their outputs are objects on success and `Failed:` text otherwise. */
+function visualCards(parts: Part[]): { key: string; node: React.ReactNode }[] {
+  const out: { key: string; node: React.ReactNode }[] = [];
+  for (const p of parts as (ToolPartLike & { toolCallId?: string })[]) {
+    if (p.state !== "output-available" || typeof p.output !== "object" || p.output === null) continue;
+    const key = String(p.toolCallId ?? out.length);
+    if (p.type === "tool-suggestVisuals") out.push({ key, node: <VisualConceptCards output={p.output as SuggestVisualsOutput} /> });
+    else if (p.type === "tool-proposeVisual") out.push({ key, node: <VisualProposalCard output={p.output as ProposeVisualOutput} /> });
+    else if (p.type === "tool-editVisual") out.push({ key, node: <VisualEditStatus output={p.output as EditVisualOutput} /> });
   }
   return out;
 }

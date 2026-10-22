@@ -1,6 +1,8 @@
 import { after } from "next/server";
 import { createAiClient, createEmbedder, getModel, webSearchTool } from "@brandloop/ai";
 import { fakeEmbedder } from "@brandloop/ai/testing";
+import { visualsEnabled } from "@/lib/visuals/deps";
+import { visualsToolDeps } from "@/lib/visuals/chat-tools";
 import { createScriptedChatModel, getRunRegistry, scriptedAi, type ChatDeps } from "@brandloop/agent";
 
 /**
@@ -25,7 +27,7 @@ function afterResponse(fn: () => Promise<void>): void {
 
 /** The chat turn's dependencies for this request. Building them never reads the API key. */
 export function getChatDeps(): ChatDeps {
-  const base = { registry: getRunRegistry(), after: afterResponse };
+  const base = { registry: getRunRegistry(), after: afterResponse, visuals: visualsEnabled() ? visualsToolDeps : null };
   if (isMockMode()) {
     const pace = Number(process.env.AI_MOCK_CHUNK_MS);
     const model = createScriptedChatModel(Number.isFinite(pace) && pace > 0 ? { chunkDelayMs: pace } : {});

@@ -1,9 +1,9 @@
 import { beginEdit, getTheme, getVisual, listVersions, revertVisual, VisualError } from "@brandloop/db";
-import { LOGO_DEFAULT, checkVisualRequest } from "@brandloop/visuals";
+import { LOGO_DEFAULT } from "@brandloop/visuals";
 import { z } from "zod";
 import { enqueue } from "@/lib/jobs";
-import { getVisualDeps, visualsEnabled } from "./deps";
 import { currentProfile, fail, notFound, visualJson } from "./handlers";
+import { startVisualEdit } from "./start-edit";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -31,22 +31,15 @@ const Edit = z.object({ prompt: z.string().trim().min(1).max(1_000), requestId: 
 export async function editHandler(request: Request, { params }: Ctx): Promise<Response> {
   const profile = await currentProfile();
   if (!profile) return notFound();
-  if (!visualsEnabled()) return fail(503, "Image editing is paused right now.", { code: "visuals_disabled" });
   const parsed = Edit.safeParse(await request.json().catch(() => undefined));
   if (!parsed.success) return fail(400, "Describe the change you want.");
   const id = (await params).id;
-  if (!(await getVisual(profile.id, id))) return notFound();
-
-  const deps = getVisualDeps();
-  const verdict = await checkVisualRequest(deps.ai, parsed.data.prompt, { log: deps.log });
-  if (!verdict.allowed) return fail(422, verdict.message, { code: "refused", category: verdict.category });
-
-  try {
-    await beginEdit(profile.id, id, "edit", { instruction: parsed.data.prompt });
-  } catch (err) {
-    return fromError(err);
+  const started = await startVisualEdit(profile.id, id, parsed.data.prompt, parsed.data.requestId);
+  if (!started.ok) {
+    if (started.status === 404) return notFound();
+    const message = started.message.charAt(0).toUpperCase() + started.message.slice(1);
+    return fail(started.status, message, { code: started.code, ...(started.category ? { category: started.category } : {}) });
   }
-  await enqueue("visual.edit", { visualId: id }, { dedupeId: `visual:${id}:edit:${parsed.data.requestId}` });
   return reply(profile.id, id, 202);
 }
 

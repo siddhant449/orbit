@@ -26,7 +26,7 @@ import {
   type UIMessageStreamWriter,
 } from "ai";
 import { randomUUID } from "node:crypto";
-import type { TurnContext } from "./context";
+import type { TurnContext, VisualsToolDeps } from "./context";
 import { windowHistory } from "./history";
 import { nextActiveTask, type TurnOutcome } from "./ledger";
 import { LIMITS } from "./limits";
@@ -46,6 +46,8 @@ export type ChatDeps = {
   /** Runs work after the response is sent (Next's `after`). */
   after: (fn: () => Promise<void>) => void;
   webSearchTool?: Tool | null;
+  /** Image tools (suggest, propose, edit). Null or absent: the tools are not offered. */
+  visuals?: VisualsToolDeps | null;
   now?: () => Date;
   generateId?: () => string;
   /** Whole-turn deadline; past it the turn is aborted and its partial reply saved. Default 285 s (route max 300 s). */
@@ -439,6 +441,7 @@ export async function runChatTurn(
       handoffs: new Map(),
       documentRef: { current: await getChatDocument(profileId, chatId) },
       documentContext: body.documentContext ?? null,
+      visuals: deps.visuals ?? null,
       now,
     };
     const tools = tagToolErrors(buildTools(ctx, { webSearchTool: deps.webSearchTool }));

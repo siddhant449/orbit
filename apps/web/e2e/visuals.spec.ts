@@ -212,3 +212,53 @@ test("attach to a post: the draft follows edits and reverts, survives a reload, 
     await page.request.delete(`/api/chat/${chatId}`).catch(() => {});
   }
 });
+
+test("chat: suggest images -> cards -> make one (1 credit) -> image appears -> ask for an edit in chat", async ({ page }) => {
+  await signIn(page);
+  const box = page.getByLabel("Message", { exact: true });
+  await box.fill("Draft a short LinkedIn post about pricing");
+  await box.press("Enter");
+  await expect(page).toHaveURL(/\/chat\/[0-9a-f-]{36}$/, { timeout: 30_000 });
+  const chatId = /\/chat\/([0-9a-f-]{36})$/.exec(page.url())![1]!;
+  try {
+    await expect(page.getByText("Your draft is open on the right.")).toBeVisible({ timeout: 45_000 });
+    const before = (await api(page, "/api/credits")).json.balance as number;
+
+    // The assistant suggests three ideas and spends nothing.
+    await box.fill("Suggest some images for this post.");
+    await box.press("Enter");
+    const ideas = page.locator("[data-visual-concept]");
+    await expect(ideas).toHaveCount(3, { timeout: 45_000 });
+    expect((await api(page, "/api/credits")).json.balance).toBe(before);
+
+    // Reviewing a prompt is free; making the image is the click that costs a credit.
+    await ideas.first().getByRole("button", { name: "Review prompt" }).click();
+    await expect(ideas.first().getByLabel(/Prompt \(editing it is free\)/)).toBeVisible();
+    await ideas.first().getByRole("button", { name: "Make image · 1 credit" }).click();
+
+    // First image for this profile: confirm brand colours, which re-sends the request.
+    const confirm = ideas.first().locator("[data-brand-confirm]");
+    await expect(confirm).toBeVisible({ timeout: 30_000 });
+    expect((await api(page, "/api/credits")).json.balance).toBe(before);
+    await confirm.getByRole("button", { name: "Skip colours" }).click();
+
+    const result = ideas.first().locator("[data-visual-result]");
+    await expect(result).toBeVisible({ timeout: 60_000 });
+    await expect(result.locator("img")).toHaveJSProperty("naturalWidth", 1080, { timeout: 15_000 });
+    await expect(ideas.first()).toContainText("Added to your post.");
+    expect((await api(page, "/api/credits")).json.balance).toBe(before - 1);
+
+    // An edit asked for in chat is free and shows the new image.
+    await box.fill("Make the background navy");
+    await box.press("Enter");
+    const edit = page.locator("[data-visual-edit]");
+    await expect(edit).toBeVisible({ timeout: 45_000 });
+    await expect(edit).toContainText("Updated.", { timeout: 60_000 });
+    expect((await api(page, "/api/credits")).json.balance).toBe(before - 1);
+  } finally {
+    const list = (await api(page, "/api/visuals")).json?.items as { id: string }[] | undefined;
+    for (const v of list ?? []) await api(page, `/api/visuals/${v.id}`, "DELETE");
+    await api(page, "/api/brand-theme", "DELETE");
+    await page.request.delete(`/api/chat/${chatId}`).catch(() => {});
+  }
+});

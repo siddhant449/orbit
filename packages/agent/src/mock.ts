@@ -105,6 +105,9 @@ const AFTER_TOOL: Record<string, string> = {
   proposeDocumentEdits: "Here is a punchier opening. Apply it if you like it.",
   updateDocument: "Done. The shorter version is in the panel.",
   delegateEditing: "The review is ready.",
+  suggestVisuals: "Here are three image ideas for your post.",
+  proposeVisual: "Here is the image. Check the prompt, then make it.",
+  editVisual: "On it. The new image will appear in the panel.",
 };
 
 /** A formatted reply for exercising the chat's markdown rendering offline. */
@@ -143,6 +146,13 @@ function route(opts: CallOptions): ScriptStep {
       return call("createDocument", { title: SCRIPTED_TITLE, kind: "text", specialistHandoffToolCallId: last.toolCallId });
     }
     return { text: AFTER_TOOL[last.toolName] ?? "Done." };
+  }
+  if (/\bimages?\b/i.test(text) && /\bsuggest\b/i.test(text)) return call("suggestVisuals", { focusHint: null });
+  if (/\b(image|picture)\b/i.test(text) && /\b(make|create|add)\b/i.test(text)) {
+    return call("proposeVisual", { prompt: text.slice(0, 1_000), type: "general", aspect: null });
+  }
+  if (/\b(background|headline|colou?rs?)\b/i.test(text) && /\b(make|change|use)\b/i.test(text)) {
+    return call("editVisual", { instruction: text.slice(0, 1_000) });
   }
   if (/\bremember\b/i.test(text)) {
     const fact = text.replace(/^.*?\bremember\b\s*(that\s+)?/i, "").replace(/[.!?\s]+$/, "") || text;
@@ -225,6 +235,14 @@ CANNED.push(
     payload: { qualityReview: { passed: true, score: 84, issues: [], deterministicChecks: [] } },
   },
 );
+
+/** The mock image ideas (suggestVisuals). */
+export const SCRIPTED_VISUAL_CONCEPTS = [
+  { name: "Three habits list", description: "A clean numbered list of the three habits.", whyItWorks: "Lists are easy to scan in the feed.", type: "infographic", prompt: "A clean infographic with a numbered list of three habits, large readable type, calm colours." },
+  { name: "Before and after", description: "Two columns showing the old way against the new way.", whyItWorks: "Contrast makes the change obvious at a glance.", type: "before_after", prompt: "A before-and-after comparison with two labelled columns, simple icons and a clear divider." },
+  { name: "The key line", description: "The post's strongest sentence as a typographic card.", whyItWorks: "A single line is memorable and shareable.", type: "quote", prompt: "A typographic quote card with one strong sentence on a plain gradient background." },
+];
+CANNED.push({ concepts: SCRIPTED_VISUAL_CONCEPTS });
 
 /** The mock carousel: slides for the scripted post (the carousel studio's "Generate slides"). */
 export const SCRIPTED_SLIDES = [
