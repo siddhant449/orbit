@@ -650,11 +650,3 @@ h1[tabindex="-1"]:focus-visible {
     opacity: 1;
   }
 }
-
-/* Clerk's sign-in start step carries a hidden password field for password managers and reveals it when Chrome autofills
-   it; the value isn't used there, so users were asked for their password twice. Keep that field out of the page so the
-   browser fills the real password step instead. The start step is the only form with the identifier field (Clerk drops
-   aria-hidden from the row once autofill reveals it, so key off the form, not the row). */
-.cl-form:has(input[name="identifier"]) .cl-formFieldRow__password {
-  display: none !important;
-}
