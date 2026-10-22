@@ -18,3 +18,10 @@ export function carouselHeading(name: string, count: number): string {
   const slides = `${word(count)} ${count === 1 ? "slide" : "slides"}`;
   return base ? `${base}, in ${slides}` : `A carousel in ${slides}`;
 }
+
+/** The generator's source limit; a longer post is cut there, and the form says so. */
+export const SOURCE_MAX = 6000;
+
+export function clampSource(text: string, max = SOURCE_MAX): { text: string; clipped: boolean } {
+  return text.length > max ? { text: text.slice(0, max), clipped: true } : { text, clipped: false };
+}

@@ -41,7 +41,7 @@ export type CarouselAction =
   | { type: "load"; state: CarouselState };
 
 export function initialCarousel(): CarouselState {
-  return { slides: [], activeId: null, template: "ink", aspect: "4:5", kit: "orbit", logo: true };
+  return { slides: [], activeId: null, template: "ink", aspect: "4:5", kit: "orbit", logo: false };
 }
 
 const indexOf = (s: CarouselState, id: string | null) => (id === null ? -1 : s.slides.findIndex((x) => x.id === id));
@@ -99,11 +99,14 @@ export function carouselReducer(s: CarouselState, a: CarouselAction): CarouselSt
 
 // --- Browser draft --------------------------------------------------------------------------------------------------
 
-export const DRAFT_KEY = "orbit-carousel-draft";
-const DRAFT_VERSION = 1;
+/** One draft per profile, so a profile switch never shows another profile's slides. */
+export const draftKey = (profileId: string) => `orbit-carousel-draft:${profileId}`;
+const DRAFT_VERSION = 2;
 
 const DraftSchema = z.object({
   v: z.literal(DRAFT_VERSION),
+  /** The post the carousel was started from, or null for a blank one. */
+  sourceId: z.string().max(64).nullable(),
   state: z.object({
     slides: z
       .array(z.object({ id: z.string().min(1).max(64), title: z.string().max(TITLE_MAX * 2), body: z.string().max(BODY_MAX * 2) }))
@@ -116,12 +119,12 @@ const DraftSchema = z.object({
   }),
 });
 
-export function serializeDraft(s: CarouselState): string {
-  return JSON.stringify({ v: DRAFT_VERSION, state: s });
+export function serializeDraft(s: CarouselState, sourceId: string | null): string {
+  return JSON.stringify({ v: DRAFT_VERSION, sourceId, state: s });
 }
 
 /** A stored draft, or null when it's missing, from another version, or damaged. */
-export function parseDraft(raw: string | null): CarouselState | null {
+export function parseDraft(raw: string | null): { state: CarouselState; sourceId: string | null } | null {
   if (!raw) return null;
   let json: unknown;
   try {
@@ -133,5 +136,15 @@ export function parseDraft(raw: string | null): CarouselState | null {
   if (!parsed.success) return null;
   const state = parsed.data.state;
   const activeId = state.slides.some((x) => x.id === state.activeId) ? state.activeId : (state.slides[0]?.id ?? null);
-  return { ...state, activeId };
+  return { state: { ...state, activeId }, sourceId: parsed.data.sourceId };
+}
+
+/**
+ * What to do with a stored draft on opening the studio for `sourceId`: restore it when it belongs to the same post
+ * (or both are blank), otherwise only offer it ("Restore your last carousel"). Empty drafts are ignored.
+ */
+export function draftFor(raw: string | null, sourceId: string | null): { restore: CarouselState | null; other: CarouselState | null } {
+  const draft = parseDraft(raw);
+  if (!draft || draft.state.slides.length === 0) return { restore: null, other: null };
+  return draft.sourceId === sourceId ? { restore: draft.state, other: null } : { restore: null, other: draft.state };
 }

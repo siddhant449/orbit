@@ -12,10 +12,10 @@ import { exportCarouselPdf } from "@/lib/carousel/render";
 import {
   BODY_MAX,
   carouselReducer,
-  DRAFT_KEY,
+  draftFor,
+  draftKey,
   initialCarousel,
   MAX_SLIDES,
-  parseDraft,
   serializeDraft,
   TITLE_MAX,
   type Aspect,
@@ -52,9 +52,9 @@ async function requestSlides(body: GenerateBody): Promise<{ ok: true; slides: { 
   }
 }
 
-function readDraft(): CarouselState | null {
+function readRaw(key: string): string | null {
   try {
-    return parseDraft(window.localStorage.getItem(DRAFT_KEY));
+    return window.localStorage.getItem(key);
   } catch {
     return null;
   }
@@ -65,10 +65,26 @@ function readDraft(): CarouselState | null {
  * header says so and the work is kept as a browser draft. Slides are painted on canvas by the same code as the PDF
  * export, so the preview is the PDF.
  */
-export function CarouselStudio({ source, identities }: { source: SourcePost | null; identities: Record<Kit, Identity> }) {
+export function CarouselStudio({
+  profileId,
+  author,
+  source,
+  identities,
+}: {
+  profileId: string;
+  /** The person's name, written into the PDF as its author. */
+  author: string;
+  source: SourcePost | null;
+  identities: Record<Kit, Identity>;
+}) {
   const [state, dispatch] = useReducer(carouselReducer, undefined, initialCarousel);
   const restored = useRef(false);
   const [busy, setBusy] = useState<null | "generate" | RewriteId | "export">(null);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  /** A draft from another post (or a blank carousel): offered, never applied on its own. */
+  const [otherDraft, setOtherDraft] = useState<CarouselState | null>(null);
+  const key = draftKey(profileId);
+  const sourceId = source?.id ?? null;
   const [error, setError] = useState<string | null>(null);
   const [announce, setAnnounce] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -77,23 +93,27 @@ export function CarouselStudio({ source, identities }: { source: SourcePost | nu
 
   // The browser draft: read once after mount (the server can't see it), then written on every change.
   useEffect(() => {
-    const draft = readDraft();
-    if (draft && draft.slides.length) dispatch({ type: "load", state: draft });
+    const { restore, other } = draftFor(readRaw(key), sourceId);
+    if (restore) dispatch({ type: "load", state: restore });
+    // Reading browser storage is the external system here; it can only happen after mount.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setOtherDraft(other);
     restored.current = true;
-  }, []);
+  }, [key, sourceId]);
   // Debounced, so the first run (still the empty state, before the restored draft renders) is cancelled by the next.
   useEffect(() => {
     if (!restored.current) return;
     const t = window.setTimeout(() => {
       try {
-        if (state.slides.length) window.localStorage.setItem(DRAFT_KEY, serializeDraft(state));
-        else window.localStorage.removeItem(DRAFT_KEY);
+        if (state.slides.length) window.localStorage.setItem(key, serializeDraft(state, sourceId));
+        // An empty studio keeps the offered draft until the person starts a new one.
+        else if (!otherDraft) window.localStorage.removeItem(key);
       } catch {
         /* storage blocked or full: the page still works, the draft just isn't kept */
       }
     }, 300);
     return () => window.clearTimeout(t);
-  }, [state]);
+  }, [state, key, sourceId, otherDraft]);
 
   const { slides, activeId } = state;
   const activeIndex = slides.findIndex((s) => s.id === activeId);
@@ -137,13 +157,18 @@ export function CarouselStudio({ source, identities }: { source: SourcePost | nu
     undoable(`Deleted slide ${index + 1}.`, before);
   }
 
-  function move(id: string, by: number) {
+  /** Keys keep focus on the row; the Move buttons keep it on the button, or its twin once the end disables it. */
+  function move(id: string, by: number, via: "keys" | "button" = "keys") {
     const from = slides.findIndex((s) => s.id === id);
     const to = Math.max(0, Math.min(slides.length - 1, from + by));
     if (from === to) return;
     dispatch({ type: "move", id, by });
-    setAnnounce(`Slide moved to position ${to + 1} of ${slides.length}.`);
-    focusRow(id);
+    const name = plainText(slides[from]!.title).trim();
+    setAnnounce(`${name ? `\u201c${name}\u201d` : `Slide ${from + 1}`} moved to position ${to + 1} of ${slides.length}.`);
+    if (via === "keys") return focusRow(id);
+    const atEnd = to === 0 || to === slides.length - 1;
+    if (atEnd)
+      requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(`[data-move="${by < 0 ? "down" : "up"}"]`)?.focus());
   }
 
   function duplicate(id: string) {
@@ -190,9 +215,14 @@ export function CarouselStudio({ source, identities }: { source: SourcePost | nu
   async function exportPdf() {
     if (!slides.length) return;
     setBusy("export");
+    setProgress({ done: 0, total: slides.length });
     try {
       const name = carouselHeading(source?.title ?? plainText(slides[0]!.title), slides.length);
-      const blob = await exportCarouselPdf(slides.map((s, i) => inputFor(s, i)), name);
+      const blob = await exportCarouselPdf(
+        slides.map((s, i) => inputFor(s, i)),
+        { title: name, author },
+        (done, total) => setProgress({ done, total }),
+      );
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -206,6 +236,7 @@ export function CarouselStudio({ source, identities }: { source: SourcePost | nu
       toast(err instanceof Error && err.message ? err.message : "The PDF couldn't be made in this browser.");
     } finally {
       setBusy(null);
+      setProgress(null);
     }
   }
 
@@ -230,9 +261,9 @@ export function CarouselStudio({ source, identities }: { source: SourcePost | nu
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <KitSwitch value={state.kit} onChange={(kit) => dispatch({ type: "set", patch: { kit } })} />
-          <Button variant="secondary" onClick={() => void exportPdf()} disabled={!slides.length || working} aria-busy={busy === "export"}>
+          <Button variant="secondary" aria-describedby="carousel-pdf-note" onClick={() => void exportPdf()} disabled={!slides.length || working} aria-busy={busy === "export"}>
             <Download aria-hidden="true" />
-            {busy === "export" ? "Exporting…" : "Export PDF"}
+            {busy === "export" && progress ? `Exporting ${Math.min(progress.done + 1, progress.total)} of ${progress.total}` : "Export PDF"}
           </Button>
           <Button aria-disabled="true" aria-describedby="carousel-storage-note" tabIndex={0} onClick={(e) => e.preventDefault()}>
             Attach to post
@@ -243,6 +274,7 @@ export function CarouselStudio({ source, identities }: { source: SourcePost | nu
       <div id="carousel-storage-note" className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[13px] text-text-2">
         <StatusPill>Not saved yet</StatusPill>
         <span>Carousels save once storage lands. Until then this carousel stays as a draft in this browser, and attaching it to a post isn&apos;t available.</span>
+        <span id="carousel-pdf-note">The PDF flattens each slide into an image, so its text can&apos;t be selected or searched.</span>
       </div>
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[220px_minmax(0,1fr)_240px] xl:grid-cols-[250px_minmax(0,1fr)_260px]">
@@ -260,7 +292,7 @@ export function CarouselStudio({ source, identities }: { source: SourcePost | nu
                     <div
                       className={cn(
                         "orbit-transition rounded-card-sm border bg-panel",
-                        selected ? "border-[rgba(124,138,255,0.5)]" : "border-[var(--panel-border)] hover:border-line-hover",
+                        selected ? "border-[rgba(124,138,255,0.5)]" : "border-transparent hover:border-line-hover",
                       )}
                       data-slide-row=""
                     >
@@ -289,10 +321,10 @@ export function CarouselStudio({ source, identities }: { source: SourcePost | nu
                       </button>
                       {selected && (
                         <div role="group" aria-label={`Slide ${i + 1} actions`} className="flex items-center gap-1 px-2.5 pb-2.5">
-                          <RowAction label="Move slide up" onClick={() => move(slide.id, -1)} disabled={i === 0}>
+                          <RowAction label="Move slide up" data-move="up" onClick={() => move(slide.id, -1, "button")} disabled={i === 0}>
                             <ArrowUp />
                           </RowAction>
-                          <RowAction label="Move slide down" onClick={() => move(slide.id, 1)} disabled={i === slides.length - 1}>
+                          <RowAction label="Move slide down" data-move="down" onClick={() => move(slide.id, 1, "button")} disabled={i === slides.length - 1}>
                             <ArrowDown />
                           </RowAction>
                           <RowAction label="Duplicate slide" onClick={() => duplicate(slide.id)} disabled={slides.length >= MAX_SLIDES}>
@@ -331,7 +363,7 @@ export function CarouselStudio({ source, identities }: { source: SourcePost | nu
         {/* Canvas */}
         <section
           aria-label="Slide preview"
-          className="order-1 flex min-w-0 flex-col items-center gap-4 rounded-[20px] border border-[var(--panel-border)] bg-panel p-4 shadow-[var(--panel-highlight),var(--shadow-card)] sm:p-6 lg:order-2"
+          className="order-1 flex min-w-0 flex-col items-center gap-4 rounded-[20px] border border-(color:--panel-border) bg-panel p-4 shadow-[var(--panel-highlight),var(--shadow-card)] sm:p-6 lg:order-2"
         >
           {activeInput && active ? (
             <>
@@ -386,10 +418,23 @@ export function CarouselStudio({ source, identities }: { source: SourcePost | nu
                 or
                 <span aria-hidden="true" className="h-px flex-1 bg-line-3" />
               </div>
-              <Button variant="secondary" onClick={addSlide} className="self-start">
-                <PlusIcon size={16} />
-                Start with a blank slide
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="secondary" onClick={addSlide}>
+                  <PlusIcon size={16} />
+                  Start with a blank slide
+                </Button>
+                {otherDraft && (
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      dispatch({ type: "load", state: otherDraft });
+                      setOtherDraft(null);
+                    }}
+                  >
+                    Restore your last carousel ({otherDraft.slides.length} {otherDraft.slides.length === 1 ? "slide" : "slides"})
+                  </Button>
+                )}
+              </div>
             </div>
           )}
         </section>
@@ -418,7 +463,7 @@ export function CarouselStudio({ source, identities }: { source: SourcePost | nu
             </dl>
             <div className="flex items-center justify-between gap-3 text-[12px]">
               <span id="logo-toggle" className="text-text-2">
-                Logo on slides
+                Orbit mark
               </span>
               <button
                 type="button"
@@ -428,7 +473,7 @@ export function CarouselStudio({ source, identities }: { source: SourcePost | nu
                 onClick={() => dispatch({ type: "set", patch: { logo: !state.logo } })}
                 className={cn(
                   "orbit-transition relative h-4 w-7 shrink-0 cursor-pointer rounded-pill focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-text",
-                  state.logo ? "bg-accent" : "bg-[var(--toggle-off)]",
+                  state.logo ? "bg-accent" : "bg-(--toggle-off)",
                 )}
               >
                 <span className={cn("orbit-transition absolute top-0.5 size-3 rounded-full bg-white", state.logo ? "left-[14px]" : "left-0.5")} />
@@ -501,14 +546,19 @@ function kitDots(kit: Kit): string[] {
 
 function RailPanel({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="flex flex-col gap-3 rounded-[20px] border border-[var(--panel-border)] bg-panel p-5 shadow-[var(--panel-highlight),var(--shadow-card)]">
+    <section className="flex flex-col gap-3 rounded-[20px] border border-(color:--panel-border) bg-panel p-5 shadow-[var(--panel-highlight),var(--shadow-card)]">
       <h2 className="text-[13px] font-medium text-text">{title}</h2>
       {children}
     </section>
   );
 }
 
-function RowAction({ label, children, className, ...props }: { label: string; children: ReactNode; onClick: () => void; disabled?: boolean; className?: string }) {
+function RowAction({
+  label,
+  children,
+  className,
+  ...props
+}: { label: string; children: ReactNode; onClick: () => void; disabled?: boolean; className?: string; "data-move"?: "up" | "down" }) {
   return (
     <button
       type="button"

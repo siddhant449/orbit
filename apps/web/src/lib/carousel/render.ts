@@ -147,27 +147,35 @@ export function paintSlide(canvas: HTMLCanvasElement, input: SlideInput, pixelWi
   paintOps(ctx, layoutSlide(input, canvasMeasure(ctx)));
 }
 
+const nextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+
 /**
- * The carousel as a PDF (LinkedIn's document post format): one 1080-wide page per slide, each slide painted by the
- * same code as the preview and embedded as a PNG. pdf-lib loads only when someone exports.
+ * The carousel as a PDF (LinkedIn's document post format): each slide painted by the same code as the preview, at
+ * 1080 px, as a JPEG (quality 0.92: a fraction of the PNG size, no visible loss on flat colour and large type). Slide
+ * text is flattened into the image. pdf-lib loads only when someone exports.
  */
-export async function exportCarouselPdf(inputs: SlideInput[], title: string): Promise<Blob> {
+export async function exportCarouselPdf(
+  inputs: SlideInput[],
+  meta: { title: string; author: string },
+  onProgress?: (done: number, total: number) => void,
+): Promise<Blob> {
   await fontsReady();
-  const { PDFDocument } = await import("pdf-lib");
-  const pdf = await PDFDocument.create();
-  pdf.setTitle(title);
-  pdf.setCreator("Orbit");
-  pdf.setProducer("Orbit carousel studio");
+  const { buildCarouselPdf } = await import("./pdf");
   const canvas = document.createElement("canvas");
-  for (const input of inputs) {
-    const { width, height } = canvasSize(input.aspect);
-    paintSlide(canvas, input, width);
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
-    if (!blob) throw new Error("This browser couldn't draw the slide.");
-    const png = await pdf.embedPng(new Uint8Array(await blob.arrayBuffer()));
-    const page = pdf.addPage([width, height]);
-    page.drawImage(png, { x: 0, y: 0, width, height });
-  }
-  const bytes = await pdf.save();
+  const size = canvasSize(inputs[0]!.aspect);
+  const bytes = await buildCarouselPdf({
+    count: inputs.length,
+    size,
+    nextFrame,
+    onProgress,
+    title: meta.title,
+    author: meta.author,
+    render: async (i) => {
+      paintSlide(canvas, inputs[i]!, size.width);
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
+      if (!blob) throw new Error("This browser couldn't draw the slide.");
+      return new Uint8Array(await blob.arrayBuffer());
+    },
+  });
   return new Blob([bytes as BlobPart], { type: "application/pdf" });
 }

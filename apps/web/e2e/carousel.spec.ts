@@ -16,7 +16,11 @@ test.setTimeout(180_000);
 const SHOTS = process.env.SHOTS_DIR ?? "../../.superpowers/sdd/ai-core/shots";
 const rows = (page: Page) => page.locator("[data-slide-row]");
 const rowTitles = (page: Page) => rows(page).locator("button[aria-keyshortcuts]").allInnerTexts();
-const clearDraft = (page: Page) => page.evaluate(() => localStorage.removeItem("orbit-carousel-draft"));
+// Drafts are keyed per profile (`orbit-carousel-draft:<profileId>`): clear every one this browser holds.
+const clearDraft = (page: Page) =>
+  page.evaluate(() => {
+    for (const k of Object.keys(localStorage)) if (k.startsWith("orbit-carousel-draft")) localStorage.removeItem(k);
+  });
 
 test("carousel studio: generate, edit, reorder, export, restore", async ({ page }) => {
   await page.goto("/sign-in");
@@ -67,6 +71,9 @@ test("carousel studio: generate, edit, reorder, export, restore", async ({ page 
   await expect(rows(page).nth(1).locator("button[aria-keyshortcuts]")).toHaveAttribute("aria-current", "true");
   await page.getByRole("button", { name: "Move slide down" }).click();
   expect((await rowTitles(page))[1]).toContain("Inserted");
+  await expect(page.getByRole("button", { name: "Move slide down" })).toBeFocused();
+  // The live region names the slide that moved (the one before "Inserted", now third).
+  await expect(page.locator("[aria-live=polite]").filter({ hasText: "moved to position" })).toHaveText(/^“.+” moved to position 3 of 6\.$/);
 
   // Design options.
   await page.getByRole("radio", { name: "Square 1:1" }).click();
@@ -74,9 +81,11 @@ test("carousel studio: generate, edit, reorder, export, restore", async ({ page 
   await page.getByRole("radio", { name: "Portrait 4:5" }).click();
   await page.getByRole("radio", { name: /Mixed/ }).click();
   await expect(page.getByRole("radio", { name: /Mixed/ })).toHaveAttribute("aria-checked", "true");
-  await page.getByRole("switch", { name: "Logo on slides" }).click();
-  await expect(page.getByRole("switch", { name: "Logo on slides" })).toHaveAttribute("aria-checked", "false");
-  await page.getByRole("switch", { name: "Logo on slides" }).click();
+  const mark = page.getByRole("switch", { name: "Orbit mark" });
+  await expect(mark).toHaveAttribute("aria-checked", "false");
+  await mark.click();
+  await expect(mark).toHaveAttribute("aria-checked", "true");
+  await mark.click();
 
   // Rewrite through the mock replaces the slides (and can be undone).
   await page.getByRole("button", { name: "Fewer words" }).click();
@@ -93,11 +102,20 @@ test("carousel studio: generate, edit, reorder, export, restore", async ({ page 
   const pdf = await PDFDocument.load(bytes);
   expect(pdf.getPageCount()).toBe(6);
   expect(pdf.getPage(0).getSize()).toEqual({ width: 1080, height: 1350 });
+  const meta = await PDFDocument.load(bytes, { updateMetadata: false });
+  expect(meta.getProducer()).toBe("Orbit");
+  expect(meta.getCreator()).toBe(meta.getAuthor());
+  expect(bytes.includes(Buffer.from("/DCTDecode"))).toBe(true); // JPEG pages
+  await expect(page.getByText(/flattens each slide into an image/)).toBeVisible();
 
-  // The browser draft survives a reload.
+  // The browser draft survives a reload, under this profile's key with no source post.
   await page.waitForTimeout(500);
+  const keys = await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("orbit-carousel-draft")));
+  expect(keys).toHaveLength(1);
+  expect(keys[0]).toMatch(/^orbit-carousel-draft:.+/);
   await page.reload();
-  await expect(rows(page)).toHaveCount(6);
+  // The draft is read after hydration, which a dev server can take a while to reach.
+  await expect(rows(page)).toHaveCount(6, { timeout: 15_000 });
 
   // Accessibility and layout, dark and light; screenshots when SHOTS=1.
   await page.mouse.move(0, 0);

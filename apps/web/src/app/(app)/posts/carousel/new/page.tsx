@@ -19,6 +19,9 @@ export default async function CarouselNewPage({ searchParams }: { searchParams: 
   const byline = [person, profile?.jobTitle?.trim()].filter(Boolean).join(" · ");
   return (
     <CarouselStudio
+      // No profile yet (onboarding not finished): the draft goes under a shared key that the first profile then uses.
+      profileId={profile?.id ?? "none"}
+      author={person}
       source={doc ? { id: doc.id, title: doc.title, text: doc.text } : null}
       identities={{
         orbit: { brand: profile?.company?.trim() || person, byline },

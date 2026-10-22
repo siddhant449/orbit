@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { carouselHeading, plainText } from "./view";
+import { carouselHeading, clampSource, plainText } from "./view";
 
 describe("plainText", () => {
   it("drops accent stars", () => {
@@ -22,5 +22,15 @@ describe("carouselHeading", () => {
   it("trims a trailing full stop and very long names", () => {
     expect(carouselHeading("Ship it.", 2)).toBe("Ship it, in two slides");
     expect(carouselHeading("x".repeat(90), 2).length).toBeLessThanOrEqual(80);
+  });
+});
+
+describe("clampSource", () => {
+  it("keeps a post under the limit as it is", () => {
+    expect(clampSource("short", 10)).toEqual({ text: "short", clipped: false });
+  });
+
+  it("cuts a long post at the limit and says so", () => {
+    expect(clampSource("abcdefghijkl", 10)).toEqual({ text: "abcdefghij", clipped: true });
   });
 });

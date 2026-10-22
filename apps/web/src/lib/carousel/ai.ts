@@ -75,8 +75,27 @@ export function buildCarouselPrompt(input: GenerateRequest, voice: VoiceGuide = 
   return { system, prompt: parts.join("\n\n") };
 }
 
+/**
+ * What the model is asked for: the same shape without length limits, so an over-long answer comes back instead of
+ * failing inside the SDK. The strict schema is checked after, and a length-only miss gets one retry.
+ */
+const ModelSlidesSchema = z.object({
+  slides: z.array(z.object({ title: z.string().describe("Under 12 words. Wrap 1-3 key words in *asterisks* to colour them."), body: z.string() })).max(30),
+});
+
+/** True when every problem is a size limit (too long, too short, too many, too few). */
+function lengthOnly(error: z.ZodError): boolean {
+  return error.issues.length > 0 && error.issues.every((i) => i.code === "too_big" || i.code === "too_small");
+}
+
 export async function generateSlides(ai: AiClient, input: GenerateRequest, voice: VoiceGuide = null, abortSignal?: AbortSignal) {
   const { system, prompt } = buildCarouselPrompt(input, voice);
-  const out = await ai.json({ model: "generate", system, prompt, schema: GeneratedSlidesSchema, abortSignal });
-  return out.slides.map((s) => ({ title: s.title.trim(), body: s.body.trim() }));
+  let ask = prompt;
+  for (let attempt = 0; ; attempt++) {
+    const raw = await ai.json({ model: "generate", system, prompt: ask, schema: ModelSlidesSchema, abortSignal });
+    const checked = GeneratedSlidesSchema.safeParse(raw);
+    if (checked.success) return checked.data.slides.map((s) => ({ title: s.title.trim(), body: s.body.trim() }));
+    if (attempt >= 1 || !lengthOnly(checked.error)) throw new Error(`Slides failed the schema: ${checked.error.issues[0]?.message}`);
+    ask = `${prompt}\n\nYour last answer was too long or had the wrong number of slides. Return 3 to 10 slides; each title under ${TITLE_MAX} characters (under 12 words), each supporting line under ${BODY_MAX} characters.`;
+  }
 }

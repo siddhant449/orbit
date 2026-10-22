@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { carouselReducer, initialCarousel, MAX_SLIDES, parseDraft, serializeDraft, type CarouselState } from "./state";
+import { carouselReducer, draftFor, draftKey, initialCarousel, MAX_SLIDES, parseDraft, serializeDraft, type CarouselState } from "./state";
 
 let n = 0;
 const ids = () => `s${++n}`;
@@ -17,6 +17,8 @@ describe("carouselReducer", () => {
     expect(s.activeId).toBeNull();
     expect(s.template).toBe("ink");
     expect(s.aspect).toBe("4:5");
+    // Slides carry the user's name; Orbit's mark is opt-in.
+    expect(s.logo).toBe(false);
   });
 
   it("adds after the active slide and selects it", () => {
@@ -93,21 +95,38 @@ describe("carouselReducer", () => {
 });
 
 describe("drafts", () => {
-  it("round-trips through serialize and parse", () => {
-    const s = withSlides(["a", "b"]);
-    expect(parseDraft(serializeDraft(s))).toEqual(s);
+  it("is keyed by profile", () => {
+    expect(draftKey("p1")).toBe("orbit-carousel-draft:p1");
   });
 
-  it("rejects garbage and unknown versions", () => {
+  it("round-trips with its source post", () => {
+    const s = withSlides(["a", "b"]);
+    expect(parseDraft(serializeDraft(s, "doc1"))).toEqual({ state: s, sourceId: "doc1" });
+    expect(parseDraft(serializeDraft(s, null))).toEqual({ state: s, sourceId: null });
+  });
+
+  it("rejects garbage and other versions, including the old unkeyed v1", () => {
     expect(parseDraft(null)).toBeNull();
     expect(parseDraft("not json")).toBeNull();
     expect(parseDraft(JSON.stringify({ v: 99, state: {} }))).toBeNull();
-    expect(parseDraft(JSON.stringify({ v: 1, state: { slides: "nope" } }))).toBeNull();
+    expect(parseDraft(JSON.stringify({ v: 1, state: withSlides(["a"]) }))).toBeNull();
+    expect(parseDraft(JSON.stringify({ v: 2, sourceId: null, state: { slides: "nope" } }))).toBeNull();
   });
 
   it("repairs a dangling active id", () => {
     const s = withSlides(["a"]);
-    const raw = JSON.stringify({ v: 1, state: { ...s, activeId: "gone" } });
-    expect(parseDraft(raw)!.activeId).toBe(s.slides[0]!.id);
+    const raw = JSON.stringify({ v: 2, sourceId: null, state: { ...s, activeId: "gone" } });
+    expect(parseDraft(raw)!.state.activeId).toBe(s.slides[0]!.id);
+  });
+
+  it("restores only for the same source post", () => {
+    const s = withSlides(["a"]);
+    expect(draftFor(serializeDraft(s, "doc1"), "doc1")).toEqual({ restore: s, other: null });
+    expect(draftFor(serializeDraft(s, null), null)).toEqual({ restore: s, other: null });
+    // A draft from another post (or a blank one, opened from a post) is offered, not applied.
+    expect(draftFor(serializeDraft(s, "doc1"), "doc2")).toEqual({ restore: null, other: s });
+    expect(draftFor(serializeDraft(s, null), "doc2")).toEqual({ restore: null, other: s });
+    expect(draftFor(serializeDraft(initialCarousel(), null), null)).toEqual({ restore: null, other: null });
+    expect(draftFor(null, null)).toEqual({ restore: null, other: null });
   });
 });

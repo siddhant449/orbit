@@ -5,12 +5,13 @@ import { Dialog } from "radix-ui";
 import { Sparkles } from "lucide-react";
 import { Button, Label } from "@brandloop/ui";
 import { CloseIcon } from "@brandloop/ui/icons";
+import { clampSource, SOURCE_MAX } from "@/lib/carousel/view";
 import { dialogContentClass, dialogDescriptionClass, dialogOverlayClass, dialogTitleClass, textareaClass } from "@/components/dialog-classes";
 
 export type SourcePost = { id: string; title: string; text: string };
 
 const MIN = 20;
-const MAX = 6000;
+const MAX = SOURCE_MAX;
 
 /** The post or topic the slides come from. Submitting calls the generator; the error comes back from the parent. */
 export function SourceForm({
@@ -27,7 +28,8 @@ export function SourceForm({
   onSubmit: (text: string) => Promise<boolean> | void;
 }) {
   const id = useId();
-  const [text, setText] = useState(initial);
+  const [{ text: start, clipped }] = useState(() => clampSource(initial));
+  const [text, setText] = useState(start);
   const short = text.trim().length < MIN;
   return (
     <form
@@ -52,8 +54,13 @@ export function SourceForm({
           placeholder="Paste your post, or describe what the carousel should teach."
           onChange={(e) => setText(e.target.value)}
           className={textareaClass}
-          aria-describedby={error ? `${id}-error` : undefined}
+          aria-describedby={[clipped && `${id}-clipped`, error && `${id}-error`].filter(Boolean).join(" ") || undefined}
         />
+        {clipped && (
+          <p id={`${id}-clipped`} className="text-[12px] leading-[1.5] text-text-2">
+            Your post is longer than {MAX.toLocaleString("en-US")} characters, so only the first {MAX.toLocaleString("en-US")} are used.
+          </p>
+        )}
       </div>
       {error && (
         <p id={`${id}-error`} role="alert" className="text-[13px] leading-[1.5] text-danger">

@@ -1,19 +1,18 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AiClient } from "@brandloop/ai";
 
-const env = vi.hoisted(() => {
+vi.hoisted(() => {
   // run-job (the shared AI-unavailable message) pulls in @brandloop/db, which wants DATABASE_URL; no query runs here.
   try {
     process.loadEnvFile(new URL("../../../../../.env", import.meta.url));
   } catch {
     process.env.DATABASE_URL ??= "postgres://unused";
   }
-  return { account: null as null | { currentProfile: { id: string } | null } };
 });
-vi.mock("@/lib/account", () => ({ getAccount: async () => env.account }));
 
 import { buildCarouselPrompt, GenerateRequestSchema, GeneratedSlidesSchema } from "./ai";
-import { makeGenerateHandler } from "./api";
+import { GENERATE_BODY_MAX, makeGenerateHandler } from "./api";
+import { createThrottle } from "./throttle";
 
 const slides = [
   { title: "One", body: "" },
@@ -21,7 +20,9 @@ const slides = [
   { title: "Three", body: "" },
 ];
 
-function fakeAi(result: unknown = { slides }): AiClient & { calls: { system: string; prompt: string }[] } {
+/** Answers with `results` in order (the last repeats). */
+function fakeAi(...results: unknown[]): AiClient & { calls: { system: string; prompt: string }[] } {
+  if (results.length === 0) results = [{ slides }];
   const calls: { system: string; prompt: string }[] = [];
   return {
     calls,
@@ -30,6 +31,7 @@ function fakeAi(result: unknown = { slides }): AiClient & { calls: { system: str
     },
     async json(opts) {
       calls.push({ system: opts.system, prompt: opts.prompt });
+      const result = results[Math.min(calls.length - 1, results.length - 1)];
       if (result instanceof Error) throw result;
       return opts.schema.parse(result);
     },
@@ -75,40 +77,92 @@ describe("buildCarouselPrompt", () => {
 });
 
 describe("POST /api/carousel/generate", () => {
-  const withKey = { aiAvailable: () => true, voice: async () => null };
+  const signedIn = { session: async () => ({ signedIn: true as const, profileId: "p1" }) };
+  const base = { ...signedIn, aiAvailable: () => true, voice: async () => null, throttle: createThrottle({ limit: 100, windowMs: 1000 }) };
+
+  it("is 401 when signed out", async () => {
+    const res = await makeGenerateHandler({ ...base, session: async () => ({ signedIn: false as const }), ai: () => fakeAi() })(post({ source: SOURCE }));
+    expect(res.status).toBe(401);
+  });
 
   it("needs a profile", async () => {
-    env.account = { currentProfile: null };
-    const res = await makeGenerateHandler({ ...withKey, ai: () => fakeAi() })(post({ source: SOURCE }));
+    const res = await makeGenerateHandler({ ...base, session: async () => ({ signedIn: true as const, profileId: null }), ai: () => fakeAi() })(post({ source: SOURCE }));
     expect(res.status).toBe(400);
   });
 
   it("says AI is unavailable without a key", async () => {
-    env.account = { currentProfile: { id: "p1" } };
-    const res = await makeGenerateHandler({ ...withKey, aiAvailable: () => false, ai: () => fakeAi() })(post({ source: SOURCE }));
+    const res = await makeGenerateHandler({ ...base, aiAvailable: () => false, ai: () => fakeAi() })(post({ source: SOURCE }));
     expect(res.status).toBe(503);
     expect((await res.json()).error).toMatch(/OPENAI_API_KEY/);
   });
 
+  it("refuses an oversized body before parsing it", async () => {
+    const res = await makeGenerateHandler({ ...base, ai: () => fakeAi() })(post({ source: "x".repeat(GENERATE_BODY_MAX) }));
+    expect(res.status).toBe(413);
+  });
+
   it("rejects a bad body", async () => {
-    env.account = { currentProfile: { id: "p1" } };
-    const res = await makeGenerateHandler({ ...withKey, ai: () => fakeAi() })(post({ source: "short" }));
+    const res = await makeGenerateHandler({ ...base, ai: () => fakeAi() })(post({ source: "short" }));
     expect(res.status).toBe(400);
   });
 
+  it("throttles each profile", async () => {
+    const handler = makeGenerateHandler({ ...base, throttle: createThrottle({ limit: 1, windowMs: 60_000 }), ai: () => fakeAi() });
+    expect((await handler(post({ source: SOURCE }))).status).toBe(200);
+    const res = await handler(post({ source: SOURCE }));
+    expect(res.status).toBe(429);
+    expect(Number(res.headers.get("retry-after"))).toBeGreaterThan(0);
+  });
+
   it("returns the generated slides", async () => {
-    env.account = { currentProfile: { id: "p1" } };
     const ai = fakeAi();
-    const res = await makeGenerateHandler({ ...withKey, ai: () => ai })(post({ source: SOURCE }));
+    const res = await makeGenerateHandler({ ...base, ai: () => ai })(post({ source: SOURCE }));
     expect(res.status).toBe(200);
     expect((await res.json()).slides).toEqual(slides);
     expect(ai.calls[0]!.prompt).toContain("minimum viable product");
   });
 
+  it("retries once when the slides only break the length limits", async () => {
+    const long = { slides: [{ title: "x ".repeat(200), body: "" }, ...slides] };
+    const ai = fakeAi(long, { slides });
+    const res = await makeGenerateHandler({ ...base, ai: () => ai })(post({ source: SOURCE }));
+    expect(res.status).toBe(200);
+    expect(ai.calls).toHaveLength(2);
+    expect(ai.calls[1]!.prompt).toMatch(/too long/i);
+  });
+
+  it("gives up after the one retry", async () => {
+    const long = { slides: [{ title: "x ".repeat(200), body: "" }, ...slides] };
+    const ai = fakeAi(long);
+    const res = await makeGenerateHandler({ ...base, ai: () => ai })(post({ source: SOURCE }));
+    expect(res.status).toBe(502);
+    expect(ai.calls).toHaveLength(2);
+  });
+
+  it("does not retry other schema failures", async () => {
+    const ai = fakeAi({ nope: true });
+    const res = await makeGenerateHandler({ ...base, ai: () => ai })(post({ source: SOURCE }));
+    expect(res.status).toBe(502);
+    expect(ai.calls).toHaveLength(1);
+  });
+
   it("turns a model failure into a 502 with a plain message", async () => {
-    env.account = { currentProfile: { id: "p1" } };
-    const res = await makeGenerateHandler({ ...withKey, ai: () => fakeAi(new Error("boom")) })(post({ source: SOURCE }));
+    const res = await makeGenerateHandler({ ...base, ai: () => fakeAi(new Error("boom")) })(post({ source: SOURCE }));
     expect(res.status).toBe(502);
     expect((await res.json()).error).not.toContain("boom");
+  });
+});
+
+describe("createThrottle", () => {
+  it("allows `limit` calls per window per key, then reports the wait", () => {
+    let now = 0;
+    const t = createThrottle({ limit: 2, windowMs: 10_000, now: () => now });
+    expect(t.take("a").ok).toBe(true);
+    expect(t.take("a").ok).toBe(true);
+    expect(t.take("b").ok).toBe(true);
+    const blocked = t.take("a");
+    expect(blocked).toEqual({ ok: false, retryAfterSec: 10 });
+    now = 10_001;
+    expect(t.take("a").ok).toBe(true);
   });
 });
