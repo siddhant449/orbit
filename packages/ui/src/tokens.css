@@ -492,6 +492,12 @@
   transition-duration:
     var(--dur-hover-color), var(--dur-hover-color), var(--dur-hover-color), var(--dur-hover-color),
     var(--dur-hover-color), var(--dur-hover), var(--dur-hover);
+  /* Press lands at once (90 ms); the release still settles over 400 ms. */
+  &:active {
+    transition-duration:
+      var(--dur-hover-color), var(--dur-hover-color), var(--dur-hover-color), var(--dur-hover-color),
+      var(--dur-hover-color), 90ms, 90ms;
+  }
 }
 
 /* Icons: lucide sizes kept until the chrome moves to the Orbit set in O2. */
