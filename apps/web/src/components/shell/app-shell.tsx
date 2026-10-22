@@ -73,6 +73,8 @@ export function AppShell({ account, children }: { account: ShellAccount; childre
   const pathname = usePathname();
   const router = useRouter();
   const section = sectionFor(pathname);
+  // Post editor: document mode. The sidebar steps aside (the chat column carries the way back) to give the editor room.
+  const focusMode = /^\/posts\/[^/]+\/?$/.test(pathname);
   const collapsedPref = useSyncExternalStore(subscribeCollapsed, readCollapsed, () => false);
   const tablet = useMediaQuery("(min-width: 768px) and (max-width: 1023px)");
   const collapsed = collapsedPref || tablet;
@@ -120,7 +122,8 @@ export function AppShell({ account, children }: { account: ShellAccount; childre
           aria-label="Sidebar"
           style={{ width: asideWidth }}
           className={cn(
-            "relative hidden shrink-0 overflow-hidden border-r border-line-soft md:flex",
+            "relative hidden shrink-0 overflow-hidden border-r border-line-soft",
+            focusMode ? "md:hidden" : "md:flex",
             "motion-safe:transition-[width] motion-safe:duration-[400ms] motion-safe:ease-[var(--ease-out)]",
           )}
         >

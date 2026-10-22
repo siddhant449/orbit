@@ -136,6 +136,25 @@ export function PostEditorView({
   const editorId = useId();
   const [busy, setBusy] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  // Desktop: the chat column can be closed (reopened from the header) and dragged to a width kept in localStorage.
+  const [chatHidden, setChatHidden] = useState(false);
+  const [chatWidth, setChatWidth] = useState(CHAT_DEFAULT_W);
+  useEffect(() => {
+    try {
+      const saved = Number(localStorage.getItem(CHAT_W_KEY));
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is client-only; read after hydration
+      if (saved) setChatWidth(clampChatW(saved));
+    } catch {}
+  }, []);
+  const resizeChat = useCallback((w: number, persist: boolean) => {
+    const next = clampChatW(w);
+    setChatWidth(next);
+    if (persist) {
+      try {
+        localStorage.setItem(CHAT_W_KEY, String(next));
+      } catch {}
+    }
+  }, []);
   const [view, setView] = useState<PreviewView>("mobile");
   const [savedAt, setSavedAt] = useState(initialDoc.updatedAt);
   const doc = ctl.state.doc ?? initialDoc;
@@ -204,13 +223,14 @@ export function PostEditorView({
   useEffect(() => {
     const d = ctl.state.doc;
     if (!editor || !d || d.id !== initialDoc.id) return;
+    const clean = stripCitations(d.text);
     if (streaming) {
-      if (!autosave.snapshot().dirty && pmText(editor.state.doc) !== d.text) {
-        replaceText(editor, d.text);
+      if (!autosave.snapshot().dirty && pmText(editor.state.doc) !== clean) {
+        replaceText(editor, clean);
       }
       return;
     }
-    autosave.remote({ id: d.id, version: d.version, text: d.text });
+    autosave.remote({ id: d.id, version: d.version, text: clean });
     // A stream that ended without a new version leaves the editor on the autosave's text, never a partial stream.
     if (pmText(editor.state.doc) !== autosave.currentText) {
       replaceText(editor, autosave.currentText);
@@ -369,9 +389,10 @@ export function PostEditorView({
               }}
               aria-modal={chatSheet || undefined}
               data-post-chat=""
+              style={{ ["--chat-w" as string]: `${chatWidth}px` }}
               className={cn(
                 "post-chat min-h-0 border-line-soft bg-ground",
-                "lg:relative lg:flex lg:w-[400px] lg:shrink-0 lg:flex-col lg:border-r",
+                chatHidden ? "lg:hidden" : "lg:relative lg:flex lg:w-(--chat-w) lg:shrink-0 lg:flex-col",
                 chatOpen ? "max-lg:fixed max-lg:inset-0 max-lg:z-[60] max-lg:flex max-lg:flex-col" : "max-lg:hidden",
               )}
             >
@@ -388,15 +409,16 @@ export function PostEditorView({
                 beforeSend={settled}
                 onBusyChange={setBusy}
                 onClose={closeChat}
+                onCollapse={() => setChatHidden(true)}
               />
             </aside>
+            {!chatHidden && <ChatResizer width={chatWidth} onResize={resizeChat} />}
 
             <section
               aria-labelledby="post-title"
-              data-lenis-prevent
-              className="post-editor__main min-w-0 flex-1 overflow-y-auto overscroll-contain"
+              className="post-editor__main flex min-h-0 min-w-0 flex-1 flex-col"
             >
-              <header className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4 px-(--gutter) pb-6 pt-5 lg:pt-[14px]">
+              <header className="flex shrink-0 flex-wrap items-start justify-between gap-x-6 gap-y-4 px-(--gutter) pb-4 pt-5 lg:pt-[14px]">
                 <div className="min-w-0 flex-1 lg:pt-1.5">
                   <div className="mb-2 flex items-center gap-2 lg:hidden">
                     <Button asChild variant="ghost" size="sm" className="-ml-2 px-2">
@@ -457,11 +479,6 @@ export function PostEditorView({
                     )}
                     <span aria-hidden="true">·</span>
                     <span className="text-text-soft">Draft</span>
-                    <span aria-hidden="true">·</span>
-                    <span data-char-count className={cn("tabular-nums", over ? "text-danger" : "text-text-3")}>
-                      {count.toLocaleString("en-US")} / {POST_CHAR_LIMIT.toLocaleString("en-US")}
-                      <span className="sr-only"> characters</span>
-                    </span>
                     {read && (
                       <span
                         data-readability
@@ -488,8 +505,11 @@ export function PostEditorView({
                     ref={chatToggleRef}
                     variant="secondary"
                     size="md"
-                    className="lg:hidden"
-                    onClick={() => setChatOpen(true)}
+                    className={cn(!chatHidden && "lg:hidden")}
+                    onClick={() => {
+                      setChatOpen(true);
+                      setChatHidden(false);
+                    }}
                     aria-haspopup="dialog"
                     aria-expanded={chatOpen}
                   >
@@ -504,7 +524,8 @@ export function PostEditorView({
                 </div>
               </header>
 
-              <div className="flex flex-col items-center gap-5 px-(--gutter) pb-16">
+              <div className="mx-(--gutter) mb-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-card border border-line-soft bg-panel lg:mb-4">
+              <div className="flex shrink-0 justify-center px-4 py-3">
                 <EditorToolbar
                   controls={editorId}
                   canUndo={history?.canUndo ?? false}
@@ -517,6 +538,9 @@ export function PostEditorView({
                   onEmoji={(em) => editor?.chain().focus().insertContent(em).run()}
                   onView={setView}
                 />
+              </div>
+              <div data-lenis-prevent className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+              <div className="flex flex-col items-center gap-5 px-4 pb-8">
 
                 {snap.conflict && (
                   <div
@@ -586,6 +610,14 @@ export function PostEditorView({
                     </div>
                   </PostSheet>
                 </div>
+              </div>
+              </div>
+              <footer className="shrink-0 px-4 py-2.5 text-[13px]">
+                <span data-char-count className={cn("tabular-nums", over ? "text-danger" : "text-text-3")}>
+                  {count.toLocaleString("en-US")} / {POST_CHAR_LIMIT.toLocaleString("en-US")}
+                  <span className="sr-only"> characters</span>
+                </span>
+              </footer>
               </div>
             </section>
           </div>
@@ -710,5 +742,59 @@ function TitleField({ initial, onDone }: { initial: string; onDone: (value: stri
       onBlur={() => finish(value)}
       className="w-full max-w-[560px] rounded-card-sm border border-line-control bg-transparent px-3 py-1.5 text-[22px] font-medium leading-tight tracking-[-0.01em] text-text outline-none focus-visible:border-accent-text"
     />
+  );
+}
+
+const CHAT_W_KEY = "orbit-post-chat-width";
+const CHAT_DEFAULT_W = 400;
+const CHAT_MIN_W = 320;
+function clampChatW(w: number): number {
+  const max = typeof window === "undefined" ? 640 : Math.max(CHAT_MIN_W, Math.floor(window.innerWidth * 0.5));
+  return Math.min(max, Math.max(CHAT_MIN_W, Math.round(w)));
+}
+
+/** Drag (or arrow-key) the chat column's right edge: 320 px up to half the window. */
+function ChatResizer({ width, onResize }: { width: number; onResize: (w: number, persist: boolean) => void }) {
+  const max = typeof window === "undefined" ? 640 : Math.max(CHAT_MIN_W, Math.floor(window.innerWidth * 0.5));
+  return (
+    <div
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize chat"
+      aria-valuemin={CHAT_MIN_W}
+      aria-valuemax={max}
+      aria-valuenow={width}
+      tabIndex={0}
+      data-chat-resizer=""
+      className="group relative z-10 hidden w-0 shrink-0 cursor-col-resize touch-none outline-none lg:block"
+      onPointerDown={(e) => {
+        e.preventDefault();
+        const startX = e.clientX;
+        const startW = width;
+        const el = e.currentTarget;
+        el.setPointerCapture(e.pointerId);
+        let last = startW;
+        const move = (ev: PointerEvent) => {
+          last = startW + ev.clientX - startX;
+          onResize(last, false);
+        };
+        const up = () => {
+          el.removeEventListener("pointermove", move);
+          el.removeEventListener("pointerup", up);
+          onResize(last, true);
+        };
+        el.addEventListener("pointermove", move);
+        el.addEventListener("pointerup", up);
+      }}
+      onKeyDown={(e) => {
+        const step = e.shiftKey ? 48 : 16;
+        if (e.key === "ArrowLeft") onResize(width - step, true);
+        else if (e.key === "ArrowRight") onResize(width + step, true);
+        else return;
+        e.preventDefault();
+      }}
+    >
+      <span className="absolute inset-y-0 -left-1.5 w-3 group-hover:bg-accent-text/15 group-focus-visible:bg-accent-text/25" />
+    </div>
   );
 }

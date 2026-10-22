@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type { ChatUIMessage } from "@brandloop/agent/client";
@@ -33,6 +34,7 @@ export function PostChat({
   beforeSend,
   onBusyChange,
   onClose,
+  onCollapse,
 }: {
   documentId: string;
   chatId: string;
@@ -49,6 +51,7 @@ export function PostChat({
   onBusyChange: (busy: boolean) => void;
   /** Phones: closes the chat sheet. */
   onClose?: () => void;
+  onCollapse?: () => void;
 }) {
   const router = useRouter();
   const [draft, setDraft] = useState("");
@@ -166,7 +169,9 @@ export function PostChat({
     <div className="flex h-full min-h-0 flex-col">
       <header className="flex min-h-(--header-row) shrink-0 items-center justify-between gap-3 px-5">
         <h2 id="post-chat-title" className="flex items-center gap-2.5 text-[13px] font-medium text-text-2">
-          <LogoMark />
+          <Link href="/posts" aria-label="Back to posts" title="Back to posts" className="inline-flex">
+            <LogoMark />
+          </Link>
           Chat with Orbit
         </h2>
         <div className="flex items-center gap-2">
@@ -178,6 +183,11 @@ export function PostChat({
           )}
           {onClose && (
             <Button variant="ghost" size="icon" className="size-11 border border-line-3 lg:hidden" onClick={onClose} aria-label="Close chat">
+              <CloseIcon />
+            </Button>
+          )}
+          {onCollapse && (
+            <Button variant="ghost" size="icon" className="hidden size-8 lg:inline-flex" onClick={onCollapse} aria-label="Hide chat" title="Hide chat">
               <CloseIcon />
             </Button>
           )}

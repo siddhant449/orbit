@@ -73,6 +73,9 @@ h1[tabindex="-1"]:focus-visible {
     width: 8px;
     height: 8px;
   }
+  ::-webkit-scrollbar-button {
+    display: none;
+  }
   ::-webkit-scrollbar-track {
     background: transparent;
   }
