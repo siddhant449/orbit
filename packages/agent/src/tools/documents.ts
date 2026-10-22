@@ -71,6 +71,9 @@ export async function createDocumentFromHandoff(ctx: TurnContext, input: CreateD
     return { status: "needs-user-input", missingInput: missing };
   }
 
+  const blocked = await ctx.screenText?.(payload.data.draft);
+  if (blocked) return `Refused: ${blocked}` as never;
+
   const title = (input.title.trim() || payload.data.title.trim() || "Untitled post").slice(0, LIMITS.titleChars);
   const write = (chunk: { type: `data-${string}`; id?: string; data: unknown; transient?: boolean }) => ctx.writer?.write(chunk as never);
   write({ type: "data-creating", data: true, transient: true });
@@ -214,6 +217,8 @@ export async function updateDocumentRun(ctx: TurnContext, input: UpdateDocumentI
       return `Failed: the editor couldn't produce a usable edit (${res.reason}). Ask the user to rephrase or try again.`;
     }
     if (res.text === doc.text) return unchanged(doc, res.changeSummary || "No change was needed.");
+    const blocked = await ctx.screenText?.(res.text);
+    if (blocked) return `Refused: ${blocked}`;
     const saved = await saveDocumentVersion(ctx.profileId, doc.id, {
       text: res.text,
       hook: hookOf(res.text),
@@ -298,6 +303,8 @@ export async function proposeDocumentEditsRun(
     const raw = await ctx.ai.json({ model: "generate", system: PROPOSE_SYSTEM, prompt, schema: z.object({ replacement: z.string() }), abortSignal });
     const replacement = z.object({ replacement: z.string() }).parse(raw).replacement;
     if (replacement.length > LIMITS.proposalChars) return "Failed: the suggested passage came back too long. Try a shorter passage.";
+    const blocked = await ctx.screenText?.(replacement);
+    if (blocked) return `Refused: ${blocked}`;
     if (replacement === input.targetText) return "Failed: the suggestion didn't change the passage. Ask the user what they'd like different.";
     return {
       proposalId: toolCallId,

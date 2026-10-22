@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createModerator } from "./moderation";
-import { createUsageLimiter, estimateCostMicroUsd, memoryStore, upstashStore } from "./usage-limits";
+import { createUsageLimiter, defaultCounterStore, estimateCostMicroUsd, memoryStore, upstashStore } from "./usage-limits";
 
 describe("usage limiter", () => {
   it("allows 20 turns per window and denies the 21st with a wait", async () => {
@@ -55,6 +55,31 @@ describe("usage limiter", () => {
   it("estimates cost from tokens and honours an override", () => {
     expect(estimateCostMicroUsd("gpt-6-luna", { inputTokens: 1000, outputTokens: 1000 }, {})).toBeCloseTo(1500);
     expect(estimateCostMicroUsd("gpt-6-luna", { inputTokens: 1000 }, { AI_PRICE_GPT_6_LUNA: "1,2" })).toBe(1000);
+  });
+});
+
+describe("production fail-closed", () => {
+  const down = { incr: async () => Promise.reject(new Error("down")), get: async () => Promise.reject(new Error("down")) };
+
+  it("budget and daily limits deny when the store errors, rate limits stay open", async () => {
+    const lim = createUsageLimiter({ store: down, failClosed: true, onError: () => {} });
+    expect(await lim.checkBudget("chat", "p", 1)).toMatchObject({ ok: false, kind: "daily" });
+    expect(await lim.takeDaily("img", "t", 1)).toMatchObject({ ok: false });
+    expect((await lim.take("chat", "p", { limit: 1, windowSec: 60 })).ok).toBe(true);
+  });
+
+  it("production without Upstash variables logs loudly and refuses the budget", async () => {
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    const store = defaultCounterStore({ NODE_ENV: "production" });
+    expect(err).toHaveBeenCalledWith(expect.stringContaining("UPSTASH_REDIS_REST_URL"));
+    const lim = createUsageLimiter({ store, failClosed: true, onError: () => {} });
+    expect((await lim.checkBudget("chat", "p", 1)).ok).toBe(false);
+    err.mockRestore();
+  });
+
+  it("development with no Upstash variables uses memory and allows", async () => {
+    const lim = createUsageLimiter({ store: defaultCounterStore({ NODE_ENV: "development" }), failClosed: false });
+    expect((await lim.checkBudget("chat", "p", 1)).ok).toBe(true);
   });
 });
 

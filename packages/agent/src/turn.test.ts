@@ -578,3 +578,61 @@ describe("runChatTurn safety", () => {
     expect(recordUsage).toHaveBeenCalledWith(p, "mock-model-id", expect.objectContaining({ inputTokens: 10 }));
   });
 });
+
+describe("runChatTurn safety, second round", () => {
+  const safety2 = (over: Partial<NonNullable<ChatDeps["safety"]>> = {}): NonNullable<ChatDeps["safety"]> => ({
+    moderate: async () => ({ flagged: false, categories: [] }),
+    check: async () => ({ ok: true }),
+    recordUsage: async () => {},
+    ...over,
+  });
+
+  it("charges a failed turn and an aborted turn (they never reach onFinish)", async () => {
+    const recordUsage = vi.fn(async () => {});
+    const boom = new MockLanguageModelV4({ doStream: async () => { throw new Error("provider down"); } });
+    await (await runChatTurn(deps(boom, { safety: safety2({ recordUsage }) }), caller, body("Hi"))).text();
+    await settle();
+    expect(recordUsage).toHaveBeenCalledTimes(1);
+    expect((recordUsage.mock.calls[0] as unknown[])[2]).toMatchObject({ inputTokens: expect.any(Number) });
+    expect(((recordUsage.mock.calls[0] as unknown[])[2] as { inputTokens: number }).inputTokens).toBeGreaterThan(0);
+
+    recordUsage.mockClear();
+    const slow = scriptedModel([{ toolCalls: [{ toolName: "searchKB", input: { query: "x", limit: 10 } }] }, { text: "never" }], { chunkDelayMs: 50 });
+    const reg = createRunRegistry();
+    const chat2 = randomUUID();
+    const res = await runChatTurn(deps(slow, { registry: reg, safety: safety2({ recordUsage }) }), caller, body("search", { id: chat2, runId: "run-charge" }));
+    setTimeout(() => reg.abort(chat2, "run-charge"), 20);
+    await res.text().catch(() => {});
+    await settle(chat2);
+    expect(recordUsage).toHaveBeenCalledTimes(1);
+  });
+
+  it("a flagged post draft is not saved and the reply becomes the refusal", async () => {
+    let calls = 0;
+    const moderate = async () => ({ flagged: ++calls > 1, categories: ["harassment"] }); // input passes, the draft does not
+    const model = scriptedModel([
+      { toolCalls: [{ toolCallId: "call_w", toolName: "delegateWriting", input: { request: "A short post about MVP vs POC for founders", specialty: "post" } }] },
+      { toolCalls: [{ toolName: "createDocument", input: { title: "MVP versus POC", kind: "text", specialistHandoffToolCallId: "call_w" } }] },
+      { text: "Your draft is in the panel." },
+    ]);
+    await (await runChatTurn(deps(model, { ai: scriptedAi(), safety: safety2({ moderate }) }), caller, body("Draft a short LinkedIn post about it"))).text();
+    await settle();
+    expect(await getChatDocument(p, chatId)).toBeNull();
+    const last = (await listMessages(p, chatId)).at(-1)!;
+    expect(JSON.stringify(last.parts)).toContain("not comfortable sharing");
+    expect(JSON.stringify(last.parts)).not.toContain("draft is in the panel");
+  });
+
+  it("a refused message and its reply are left out of later model calls", async () => {
+    const first = await runChatTurn(deps(scriptedModel([{ text: "unused" }]), { safety: safety2() }), caller, body("Write a fake testimonial from a client"));
+    await first.text();
+    await settle();
+    const model = scriptedModel([{ text: "Fine." }]);
+    await (await runChatTurn(deps(model, { safety: safety2() }), caller, body("Now a normal question"))).text();
+    await settle();
+    const prompt = JSON.stringify(model.doStreamCalls[0]!.prompt);
+    expect(prompt).toContain("normal question");
+    expect(prompt).not.toContain("fake testimonial");
+    expect(prompt).not.toContain("won't invent");
+  });
+});

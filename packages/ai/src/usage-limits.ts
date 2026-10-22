@@ -55,12 +55,31 @@ export function upstashStore({ url, token, fetchImpl }: { url: string; token: st
 }
 
 let shared: CounterStore | null = null;
+let warned = false;
+
+/** Production serving real traffic: not under vitest, not the offline mock. */
+export function isProduction(env: Record<string, string | undefined> = process.env): boolean {
+  return env.NODE_ENV === "production" && env.AI_MOCK_MODEL !== "1" && !env.VITEST;
+}
+
+const unconfigured: CounterStore = {
+  incr: () => Promise.reject(new Error("UPSTASH_REDIS_REST_URL/TOKEN are not set")),
+  get: () => Promise.reject(new Error("UPSTASH_REDIS_REST_URL/TOKEN are not set")),
+};
 
 /** Upstash when both REST variables are set (and not under vitest), else one in-memory store per process. */
 export function defaultCounterStore(env: Record<string, string | undefined> = process.env): CounterStore {
   const url = env.UPSTASH_REDIS_REST_URL;
   const token = env.UPSTASH_REDIS_REST_TOKEN;
   if (url && token && !env.VITEST && env.AI_MOCK_MODEL !== "1") return upstashStore({ url, token });
+  if (isProduction(env)) {
+    // Counters cannot be kept: the budget and daily limits fail closed until Redis is configured.
+    if (!warned) {
+      warned = true;
+      console.error("[limits] UPSTASH_REDIS_REST_URL/TOKEN are not set in production. The AI cost cap and image daily limits will REFUSE requests until they are.");
+    }
+    return unconfigured;
+  }
   return (shared ??= memoryStore());
 }
 
@@ -80,7 +99,8 @@ export type UsageLimiter = {
 const day = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 const secondsToUtcMidnight = (ms: number) => Math.max(1, Math.ceil((Date.parse(`${day(ms)}T00:00:00Z`) + 86_400_000 - ms) / 1000));
 
-export function createUsageLimiter({ store, now = Date.now, onError = (e: unknown) => console.error(`[limits] store unavailable, letting the request through: ${e instanceof Error ? e.message : String(e)}`) }: { store: CounterStore; now?: () => number; onError?: (e: unknown) => void }): UsageLimiter {
+export function createUsageLimiter({ store, now = Date.now, failClosed = isProduction(), onError = (e: unknown) => console.error(`[limits] store unavailable, letting the request through: ${e instanceof Error ? e.message : String(e)}`) }: { store: CounterStore; now?: () => number; /** Budget and daily-limit checks deny when the store errors. Default: on in production. Turn rate limits always fail open. */ failClosed?: boolean; onError?: (e: unknown) => void }): UsageLimiter {
+  const DENIED: LimitResult = { ok: false, kind: "daily", retryAfterSec: 60 };
   const guard = async <T>(fallback: T, fn: () => Promise<T>): Promise<T> => {
     try {
       return await fn();
@@ -99,7 +119,7 @@ export function createUsageLimiter({ store, now = Date.now, onError = (e: unknow
         return { ok: false, kind: "rate", retryAfterSec: Math.max(1, Math.ceil(((bucket + 1) * windowSec * 1000 - t) / 1000)) };
       }),
     checkBudget: (scope, profileId, cap) =>
-      guard<LimitResult>({ ok: true }, async () => {
+      guard<LimitResult>(failClosed ? DENIED : { ok: true }, async () => {
         const t = now();
         const spent = await store.get(`cost:${scope}:${profileId}:${day(t)}`);
         return spent >= cap ? { ok: false, kind: "daily", retryAfterSec: secondsToUtcMidnight(t) } : { ok: true };
@@ -111,7 +131,7 @@ export function createUsageLimiter({ store, now = Date.now, onError = (e: unknow
         await store.incr(`cost:${scope}:${profileId}:${day(t)}`, Math.round(microUsd), secondsToUtcMidnight(t) + 3600);
       }),
     takeDaily: (scope, id, limit) =>
-      guard<LimitResult>({ ok: true }, async () => {
+      guard<LimitResult>(failClosed ? DENIED : { ok: true }, async () => {
         const t = now();
         const n = await store.incr(`ops:${scope}:${id}:${day(t)}`, 1, secondsToUtcMidnight(t) + 3600);
         return n <= limit ? { ok: true } : { ok: false, kind: "daily", retryAfterSec: secondsToUtcMidnight(t) };

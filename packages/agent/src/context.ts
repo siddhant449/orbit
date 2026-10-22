@@ -40,5 +40,7 @@ export type TurnContext = {
   documentRef: { current: OpenDocument | null };
   /** Image tools are offered only when the app wires this in (VISUALS_ENABLED). */
   visuals?: VisualsToolDeps | null;
+  /** Moderation for text a tool is about to save as the post. Returns the refusal message when it is flagged, else null. */
+  screenText?: ((text: string) => Promise<string | null>) | undefined;
   now: () => Date;
 };

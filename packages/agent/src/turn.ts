@@ -250,6 +250,8 @@ export async function runChatTurn(
     throw err;
   }
 
+  /** Set when a document tool's text was flagged: the stored reply becomes this refusal. */
+  let blockedMessage: string | null = null;
   let setup;
   try {
     setup = await prepareTurn();
@@ -273,6 +275,9 @@ export async function runChatTurn(
   const modelId = typeof turnModel === "string" ? turnModel : turnModel.modelId;
   const metadata: MessageMetadata = { createdAt, modelId };
   let streamFailed = false;
+  let charged = false;
+  let usageSoFar = 0;
+  let outputRefused = false;
 
   /** Top-level failures (model, network, processing) fail the turn; tool step errors are recoverable. */
   const streamErrorText = (err: unknown) => {
@@ -323,7 +328,11 @@ export async function runChatTurn(
           streamFailed = true;
           log("chat model error", error);
         },
+        onStepFinish: (step) => {
+          usageSoFar += (step.usage?.inputTokens ?? 0) + (step.usage?.outputTokens ?? 0);
+        },
         onFinish: ({ totalUsage }) => {
+          charged = true;
           if (verdict.ok) void deps.safety?.recordUsage(profileId, modelId, totalUsage).catch(() => {});
         },
       });
@@ -349,11 +358,23 @@ export async function runChatTurn(
         const finish = isAborted ? "aborted" : failed ? "error" : "stop";
         let parts = toStoredParts(responseMessage.parts);
         if (finish !== "stop") parts = finalizeAbortedParts(parts);
-        if (finish === "stop" && verdict.ok && deps.safety) {
+        // Stopped, failed or timed-out turns never reach onFinish but still cost money: charge what was seen, else an estimate.
+        if (finish !== "stop" && verdict.ok && !charged && deps.safety) {
+          charged = true;
+          const estIn = Math.ceil((instructions.length + JSON.stringify(modelMessages).length) / 4);
+          const estOut = Math.ceil(textOf(parts).length / 4) + 200;
+          const usage = { inputTokens: Math.max(usageSoFar, estIn), outputTokens: estOut };
+          void deps.safety.recordUsage(profileId, modelId, usage).catch(() => {});
+        }
+        if (blockedMessage) {
+          outputRefused = true;
+          parts = [{ type: "text", text: blockedMessage }] as typeof parts;
+        } else if (finish === "stop" && verdict.ok && deps.safety) {
           // The reply was already streamed; what is stored (and shown on reload) is the refusal instead.
           const out = await screenOutput(textOf(parts), deps.safety.moderate);
           if (!out.ok) {
             log("assistant reply withheld (moderation)", new Error("policy"));
+            outputRefused = true;
             parts = [{ type: "text", text: out.message }] as typeof parts;
           }
         }
@@ -372,7 +393,8 @@ export async function runChatTurn(
           picker: null,
           now: now(),
         };
-        const activeTask = nextActiveTask(prevTask, turn, () => ctx.taskId);
+        // A refused exchange leaves the task ledger alone, so its text never reaches a later prompt.
+        const activeTask = !verdict.ok || outputRefused ? prevTask : nextActiveTask(prevTask, turn, () => ctx.taskId);
 
         await saveAssistantMessage(chatId, {
           id: assistantId,
@@ -386,6 +408,7 @@ export async function runChatTurn(
             documentId: ctx.documentRef.current?.id ?? null,
             modelId,
             finish,
+            ...(!verdict.ok || outputRefused ? { refused: true } : {}),
           },
         });
         if (defaultTitle && userText) deps.after(async () => void (await titleChat(deps.ai, chatId, userText)));
@@ -441,6 +464,15 @@ export async function runChatTurn(
       ...(m.metadata ? { metadata: m.metadata } : {}),
     })) as ChatUIMessage[];
     const window = windowHistory(history);
+    // Messages refused by safety (and the reply that refused them) never reach the model again.
+    const refusedIds = new Set(
+      stored
+        .filter((m) => m.role === "assistant" && (m.context as { refused?: unknown } | null)?.refused === true)
+        .map((m) => (m.context as { requestMessageId?: string }).requestMessageId),
+    );
+    const modelWindow = windowHistory(
+      history.filter((m) => !(m.role === "user" && refusedIds.has(m.id)) && !(m.role === "assistant" && stored.find((x) => x.id === m.id && (x.context as { refused?: unknown } | null)?.refused === true))),
+    );
     const newest = window.at(-1);
     if (newest?.role !== "user" || newest.id !== requestMessageId) {
       throw new TurnComplete("This message isn't the newest in the chat. Reload the conversation.");
@@ -470,11 +502,19 @@ export async function runChatTurn(
       documentRef: { current: await getChatDocument(profileId, chatId) },
       documentContext: body.documentContext ?? null,
       visuals: deps.visuals ?? null,
+      screenText: deps.safety
+        ? async (text) => {
+            const out = await screenOutput(text, deps.safety!.moderate);
+            if (out.ok) return null;
+            blockedMessage = out.message;
+            return out.message;
+          }
+        : undefined,
       now,
     };
     const tools = tagToolErrors(buildTools(ctx, { webSearchTool: deps.webSearchTool }));
     const instructions = buildSystemPrompt(await loadPromptInput(ctx, prevTask));
-    const modelMessages = await convertToModelMessages(window, { tools, ignoreIncompleteToolCalls: true });
+    const modelMessages = await convertToModelMessages(modelWindow, { tools, ignoreIncompleteToolCalls: true });
     const controller = deps.registry.start(chatId, runId);
     return { ctx, tools, instructions, window, modelMessages, prevTask, controller, userText };
   }
