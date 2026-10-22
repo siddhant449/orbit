@@ -4,9 +4,10 @@
  * validator, the final review and the Memories screen all read the same `EffectiveRules`.
  */
 import { bannedWordsFromRules } from "./patterns";
+import type { PostType } from "@brandloop/ai/style";
 import type { LayoutTargets } from "./measure";
 
-export type PostType = "story" | "framework" | "how-to" | "analysis" | "opinion" | "news" | "short";
+export type { PostType } from "@brandloop/ai/style";
 
 export type HardRules = {
   forbidEmoji: boolean;

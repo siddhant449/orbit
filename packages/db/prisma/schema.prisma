@@ -174,11 +174,61 @@ model VoiceStyle {
   tagline     String    @default("")
   guide       String    @default("")
   samplePosts String[]
+  /// The compiled StyleProfile (packages/ai/src/style.ts), validated on write. Null for rows that only have a `guide`.
+  styleProfile      Json?
+  profileVersion    Int         @default(0)
+  status            StyleStatus @default(READY)
+  statusDetail      String?
+  analyzedPostCount Int         @default(0)
+  analyzedAt        DateTime?
+  corpusHash        String?
+  versions          VoiceStyleVersion[]
+  corpus            StyleCorpusPost[]
   selectedBy  Profile[] @relation("SelectedVoice")
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
   @@index([profileId])
+}
+
+enum StyleStatus {
+  PENDING
+  ANALYZING
+  READY
+  FAILED
+}
+
+enum CorpusSource {
+  PASTE
+  EXPORT
+  ORBIT
+}
+
+/// An earlier compiled profile, kept so a re-extraction that made the style worse can be undone (last 10).
+model VoiceStyleVersion {
+  id           String     @id @default(cuid())
+  voiceStyle   VoiceStyle @relation(fields: [voiceStyleId], references: [id], onDelete: Cascade)
+  voiceStyleId String
+  version      Int
+  profile      Json
+  corpusHash   String
+  createdAt    DateTime   @default(now())
+
+  @@unique([voiceStyleId, version])
+}
+
+/// One post of a style's corpus (a pasted post, a LinkedIn export row). Deduplicated by hash.
+model StyleCorpusPost {
+  id           String       @id @default(cuid())
+  voiceStyle   VoiceStyle   @relation(fields: [voiceStyleId], references: [id], onDelete: Cascade)
+  voiceStyleId String
+  text         String
+  source       CorpusSource
+  postedAt     DateTime?
+  hash         String
+  createdAt    DateTime     @default(now())
+
+  @@unique([voiceStyleId, hash])
 }
 
 model KnowledgeItem {

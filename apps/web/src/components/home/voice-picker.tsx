@@ -15,6 +15,7 @@ import {
   textareaClass,
 } from "@/components/dialog-classes";
 import { selectVoiceAction } from "@/app/(app)/actions";
+import { StyleDetailsSheet } from "@/components/chat/style-details-sheet";
 
 export type VoiceOption = { id: string; name: string; tagline: string; own: boolean };
 
@@ -59,6 +60,7 @@ export function VoicePicker({ voices, selectedId }: { voices: VoiceOption[]; sel
   const listId = useId();
   const [open, setOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  const [detailsId, setDetailsId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const [pending, startTransition] = useTransition();
@@ -213,6 +215,18 @@ export function VoicePicker({ voices, selectedId }: { voices: VoiceOption[]; sel
                         <span className="block truncate text-[12px] text-text-2">{v.tagline}</span>
                       </span>
                       {sel && <CheckIcon size={16} className="shrink-0 text-accent-text" />}
+                      <button
+                        type="button"
+                        aria-label={`Details: ${v.name}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpen(false);
+                          setDetailsId(v.id);
+                        }}
+                        className="orbit-transition shrink-0 rounded-pill border border-line-control px-2.5 py-1 text-[12px] font-medium text-text-2 hover:border-text-3 hover:text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-text"
+                      >
+                        Details
+                      </button>
                     </div>
                   );
                 })}
@@ -222,6 +236,7 @@ export function VoicePicker({ voices, selectedId }: { voices: VoiceOption[]; sel
         </Popover.Root>
       </div>
       <AddStyleDialog open={addOpen} onOpenChange={setAddOpen} />
+      <StyleDetailsSheet styleId={detailsId} onClose={() => setDetailsId(null)} />
     </>
   );
 }
