@@ -1,5 +1,6 @@
 "use client";
 
+import { stripCitations } from "@brandloop/agent/client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import {
@@ -43,7 +44,7 @@ async function fetchDoc(id: string, opts: { throwMissing?: boolean } = {}): Prom
   if (res.status === 404 && opts.throwMissing) throw new DocMissing();
   if (!res.ok) return null;
   const d = (await res.json()) as PanelDoc;
-  return { id: d.id, title: d.title, version: d.version, text: d.text };
+  return { id: d.id, title: d.title, version: d.version, text: stripCitations(d.text) };
 }
 
 const fetchVersions = (url: string) =>

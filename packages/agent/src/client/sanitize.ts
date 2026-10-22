@@ -16,5 +16,6 @@ export function stripCitations(text: string): string {
     .replace(STRAY_BLOCK, (m) => (/(?:navlist|entity|cite)/.test(m) ? "" : m))
     .replace(PUA_ONLY, "")
     .replace(/[ \t]+([.,;:!?])/g, "$1")
-    .replace(/[ \t]{2,}/g, " ");
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/[ \t]+\n/g, "\n");
 }

@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type { ChatUIMessage } from "@brandloop/agent/client";
 import { Button, LogoMark } from "@brandloop/ui";
-import { CloseIcon } from "@brandloop/ui/icons";
+import { ChevronLeftIcon, CloseIcon, SidebarIcon } from "@brandloop/ui/icons";
 import type { VoiceOption } from "@/components/home/voice-picker";
 import { ChatComposer } from "@/components/chat/chat-composer";
 import { liveStatus, SAVING_FIRST } from "@/components/chat/chat-view";
@@ -169,9 +169,24 @@ export function PostChat({
     <div className="flex h-full min-h-0 flex-col">
       <header className="flex min-h-(--header-row) shrink-0 items-center justify-between gap-3 px-5">
         <h2 id="post-chat-title" className="flex items-center gap-2.5 text-[13px] font-medium text-text-2">
-          <Link href="/posts" aria-label="Back to posts" title="Back to posts" className="inline-flex">
-            <LogoMark />
+          <Link
+            href="/posts"
+            aria-label="Back to posts"
+            className="orbit-transition inline-flex h-8 items-center gap-1.5 rounded-pill border border-line-control pl-2 pr-3 text-[12px] font-medium text-text hover:border-inverse hover:bg-inverse hover:text-on-inverse max-lg:hidden"
+          >
+            <ChevronLeftIcon />
+            Posts
           </Link>
+          <button
+            type="button"
+            aria-label="Toggle sidebar"
+            title="Toggle sidebar"
+            onClick={() => window.dispatchEvent(new Event("orbit:toggle-sidebar"))}
+            className="orbit-transition grid size-8 place-items-center rounded-full border border-line-control text-text hover:border-inverse hover:bg-inverse hover:text-on-inverse max-lg:hidden"
+          >
+            <SidebarIcon />
+          </button>
+          <LogoMark />
           Chat with Orbit
         </h2>
         <div className="flex items-center gap-2">

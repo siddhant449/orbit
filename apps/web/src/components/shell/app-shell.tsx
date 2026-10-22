@@ -74,7 +74,13 @@ export function AppShell({ account, children }: { account: ShellAccount; childre
   const router = useRouter();
   const section = sectionFor(pathname);
   // Post editor: document mode. The sidebar steps aside (the chat column carries the way back) to give the editor room.
-  const focusMode = /^\/posts\/[^/]+\/?$/.test(pathname);
+  const [peek, setPeek] = useState<string | null>(null);
+  const focusMode = /^\/posts\/[^/]+\/?$/.test(pathname) && peek !== pathname;
+  useEffect(() => {
+    const toggle = () => setPeek((p) => (p === pathname ? null : pathname));
+    window.addEventListener("orbit:toggle-sidebar", toggle);
+    return () => window.removeEventListener("orbit:toggle-sidebar", toggle);
+  }, [pathname]);
   const collapsedPref = useSyncExternalStore(subscribeCollapsed, readCollapsed, () => false);
   const tablet = useMediaQuery("(min-width: 768px) and (max-width: 1023px)");
   const collapsed = collapsedPref || tablet;

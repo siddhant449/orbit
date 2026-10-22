@@ -117,7 +117,7 @@ function saveLine(s: AutosaveSnapshot, streaming: boolean): string {
  * raise a keep-mine / use-latest choice over unsaved edits. Schedule and Publish wait for the LinkedIn connection.
  */
 export function PostEditorView({
-  doc: initialDoc,
+  doc: rawDoc,
   chat,
   voices,
   selectedVoiceId,
@@ -128,6 +128,8 @@ export function PostEditorView({
   voices: VoiceOption[];
   selectedVoiceId: string | null;
 }) {
+  // Existing drafts may still hold web-search citation tokens: clean them before anything (editor, autosave) sees the text.
+  const initialDoc = useMemo(() => ({ ...rawDoc, text: stripCitations(rawDoc.text) }), [rawDoc]);
   const ctl = useDocument(initialDoc);
   // A post without a chat gets one id per visit, kept across refreshes of this view; the first send links it.
   const [freshChatId] = useState(() => crypto.randomUUID());

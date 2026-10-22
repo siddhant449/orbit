@@ -15,3 +15,10 @@ describe("stripCitations", () => {
     expect(stripCitations("a\n\nb")).toBe("a\n\nb");
   });
 });
+
+describe("stripCitations: stored draft characters", () => {
+  it("removes U+E200 cite U+E202 turn1view2 U+E201 exactly as stored", () => {
+    const stored = "approvals. citeturn1view2\n\nTool-building";
+    expect(stripCitations(stored)).toBe("approvals.\n\nTool-building");
+  });
+});
