@@ -67,7 +67,11 @@ test("starts on home, shows tool activity, keeps the history, manages the chat f
   await expect(page).toHaveURL(CHAT_URL);
   const id = CHAT_URL.exec(page.url())![1]!;
   expect(created.has(id)).toBe(true);
-  const row = page.getByRole("complementary", { name: "Sidebar" }).locator(`a[href="/chat/${id}"]`);
+  const sidebar = page.getByRole("complementary", { name: "Sidebar" });
+  const link = `a[href="/chat/${id}"]`;
+  const row = sidebar.locator(link);
+  // This chat's own list item, found by its link: other chats in the shared test profile may carry the same title.
+  const item = sidebar.getByRole("listitem").filter({ has: page.locator(link) });
   await expect(row).toBeVisible();
   await expect(row).toHaveAttribute("aria-current", "page");
   // The composer keeps focus through the address change.
@@ -87,7 +91,7 @@ test("starts on home, shows tool activity, keeps the history, manages the chat f
 
   // Rename, pin, delete from the row menu.
   const title = (await row.innerText()).trim();
-  await page.getByRole("button", { name: `Chat options, ${title}` }).click();
+  await item.getByRole("button", { name: `Chat options, ${title}` }).click();
   await page.getByRole("menuitem", { name: "Rename" }).click();
   const stamp = Date.now().toString(36);
   await page.getByLabel("Chat title").fill(`Onboarding notes ${stamp}`);
@@ -95,12 +99,12 @@ test("starts on home, shows tool activity, keeps the history, manages the chat f
   await expect(row).toHaveText(`Onboarding notes ${stamp}`);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(`Onboarding notes ${stamp}`);
 
-  await page.getByRole("button", { name: `Chat options, Onboarding notes ${stamp}` }).click();
+  await item.getByRole("button", { name: `Chat options, Onboarding notes ${stamp}` }).click();
   await page.getByRole("menuitem", { name: "Pin" }).click();
   await expect(page.getByText("Chat pinned")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Pinned", level: 3 })).toBeVisible();
 
-  await page.getByRole("button", { name: `Chat options, Onboarding notes ${stamp}` }).click();
+  await item.getByRole("button", { name: `Chat options, Onboarding notes ${stamp}` }).click();
   await page.getByRole("menuitem", { name: "Delete" }).click();
   await page.getByRole("alertdialog").getByRole("button", { name: "Delete chat" }).click();
   await expect(page.getByText("Chat deleted")).toBeVisible();
@@ -223,7 +227,9 @@ test("shows 409 recovery: a refused send comes back to the composer, rapid sends
 test("New chat while the first reply streams on home starts fresh", async ({ page }) => {
   await signIn(page);
   await page.goto("/");
-  await page.getByLabel("Message", { exact: true }).fill("Give me markdown");
+  // Paced ("slowly"), so the reply is still streaming on "/" when New chat is clicked: at the default pace it ends, and
+  // the address moves to the chat, before the click can land.
+  await page.getByLabel("Message", { exact: true }).fill("Give me markdown, slowly");
   await page.getByLabel("Message", { exact: true }).press("Enter");
   await expect(page.locator(".md--streaming")).toBeVisible({ timeout: 30_000 });
   await expect(page).toHaveURL(/\/$/);
@@ -231,19 +237,39 @@ test("New chat while the first reply streams on home starts fresh", async ({ pag
   await expect(page.getByRole("heading", { name: /What are we putting out there\?/ })).toBeVisible();
   await expect(page.getByLabel("Message", { exact: true })).toHaveValue("");
   expect(created.size).toBe(1);
+  // Once the first chat's turn is over, home is still home: the finished reply doesn't pull the address to the chat.
+  const [first] = created;
+  await expect
+    .poll(async () => ((await (await page.request.get(`/api/chat/${first}/messages`)).json()) as { activeTurn: unknown }).activeTurn, {
+      timeout: 30_000,
+    })
+    .toBeNull();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole("heading", { name: /What are we putting out there\?/ })).toBeVisible();
 });
 
 test("stop ends a live reply and keeps what was written", async ({ page }) => {
   await signIn(page);
   await startChat(page, "Hi");
   await expect(page.getByText("Mock reply.")).toBeVisible();
-  await page.getByLabel("Message", { exact: true }).fill("Write some markdown for me");
+  // "slowly" paces the mock (about 120 ms a word), so the reply is still live when Stop lands; at the default pace the
+  // whole reply streams in well under a second and the click raced the stream's end.
+  await page.getByLabel("Message", { exact: true }).fill("Write some markdown for me, slowly");
   await page.getByLabel("Message", { exact: true }).press("Enter");
   await expect(page.locator(".md--streaming")).toBeVisible({ timeout: 30_000 });
+  await expect(liveReply(page).getByRole("heading", { name: "Three ways to open the post" })).toBeVisible();
   await page.getByRole("button", { name: "Stop" }).click();
   await expect(liveReply(page)).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Send" })).toBeVisible();
   await expect(page.locator('[data-message="assistant"]')).toHaveCount(2);
+  // What was written stays; the rest never arrives.
+  await expect(page.getByRole("heading", { name: "Three ways to open the post" })).toBeVisible();
+  await page.waitForTimeout(9_000);
+  await expect(page.getByText("Read more in")).toHaveCount(0);
+  await page.reload();
+  await expect(page.locator('[data-message="assistant"]')).toHaveCount(2);
+  await expect(page.getByRole("heading", { name: "Three ways to open the post" })).toBeVisible();
+  await expect(page.getByText("Read more in")).toHaveCount(0);
 });
 
 // The mock writing specialist's post (packages/agent/src/mock.ts SCRIPTED_TITLE / SCRIPTED_DRAFT).
