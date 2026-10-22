@@ -323,6 +323,7 @@ model Document {
   versions  DocumentVersion[]
   chat      Chat?
   visuals   Visual[]
+  media     PostMedia[]
 
   @@index([profileId, deletedAt, updatedAt])
 }
@@ -380,6 +381,7 @@ model StorageObject {
   versions     VisualVersion[]
   brandLogoFor BrandTheme[]
   referenceFor ReferenceImage[]
+  postMedia    PostMedia[]
 
   @@index([profileId, kind, createdAt])
   @@index([deletedAt])
@@ -451,6 +453,7 @@ model Visual {
   updatedAt          DateTime        @updatedAt
   deletedAt          DateTime?
   versions           VisualVersion[]
+  postMedia          PostMedia[]
 
   @@unique([teamId, requestId])
   @@index([profileId, deletedAt, createdAt])
@@ -549,4 +552,32 @@ model ReferenceImage {
   createdAt       DateTime      @default(now())
 
   @@index([profileId, createdAt])
+}
+
+enum PostMediaKind {
+  IMAGE
+  DOCUMENT
+}
+
+/// A file attached to a post. For an attached visual, `storageObjectId` follows the visual's current version while the post
+/// is a draft; once the post is published the publisher sets `frozenAt` and the row stays on the published file.
+model PostMedia {
+  id               String        @id @default(cuid())
+  document         Document      @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  documentId       String
+  kind             PostMediaKind
+  position         Int
+  visual           Visual?       @relation(fields: [visualId], references: [id], onDelete: SetNull)
+  visualId         String?
+  storageObject    StorageObject @relation(fields: [storageObjectId], references: [id], onDelete: Cascade)
+  storageObjectId  String
+  altText          String?
+  /// LinkedIn's asset id for the uploaded file; cleared whenever the file changes.
+  linkedinAssetUrn String?
+  frozenAt         DateTime?
+  createdAt        DateTime      @default(now())
+
+  @@unique([documentId, visualId])
+  @@index([documentId, position])
+  @@index([visualId])
 }

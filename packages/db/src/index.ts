@@ -17,3 +17,4 @@ export * from "./services/credits";
 export * from "./services/visuals";
 export * from "./services/brand-theme";
 export * from "./services/reference-images";
+export * from "./services/post-media";

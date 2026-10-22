@@ -188,6 +188,14 @@ export async function beginEdit(
   throw new VisualError("in_progress", "This image is busy");
 }
 
+/**
+ * Posts that still carry this visual follow its current version, in the same transaction, and forget their cached LinkedIn
+ * asset. Media frozen by publishing (`frozenAt`) is left on the published file.
+ */
+async function syncDraftMedia(tx: Tx, visualId: string, storageObjectId: string): Promise<void> {
+  await tx.postMedia.updateMany({ where: { visualId, frozenAt: null }, data: { storageObjectId, linkedinAssetUrn: null } });
+}
+
 export type EditResult = {
   storageObjectId: string;
   editPrompt: string | null;
@@ -210,6 +218,7 @@ export async function completeEdit(visualId: string, r: EditResult): Promise<num
     await tx.visualVersion.create({
       data: { visualId, version: next, kind: r.kind, storageObjectId: r.storageObjectId, editPrompt: r.editPrompt, width: r.width, height: r.height },
     });
+    await syncDraftMedia(tx, visualId, r.storageObjectId);
     return next;
   });
 }
@@ -257,6 +266,7 @@ export async function revertVisual(profileId: string, visualId: string, version:
     await tx.visualVersion.create({
       data: { visualId, version: next, kind: "REVERT", storageObjectId: target.storageObjectId, width: target.width, height: target.height },
     });
+    await syncDraftMedia(tx, visualId, target.storageObjectId);
     return { version: next };
   });
 }
@@ -322,8 +332,13 @@ export async function updateAltText(profileId: string, id: string, altText: stri
   return count === 1;
 }
 
-/** Soft delete. An operation in flight is left to finish into a deleted visual and then be ignored. False when not found. */
+/** Soft delete, and detach from draft posts. An operation in flight is left to finish into a deleted visual and then be ignored. False when not found. */
 export async function deleteVisual(profileId: string, id: string): Promise<boolean> {
-  const { count } = await prisma.visual.updateMany({ where: { id, profileId, deletedAt: null }, data: { deletedAt: new Date() } });
-  return count === 1;
+  return prisma.$transaction(async (tx) => {
+    const { count } = await tx.visual.updateMany({ where: { id, profileId, deletedAt: null }, data: { deletedAt: new Date() } });
+    if (count === 0) return false;
+    // Drafts lose the image; published posts keep what they published.
+    await tx.postMedia.deleteMany({ where: { visualId: id, frozenAt: null } });
+    return true;
+  });
 }
