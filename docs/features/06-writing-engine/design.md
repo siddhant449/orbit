@@ -542,5 +542,5 @@ Recommended order: W1 → W2 → W3 → W4 → W5 → W6 → [AI core 11 trimmed
 ## User decisions (2026-10-22)
 - **Sources line:** goes **in the post** (like Kleo) when research was used — a short "Sources:" line at the end, built only from URLs the provider returned; the chat reply also lists them.
 - **Fair eval profile:** the user's Kleo writing rules and memory may be copied read-only into a gitignored local eval profile under `.recon/` (never committed or uploaded).
-- **Live eval budget:** ~$5 per full run (3 samples per prompt).
+- **Live eval budget:** ~$1 per full run (1 sample per prompt), max 2 runs — user lowered it from $5.
 - **Fold:** assume ~210 characters for "…see more" and ~50 characters per mobile line until verified.
