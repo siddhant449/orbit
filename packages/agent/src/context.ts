@@ -33,4 +33,6 @@ export type TurnContext = {
   /** The chat's post: loaded at the start of the turn, replaced when a tool creates or edits it. */
   documentRef: { current: OpenDocument | null };
   now: () => Date;
+  /** When the turn is aborted. The polish pass skips its model repair in the last 20 s. */
+  deadline: Date;
 };

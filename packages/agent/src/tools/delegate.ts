@@ -4,6 +4,7 @@ import type { TurnContext } from "../context";
 import { frameData, type DataSource } from "../data";
 import { bannedWordsFromRules, mergeChecks, runDeterministicChecks, runWritingChecks } from "../specialists/checks";
 import { lintPost, type Violation } from "../writing/lint";
+import { polishDraft, polishSummary, polishText } from "../writing/polish";
 import { acceptOverrides, resolveRules, type TurnOverrides } from "../writing/rules";
 import { stampEnvelope, type FinalReview, type HandoffEnvelope, type PostWriting } from "../specialists/envelope";
 import { buildGrounding, provenanceText, renderGrounding } from "../specialists/grounding";
@@ -98,21 +99,37 @@ export async function delegateWritingRun(
       return `Failed: the writing specialist couldn't produce a usable draft (${res.reason}). Ask the user to rephrase or try again.`;
     }
     const output = res.output;
-    const payload = output.payload;
+    let payload = output.payload;
     const extra: string[] = [];
     if (payload.readiness === "ready" && payload.draft) {
-      const { violations } = lintPost(payload.draft, grounding.rules, {
+      const lintCtx = {
         postType: payload.postType ?? null,
         groundingText: provenanceText(grounding, input.request),
         researchDates: null,
         personalDetails: personal,
-      });
-      extra.push(...violations.filter((v) => v.level !== "advice").sort((a, b) => Number(b.level === "hard") - Number(a.level === "hard")).map(describeViolation));
+      };
+      const common = { rules: grounding.rules, lintCtx, request: input.request, grounding: renderGrounding(grounding), deadline: ctx.deadline, abortSignal, render: { bullet: grounding.style.bullet, numbered: true } };
+      const started = Date.now();
+      const polished = payload.blocks?.length
+        ? await polishDraft(ctx.ai, { ...common, blocks: payload.blocks })
+        : { ...(await polishText(ctx.ai, { ...common, text: payload.draft, document: { id: "new", title: payload.title, version: 0 } })), blocks: undefined };
+      const note = polishSummary(polished.log);
+      if (note) extra.push(note);
+      payload = {
+        ...payload,
+        draft: polished.text,
+        hook: (polished.text.split(/\n\s*\n/)[0] ?? polished.text).slice(0, 200),
+        ...(polished.blocks ? { blocks: polished.blocks } : {}),
+      };
+      if (polished.log.mechanical.length + polished.log.lastResort.length > 0 || polished.log.modelRepair.attempted) {
+        console.info(`[agent] polish: ${polished.log.mechanical.length} mechanical, model repair ${polished.log.modelRepair.attempted ? "yes" : "no"}, ${polished.log.lastResort.length} last resort, ${Date.now() - started} ms, ${polished.log.remaining.length} remaining`);
+      }
+      extra.push(...polished.log.remaining.sort((a, b) => Number(b.level === "hard") - Number(a.level === "hard")).slice(0, 3).map(describeViolation));
     }
     extra.push(...grounding.rules.dropped.map((d) => `Style rule left out: ${d.text} (${d.reason})`));
     const envelope = stampEnvelope(
       "post-writing",
-      { ...output, findings: [...extra, ...output.findings].slice(0, MAX_FINDINGS) },
+      { ...output, payload, findings: [...extra, ...output.findings].slice(0, MAX_FINDINGS) },
       { toolCallId, taskId: ctx.taskId, request: input.request, document: null, style: grounding.style.ref, now: ctx.now() },
     );
     ctx.handoffs.set(toolCallId, envelope);

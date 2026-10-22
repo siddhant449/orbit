@@ -70,6 +70,7 @@ export async function testContext(over: Partial<TurnContext> = {}): Promise<Turn
     documentRef: { current: null },
     documentContext: null,
     now: () => new Date("2026-10-21T09:00:00Z"),
+    deadline: new Date(Date.now() + 285_000),
     ...over,
   };
 }

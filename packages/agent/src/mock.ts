@@ -278,7 +278,34 @@ CANNED.push(SCRIPTED_STYLE);
 
 /** Keyword routes, tried before CANNED: one schema can return a different canned output per scenario. */
 export const SCRIPTED_QUESTIONS = ["Who was your first hire, and when did you hire them?", "What changed for the team after they joined?"];
+const WALL =
+  "A proof of concept answers one narrow question about whether the idea can work at all, while a minimum viable product answers a much wider one about real demand, about paying users, about retention and about what the team should build next";
+export const EMOJI_DRAFT_BLOCKS: WriterBlock[] = [
+  { kind: "hook", lines: ["Stop building the wrong thing \u{1F680}"] },
+  { kind: "prose", lines: [WALL] },
+  { kind: "close", lines: ["Pick the harder question first."] },
+];
+export const EMOJI_REPAIRED_BLOCKS: WriterBlock[] = [
+  { kind: "hook", lines: ["Stop building the wrong thing \u{1F680}"] },
+  { kind: "prose", lines: ["A proof of concept answers one narrow question.", "A minimum viable product answers a wider one."] },
+  { kind: "prose", lines: ["The wider one is about real demand and paying users."] },
+  { kind: "close", lines: ["Pick the harder question first."] },
+];
 const ROUTES: { match: RegExp; output: unknown }[] = [
+  {
+    match: /\[e2e:emoji-draft\]/,
+    output: {
+      summary: "A short post.",
+      findings: [],
+      recommendation: "Create the post.",
+      missingInput: [],
+      confidence: "medium",
+      parentAction: "create-document",
+      payload: { readiness: "ready", title: "Wrong thing first", postType: "opinion", blocks: EMOJI_DRAFT_BLOCKS, facts: [], missingFacts: [], clarifyingQuestion: null },
+    },
+  },
+  // The polish pass's repair call (writing/polish.ts) carries the same request, so it matches the marker too.
+  { match: /\[e2e:emoji-draft\]/, output: { blocks: EMOJI_REPAIRED_BLOCKS } },
   {
     match: /\[e2e:needs-facts\]/,
     output: {

@@ -1,7 +1,7 @@
 import { toolLabel, type ToolState } from "@brandloop/agent/client";
 import { toolNameOf, toolStateOf, type ToolPartLike } from "./tool-row";
 
-export type Step = { label: string; state: ToolState };
+export type Step = { label: string; state: ToolState; detail: string | null };
 
 export type StepsSummary = {
   steps: Step[];
@@ -24,11 +24,20 @@ export function formatDuration(ms: number): string | null {
   return `${Math.floor(seconds / 60)}m ${String(seconds % 60).padStart(2, "0")}s`;
 }
 
+/** A finished writing step says what the polish pass did ("Polished: fixed 2 layout issues"), from the envelope's findings. */
+function stepDetail(part: ToolPartLike): string | null {
+  if (toolNameOf(part) !== "delegateWriting") return null;
+  const findings = (part.output as { findings?: unknown } | undefined)?.findings;
+  if (!Array.isArray(findings)) return null;
+  const line = findings.find((f): f is string => typeof f === "string" && f.startsWith("Polished: "));
+  return line ?? null;
+}
+
 /** A run of tool parts as the steps disclosure shows it. */
 export function summarizeSteps(parts: ToolPartLike[], durationMs?: number): StepsSummary {
   const steps = parts.map((p) => {
     const state = toolStateOf(p);
-    return { label: toolLabel(toolNameOf(p), state), state };
+    return { label: toolLabel(toolNameOf(p), state), state, detail: state === "done" ? stepDetail(p) : null };
   });
   const running = steps.filter((s) => s.state === "active").at(-1);
   return {

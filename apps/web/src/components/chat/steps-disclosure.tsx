@@ -85,6 +85,12 @@ export function StepsDisclosure({
             >
               <StepMark state={step.state} />
               <span className={cn(step.state === "active" && "steps__live")}>{step.label}</span>
+              {step.detail && (
+                <span data-step-detail className="text-text-3">
+                  {" · "}
+                  {step.detail}
+                </span>
+              )}
             </li>
           ))}
         </ol>

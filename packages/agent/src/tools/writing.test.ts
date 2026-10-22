@@ -105,4 +105,32 @@ describe("delegateWriting (writer v2)", () => {
     expect(await delegateWritingRun(ctx, { request: "Write a post about hiring a first engineer." }, "c")).toMatch(/EXISTING_POST|already/i);
     expect(ai.calls).toHaveLength(0);
   });
+
+  it("polishes the draft: an emoji and a long block are gone, with one model repair, and the envelope says so", async () => {
+    await upsertMemory(ctx.profileId, "writing/rules", "- No emojis\n- No walls of text (>3 lines)", "USER");
+    const wall = Array.from({ length: 26 }, () => "words").join(" ") + " and a few more words to fill the phone screen";
+    const dirty: WriterBlock[] = [{ kind: "hook", lines: ["Hire for the problem \u{1F680}"] }, { kind: "prose", lines: [wall] }, { kind: "close", lines: ["Write the role first."] }];
+    const split: WriterBlock[] = [
+      { kind: "hook", lines: ["Hire for the problem \u{1F680}"] },
+      { kind: "prose", lines: ["words ".repeat(12).trim()] },
+      { kind: "prose", lines: ["words ".repeat(12).trim()] },
+      { kind: "close", lines: ["Write the role first."] },
+    ];
+    const ai = fakeAi((call) => (call.system.includes("You repair one LinkedIn post") ? { blocks: split } : model({}, dirty)));
+    ctx.ai = ai;
+    const out = await run();
+    expect(out.payload.draft).not.toMatch(/\u{1F680}/u);
+    expect(out.payload.draft.split("\n\n")[1]).toBe("words ".repeat(12).trim());
+    expect(out.payload.hook).toBe("Hire for the problem");
+    expect(out.findings[0]).toMatch(/^Polished: fixed 2 layout issues$/);
+    expect(ai.calls.filter((c) => c.system.includes("You repair"))).toHaveLength(1);
+  });
+
+  it("makes no repair call when the draft is clean", async () => {
+    const ai = fakeAi(model());
+    ctx.ai = ai;
+    const out = await run();
+    expect(ai.calls).toHaveLength(1);
+    expect(out.findings.some((f) => f.startsWith("Polished"))).toBe(false);
+  });
 });

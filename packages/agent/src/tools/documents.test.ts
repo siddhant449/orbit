@@ -223,6 +223,17 @@ describe("updateDocument", () => {
     expect(types.indexOf("data-document")).toBeGreaterThan(types.lastIndexOf("data-textDelta"));
   });
 
+  it("saves only polished text: an em dash the edit introduced is gone when the rules forbid dashes", async () => {
+    await upsertMemory(ctx.profileId, "writing/rules", "- Don't use em dashes\n- No emojis", "USER");
+    const d = await openPost();
+    ctx.ai = fakeAi({ text: "Short hook \u2014 now.\n\nThe body stays the same \u{1F680}", changeSummary: "Shortened the hook", unmetRequirements: [] });
+    const out = await run(ctx, "updateDocument", edit);
+    expect(out).toMatchObject({ success: true, version: 2 });
+    const saved = (await getDocument(ctx.profileId, d.id))!;
+    expect(saved.text).toBe("Short hook, now.\n\nThe body stays the same");
+    expect(saved.text).not.toMatch(/\u2014|\u{1F680}/u);
+  });
+
   it("reports EDIT_REQUIREMENTS_MISSED after one retry and saves nothing", async () => {
     const d = await openPost();
     const ai = fakeAi({ text: "Whatever", changeSummary: "s", unmetRequirements: ["Add a CTA"] });

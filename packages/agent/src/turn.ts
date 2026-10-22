@@ -444,6 +444,7 @@ export async function runChatTurn(
       documentRef: { current: await getChatDocument(profileId, chatId) },
       documentContext: body.documentContext ?? null,
       now,
+      deadline: new Date(Date.now() + (deps.turnTimeoutMs ?? TURN_TIMEOUT_MS)),
     };
     const tools = tagToolErrors(buildTools(ctx, { webSearchTool: deps.webSearchTool }));
     const instructions = buildSystemPrompt(await loadPromptInput(ctx, prevTask));

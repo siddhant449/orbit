@@ -17,6 +17,8 @@ import { LIMITS } from "../limits";
 import { editDocumentText } from "../specialists/editing";
 import { findHandoff, PostWritingPayload } from "../specialists/envelope";
 import { buildGrounding, renderGrounding } from "../specialists/grounding";
+import { lintPost } from "../writing/lint";
+import { lastResort, mechanicalFix, polishText } from "../writing/polish";
 import { capOutput } from "./cap";
 import { countOccurrences } from "../match";
 import { isAbort, runTool } from "./run";
@@ -213,10 +215,27 @@ export async function updateDocumentRun(ctx: TurnContext, input: UpdateDocumentI
       if ("missed" in res) return editRequirementsMissed(res.missed);
       return `Failed: the editor couldn't produce a usable edit (${res.reason}). Ask the user to rephrase or try again.`;
     }
-    if (res.text === doc.text) return unchanged(doc, res.changeSummary || "No change was needed.");
-    const saved = await saveDocumentVersion(ctx.profileId, doc.id, {
+    // The polish pass: mechanical fixes, at most one repair, and the character-level rules enforced last. A hard
+    // violation the edit introduced is never saved; one the post already had is left for the user to decide.
+    const lintCtx = { postType: null, groundingText: null, researchDates: null, personalDetails: "allowed" as const };
+    const baseline = new Set(lintPost(doc.text, grounding.rules, lintCtx).violations.filter((v) => v.level === "hard").map((v) => v.id));
+    const polished = await polishText(ctx.ai, {
       text: res.text,
-      hook: hookOf(res.text),
+      document: doc,
+      rules: grounding.rules,
+      lintCtx,
+      request: input.description,
+      grounding: renderGrounding(grounding),
+      deadline: ctx.deadline,
+      abortSignal,
+      render: { bullet: grounding.style.bullet, numbered: true },
+    });
+    const introduced = polished.log.remaining.filter((v) => v.level === "hard" && !baseline.has(v.id));
+    if (introduced.length > 0) return editRequirementsMissed(introduced.map((v) => v.detail));
+    if (polished.text === doc.text) return unchanged(doc, res.changeSummary || "No change was needed.");
+    const saved = await saveDocumentVersion(ctx.profileId, doc.id, {
+      text: polished.text,
+      hook: hookOf(polished.text),
       source: "AI_EDIT",
       changeSummary: res.changeSummary || input.description,
       expectedVersion: doc.version,
@@ -297,14 +316,16 @@ export async function proposeDocumentEditsRun(
     ].join("\n\n");
     const raw = await ctx.ai.json({ model: "generate", system: PROPOSE_SYSTEM, prompt, schema: z.object({ replacement: z.string() }), abortSignal });
     const replacement = z.object({ replacement: z.string() }).parse(raw).replacement;
-    if (replacement.length > LIMITS.proposalChars) return "Failed: the suggested passage came back too long. Try a shorter passage.";
-    if (replacement === input.targetText) return "Failed: the suggestion didn't change the passage. Ask the user what they'd like different.";
+    // A passage can't be linted as a post, but the rules that work on characters apply to it too.
+    const tidy = lastResort(mechanicalFix(replacement, grounding.rules, grounding.style.bullet).text, grounding.rules).text;
+    if (tidy.length > LIMITS.proposalChars) return "Failed: the suggested passage came back too long. Try a shorter passage.";
+    if (tidy === input.targetText) return "Failed: the suggestion didn't change the passage. Ask the user what they'd like different.";
     return {
       proposalId: toolCallId,
       documentId: doc.id,
       documentVersion: doc.version,
       targetText: input.targetText,
-      replacement,
+      replacement: tidy,
       instruction: input.instruction,
     };
   } catch (err) {

@@ -167,6 +167,14 @@ function emojiOf(lines: string[]): PostMetrics["emoji"] {
   return { count: positions.length, positions };
 }
 
+/** The text with every emoji removed (a grapheme is an emoji or it is not), and the spaces they leave tidied. */
+export function stripEmoji(text: string): string {
+  return text
+    .split("\n")
+    .map((line) => (graphemes(line).some(isEmoji) ? graphemes(line).filter((g) => !isEmoji(g)).join("").replace(/[ \t]{2,}/g, " ").trimEnd() : line))
+    .join("\n");
+}
+
 /** Em dashes, en dashes that are not number ranges, and spaced hyphens. "co-founder" and "3–5" are not dashes. */
 function countDashes(lines: string[]): number {
   let n = 0;

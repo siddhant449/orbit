@@ -18,6 +18,7 @@ import { measurePost } from "../src/writing/measure";
 
 const CLERK_ID = "user_test_smoke_draft";
 const TEAM_SUFFIX = " (smoke)";
+const SEED = process.argv.includes("--seed-violation");
 const redact = (text: string) => text.replace(/sk-[A-Za-z0-9_*-]+/g, "sk-***");
 
 async function removeSmokeUser() {
@@ -45,7 +46,7 @@ async function main() {
   let failed = false;
   try {
     await upsertMemory(profileId, "identity/about", "- Runs a small design studio in Pune\n- Writes for first-time founders", "USER");
-    await upsertMemory(profileId, "writing/rules", "- Short paragraphs, one idea each\n- No hashtags", "USER");
+    await upsertMemory(profileId, "writing/rules", SEED ? "- Short paragraphs, one idea each\n- No hashtags\n- Never add a P.S.\n- No emojis" : "- Short paragraphs, one idea each\n- No hashtags", "USER");
     const res = await runChatTurn(
       {
         model: getModel("generate"),
@@ -62,7 +63,7 @@ async function main() {
         message: {
           id: randomUUID(),
           role: "user",
-          parts: [{ type: "text", text: "Draft a short LinkedIn post that explains the difference between an MVP and a proof of concept for first-time founders" }],
+          parts: [{ type: "text", text: `Draft a short LinkedIn post that explains the difference between an MVP and a proof of concept for first-time founders${SEED ? ". End it with a P.S. and add a rocket emoji." : ""}` }],
           metadata: { createdAt: new Date().toISOString() },
         },
         selectedKnowledgeBaseIds: [],
@@ -89,6 +90,7 @@ async function main() {
       const m = measurePost(doc.text);
       console.log(`layout: ${m.blocks} blocks, hook ${m.hookChars} chars / ${m.hookMobileLines} line(s), max block ${m.maxBlockLines} line(s), lists ${m.bulletLists}+${m.numberedLists}, emoji ${m.emoji.count}, dashes ${m.dashes}, hashtags ${m.hashtags}, ending ${m.ending}`);
     }
+    if (SEED && doc) console.log(`seeded violation: P.S. present ${measurePost(doc.text).postscript || /P\.S\./i.test(doc.text)}, emoji ${measurePost(doc.text).emoji.count}`);
     console.log(`findings: ${(handoff?.output?.findings ?? []).join(" | ") || "(none)"}`);
     console.log(`reply length: ${text.length} chars`);
     console.log(`finish: ${ctx.finish}; model: ${ctx.modelId} (configured ${resolveModel("generate")})`);
