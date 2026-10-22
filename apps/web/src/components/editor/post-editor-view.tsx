@@ -1,5 +1,7 @@
 "use client";
 
+import { stripCitations } from "@brandloop/agent/client";
+import { useVersionPreview, VersionPreviewBar } from "@/components/chat/version-preview";
 import Link from "next/link";
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { EditorContent, useEditor, useEditorState, type Editor } from "@tiptap/react";
@@ -116,7 +118,7 @@ function saveLine(s: AutosaveSnapshot, streaming: boolean): string {
  * raise a keep-mine / use-latest choice over unsaved edits. Schedule and Publish wait for the LinkedIn connection.
  */
 export function PostEditorView({
-  doc: initialDoc,
+  doc: rawDoc,
   chat,
   voices,
   selectedVoiceId,
@@ -127,7 +129,10 @@ export function PostEditorView({
   voices: VoiceOption[];
   selectedVoiceId: string | null;
 }) {
+  // Existing drafts may still hold web-search citation tokens: clean them before anything (editor, autosave) sees the text.
+  const initialDoc = useMemo(() => ({ ...rawDoc, text: stripCitations(rawDoc.text) }), [rawDoc]);
   const ctl = useDocument(initialDoc);
+  const vp = useVersionPreview(initialDoc.id);
   // A post without a chat gets one id per visit, kept across refreshes of this view; the first send links it.
   const [freshChatId] = useState(() => crypto.randomUUID());
   const chatId = chat.id ?? freshChatId;
@@ -135,6 +140,25 @@ export function PostEditorView({
   const editorId = useId();
   const [busy, setBusy] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  // Desktop: the chat column can be closed (reopened from the header) and dragged to a width kept in localStorage.
+  const [chatHidden, setChatHidden] = useState(false);
+  const [chatWidth, setChatWidth] = useState(CHAT_DEFAULT_W);
+  useEffect(() => {
+    try {
+      const saved = Number(localStorage.getItem(CHAT_W_KEY));
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is client-only; read after hydration
+      if (saved) setChatWidth(clampChatW(saved));
+    } catch {}
+  }, []);
+  const resizeChat = useCallback((w: number, persist: boolean) => {
+    const next = clampChatW(w);
+    setChatWidth(next);
+    if (persist) {
+      try {
+        localStorage.setItem(CHAT_W_KEY, String(next));
+      } catch {}
+    }
+  }, []);
   const [view, setView] = useState<PreviewView>("mobile");
   const [savedAt, setSavedAt] = useState(initialDoc.updatedAt);
   const doc = ctl.state.doc ?? initialDoc;
@@ -156,7 +180,7 @@ export function PostEditorView({
 
   const editor = useEditor({
     extensions: useMemo(() => postExtensions(), []),
-    content: textToDoc(initialDoc.text),
+    content: textToDoc(stripCitations(initialDoc.text)),
     immediatelyRender: false,
     shouldRerenderOnTransaction: false,
     editorProps: {
@@ -175,7 +199,7 @@ export function PostEditorView({
     bridge.bind(ctl.save, editor);
   }, [bridge, ctl.save, editor]);
   // The text as the editor shows it (typing, streams, replacements), for the counters and the hook view.
-  const text = useEditorState({ editor, selector: ({ editor: ed }) => (ed ? pmText(ed.state.doc) : initialDoc.text) }) ?? initialDoc.text;
+  const text = useEditorState({ editor, selector: ({ editor: ed }) => (ed ? pmText(ed.state.doc) : stripCitations(initialDoc.text)) }) ?? stripCitations(initialDoc.text);
 
   const history = useEditorState({
     editor,
@@ -203,13 +227,14 @@ export function PostEditorView({
   useEffect(() => {
     const d = ctl.state.doc;
     if (!editor || !d || d.id !== initialDoc.id) return;
+    const clean = stripCitations(d.text);
     if (streaming) {
-      if (!autosave.snapshot().dirty && pmText(editor.state.doc) !== d.text) {
-        replaceText(editor, d.text);
+      if (!autosave.snapshot().dirty && pmText(editor.state.doc) !== clean) {
+        replaceText(editor, clean);
       }
       return;
     }
-    autosave.remote({ id: d.id, version: d.version, text: d.text });
+    autosave.remote({ id: d.id, version: d.version, text: clean });
     // A stream that ended without a new version leaves the editor on the autosave's text, never a partial stream.
     if (pmText(editor.state.doc) !== autosave.currentText) {
       replaceText(editor, autosave.currentText);
@@ -273,7 +298,10 @@ export function PostEditorView({
       return;
     }
     const res = await ctl.restore(v, autosave.snapshot().version);
-    if (res.ok) toast(`Restored version ${v} as version ${res.version}.`);
+    if (res.ok) {
+      toast(`Restored version ${v}.`);
+      vp.close();
+    }
     else if ("conflict" in res) toast("This post changed. Reloaded the latest version.");
     else toast(res.error);
   }
@@ -368,9 +396,10 @@ export function PostEditorView({
               }}
               aria-modal={chatSheet || undefined}
               data-post-chat=""
+              style={{ ["--chat-w" as string]: `${chatWidth}px` }}
               className={cn(
                 "post-chat min-h-0 border-line-soft bg-ground",
-                "lg:relative lg:flex lg:w-[400px] lg:shrink-0 lg:flex-col lg:border-r",
+                chatHidden ? "lg:hidden" : "lg:relative lg:flex lg:w-(--chat-w) lg:shrink-0 lg:flex-col",
                 chatOpen ? "max-lg:fixed max-lg:inset-0 max-lg:z-[60] max-lg:flex max-lg:flex-col" : "max-lg:hidden",
               )}
             >
@@ -387,15 +416,16 @@ export function PostEditorView({
                 beforeSend={settled}
                 onBusyChange={setBusy}
                 onClose={closeChat}
+                onCollapse={() => setChatHidden(true)}
               />
             </aside>
+            {!chatHidden && <ChatResizer width={chatWidth} onResize={resizeChat} />}
 
             <section
               aria-labelledby="post-title"
-              data-lenis-prevent
-              className="post-editor__main min-w-0 flex-1 overflow-y-auto overscroll-contain"
+              className="post-editor__main flex min-h-0 min-w-0 flex-1 flex-col"
             >
-              <header className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4 px-(--gutter) pb-6 pt-5 lg:pt-[14px]">
+              <header className="flex shrink-0 flex-wrap items-start justify-between gap-x-6 gap-y-4 px-(--gutter) pb-4 pt-5 lg:pt-[14px]">
                 <div className="min-w-0 flex-1 lg:pt-1.5">
                   <div className="mb-2 flex items-center gap-2 lg:hidden">
                     <Button asChild variant="ghost" size="sm" className="-ml-2 px-2">
@@ -456,11 +486,6 @@ export function PostEditorView({
                     )}
                     <span aria-hidden="true">·</span>
                     <span className="text-text-soft">Draft</span>
-                    <span aria-hidden="true">·</span>
-                    <span data-char-count className={cn("tabular-nums", over ? "text-danger" : "text-text-3")}>
-                      {count.toLocaleString("en-US")} / {POST_CHAR_LIMIT.toLocaleString("en-US")}
-                      <span className="sr-only"> characters</span>
-                    </span>
                     {read && (
                       <span
                         data-readability
@@ -471,7 +496,9 @@ export function PostEditorView({
                       </span>
                     )}
                     <VersionMenu
-                      version={snap.version}
+                      version={doc.currentVersion ?? snap.version}
+                      previewing={vp.preview?.version ?? null}
+                      onPreview={(v) => void vp.open(v)}
                       versions={ctl.versions}
                       error={ctl.versionsError}
                       busy={ctl.saving || busy || streaming}
@@ -487,8 +514,11 @@ export function PostEditorView({
                     ref={chatToggleRef}
                     variant="secondary"
                     size="md"
-                    className="lg:hidden"
-                    onClick={() => setChatOpen(true)}
+                    className={cn(!chatHidden && "lg:hidden")}
+                    onClick={() => {
+                      setChatOpen(true);
+                      setChatHidden(false);
+                    }}
                     aria-haspopup="dialog"
                     aria-expanded={chatOpen}
                   >
@@ -503,12 +533,23 @@ export function PostEditorView({
                 </div>
               </header>
 
-              <div className="flex flex-col items-center gap-5 px-(--gutter) pb-16">
+              {vp.preview && (
+                <div className="mx-(--gutter) mb-3">
+                  <VersionPreviewBar
+                    version={vp.preview.version}
+                    busy={ctl.saving || busy}
+                    onRestore={() => void restore(vp.preview!.version)}
+                    onBack={vp.close}
+                  />
+                </div>
+              )}
+              <div className="mx-(--gutter) mb-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-card border border-line-soft bg-panel lg:mb-4">
+              <div className="flex shrink-0 justify-center px-4 py-3">
                 <EditorToolbar
                   controls={editorId}
                   canUndo={history?.canUndo ?? false}
                   canRedo={history?.canRedo ?? false}
-                  disabled={!editor || view === "hook" || (streaming && !snap.dirty)}
+                  disabled={!editor || view === "hook" || Boolean(vp.preview) || (streaming && !snap.dirty)}
                   view={view}
                   onUndo={() => editor?.chain().focus().undo().run()}
                   onRedo={() => editor?.chain().focus().redo().run()}
@@ -516,6 +557,9 @@ export function PostEditorView({
                   onEmoji={(em) => editor?.chain().focus().insertContent(em).run()}
                   onView={setView}
                 />
+              </div>
+              <div data-lenis-prevent className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+              <div className="flex flex-col items-center gap-5 px-4 pb-8">
 
                 {snap.conflict && (
                   <div
@@ -559,9 +603,10 @@ export function PostEditorView({
                   data-preview={view}
                 >
                   <PostSheet caption={streaming ? "Writing · LinkedIn preview" : updated ? `Edited ${updated} · LinkedIn preview` : "LinkedIn preview"}>
-                    <div hidden={view === "hook"}>
+                    {vp.preview && <div data-version-preview className="post-editor__text whitespace-pre-wrap">{vp.preview.text}</div>}
+                    <div hidden={view === "hook" || Boolean(vp.preview)}>
                       <EditorContent editor={editor} />
-                      {!editor && <div className="post-editor__text whitespace-pre-wrap">{initialDoc.text}</div>}
+                      {!editor && <div className="post-editor__text whitespace-pre-wrap">{stripCitations(initialDoc.text)}</div>}
                     </div>
                     {view === "hook" && (
                       <div data-hook-view className="text-[15px] leading-[1.5]">
@@ -585,6 +630,14 @@ export function PostEditorView({
                     </div>
                   </PostSheet>
                 </div>
+              </div>
+              </div>
+              <footer className="shrink-0 px-4 py-2.5 text-[13px]">
+                <span data-char-count className={cn("tabular-nums", over ? "text-danger" : "text-text-3")}>
+                  {count.toLocaleString("en-US")} / {POST_CHAR_LIMIT.toLocaleString("en-US")}
+                  <span className="sr-only"> characters</span>
+                </span>
+              </footer>
               </div>
             </section>
           </div>
@@ -640,17 +693,22 @@ function VersionMenu({
   error,
   busy,
   onRestore,
+  onPreview,
+  previewing,
   onRetry,
 }: {
   version: number;
+  onPreview: (v: number) => void;
+  previewing: number | null;
   versions: Parameters<typeof VersionList>[0]["versions"];
   error: boolean;
   busy: boolean;
   onRestore: (v: number) => void;
   onRetry: () => void;
 }) {
+  const [open, setOpen] = useState(false);
   return (
-    <Popover.Root>
+    <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger
         data-version-label
         className="orbit-transition inline-flex h-7 items-center rounded-pill border border-line-control px-2.5 text-[12px] font-medium text-text hover:border-inverse hover:bg-inverse hover:text-on-inverse"
@@ -666,7 +724,19 @@ function VersionMenu({
           data-lenis-prevent
           className="orbit-panel z-50 max-h-[min(420px,70svh)] w-[min(380px,calc(100vw-32px))] overflow-y-auto !pl-7 data-[state=open]:animate-[orbit-pop_200ms_var(--ease-out)_both]"
         >
-          <VersionList versions={versions} current={version} error={error} busy={busy} onRestore={onRestore} onRetry={onRetry} />
+          <VersionList
+            versions={versions}
+            current={version}
+            previewing={previewing}
+            onPreview={(v) => {
+              onPreview(v);
+              setOpen(false);
+            }}
+            error={error}
+            busy={busy}
+            onRestore={onRestore}
+            onRetry={onRetry}
+          />
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>
@@ -709,5 +779,59 @@ function TitleField({ initial, onDone }: { initial: string; onDone: (value: stri
       onBlur={() => finish(value)}
       className="w-full max-w-[560px] rounded-card-sm border border-line-control bg-transparent px-3 py-1.5 text-[22px] font-medium leading-tight tracking-[-0.01em] text-text outline-none focus-visible:border-accent-text"
     />
+  );
+}
+
+const CHAT_W_KEY = "orbit-post-chat-width";
+const CHAT_DEFAULT_W = 400;
+const CHAT_MIN_W = 320;
+function clampChatW(w: number): number {
+  const max = typeof window === "undefined" ? 640 : Math.max(CHAT_MIN_W, Math.floor(window.innerWidth * 0.5));
+  return Math.min(max, Math.max(CHAT_MIN_W, Math.round(w)));
+}
+
+/** Drag (or arrow-key) the chat column's right edge: 320 px up to half the window. */
+function ChatResizer({ width, onResize }: { width: number; onResize: (w: number, persist: boolean) => void }) {
+  const max = typeof window === "undefined" ? 640 : Math.max(CHAT_MIN_W, Math.floor(window.innerWidth * 0.5));
+  return (
+    <div
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize chat"
+      aria-valuemin={CHAT_MIN_W}
+      aria-valuemax={max}
+      aria-valuenow={width}
+      tabIndex={0}
+      data-chat-resizer=""
+      className="group relative z-10 hidden w-0 shrink-0 cursor-col-resize touch-none outline-none lg:block"
+      onPointerDown={(e) => {
+        e.preventDefault();
+        const startX = e.clientX;
+        const startW = width;
+        const el = e.currentTarget;
+        el.setPointerCapture(e.pointerId);
+        let last = startW;
+        const move = (ev: PointerEvent) => {
+          last = startW + ev.clientX - startX;
+          onResize(last, false);
+        };
+        const up = () => {
+          el.removeEventListener("pointermove", move);
+          el.removeEventListener("pointerup", up);
+          onResize(last, true);
+        };
+        el.addEventListener("pointermove", move);
+        el.addEventListener("pointerup", up);
+      }}
+      onKeyDown={(e) => {
+        const step = e.shiftKey ? 48 : 16;
+        if (e.key === "ArrowLeft") onResize(width - step, true);
+        else if (e.key === "ArrowRight") onResize(width + step, true);
+        else return;
+        e.preventDefault();
+      }}
+    >
+      <span className="absolute inset-y-0 -left-1.5 w-3 group-hover:bg-accent-text/15 group-focus-visible:bg-accent-text/25" />
+    </div>
   );
 }

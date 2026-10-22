@@ -1,3 +1,4 @@
+import { stripCitations } from "./client/sanitize";
 import type { ChatUIMessage } from "./tools";
 
 type Parts = ChatUIMessage["parts"];
@@ -19,6 +20,7 @@ export function toStoredParts(parts: Parts): Parts {
     .map((p) => {
       if (p.type === "text" && p.state === "streaming") return { ...p, state: "done" as const };
       if (isTool(p)) return safeToolError(p);
+      if (p.type === "text") return { ...p, text: stripCitations(p.text) };
       return p;
     });
 }

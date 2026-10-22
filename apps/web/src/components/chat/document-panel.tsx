@@ -14,6 +14,7 @@ import { LayoutReadout } from "./layout-readout";
 import type { DocumentController } from "./use-document";
 import { useThreadPlace } from "./thread-context";
 import { VersionList } from "./version-list";
+import { useVersionPreview, VersionPreviewBar } from "./version-preview";
 
 export const DESKTOP_PANEL = "(min-width: 1024px)";
 const PANEL_WIDTH = 460;
@@ -177,6 +178,8 @@ export function DocumentPanel({ ctl, busy }: { ctl: DocumentController; busy: bo
 
   const title = doc?.title || (streaming ? "Writing your post…" : "Post");
   const version = doc && doc.version > 0 ? doc.version : null;
+  const currentNo = doc?.currentVersion ?? version;
+  const vp = useVersionPreview(doc?.id ?? null);
 
   async function copy() {
     if (!doc) return;
@@ -192,7 +195,8 @@ export function DocumentPanel({ ctl, busy }: { ctl: DocumentController; busy: bo
     if (!version) return;
     const res = await ctl.restore(v, version);
     if (res.ok) {
-      toast(`Restored version ${v} as version ${res.version}.`);
+      toast(`Restored version ${v}.`);
+      vp.close();
       setTab("post");
     } else if ("conflict" in res) toast("This post changed. Reloaded the latest version.");
     else toast(res.error);
@@ -218,7 +222,7 @@ export function DocumentPanel({ ctl, busy }: { ctl: DocumentController; busy: bo
                 <>
                   <span aria-hidden="true">·</span>
                   <span data-version-label>
-                    Version <CountUp value={version} />
+                    Version <CountUp value={currentNo ?? version} />
                   </span>
                 </>
               )}
@@ -253,7 +257,7 @@ export function DocumentPanel({ ctl, busy }: { ctl: DocumentController; busy: bo
           }}
           options={[
             { value: "post", label: "Post" },
-            { value: "versions", label: version === 1 ? "1 version" : `${version} versions` },
+            { value: "versions", label: (ctl.versions?.length ?? currentNo ?? 1) === 1 ? "1 version" : `${ctl.versions?.length ?? currentNo} versions` },
           ]}
         />
       )}
@@ -266,7 +270,12 @@ export function DocumentPanel({ ctl, busy }: { ctl: DocumentController; busy: bo
         <div className="pl-3">
           <VersionList
             versions={ctl.versions}
-            current={version}
+            current={currentNo ?? 0}
+            previewing={vp.preview?.version ?? null}
+            onPreview={(v) => {
+              void vp.open(v);
+              setTab("post");
+            }}
             error={ctl.versionsError}
             busy={ctl.saving || busy}
             onRestore={(v) => void restore(v)}
@@ -275,8 +284,18 @@ export function DocumentPanel({ ctl, busy }: { ctl: DocumentController; busy: bo
         </div>
       ) : (
         <div className="flex flex-col gap-4">
+          {vp.preview && (
+            <VersionPreviewBar
+              version={vp.preview.version}
+              busy={ctl.saving || busy}
+              onRestore={() => void restore(vp.preview!.version)}
+              onBack={vp.close}
+            />
+          )}
           <PostSheet caption={streaming ? "Writing · LinkedIn preview" : "Just now · LinkedIn preview"}>
-            {isEditing && doc && version ? (
+            {vp.preview ? (
+              <PostText text={vp.preview.text} caret={false} />
+            ) : isEditing && doc && version ? (
               <DocumentEditor
                 doc={doc}
                 saving={ctl.saving}

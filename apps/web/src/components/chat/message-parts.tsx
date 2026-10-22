@@ -1,7 +1,7 @@
 "use client";
 
 import { lazy, memo, Suspense } from "react";
-import { collapseToolRuns, parseProposal, type ChatUIMessage, type Proposal } from "@brandloop/agent/client";
+import { collapseToolRuns, stripCitations, parseProposal, type ChatUIMessage, type Proposal } from "@brandloop/agent/client";
 import type { EditVisualOutput, ProposeVisualOutput, SuggestVisualsOutput } from "@brandloop/agent";
 import { cn } from "@brandloop/ui";
 import { AnalysisCard, analysisOf } from "./analysis-card";
@@ -77,7 +77,7 @@ export function MessageParts({ message, streaming }: { message: ChatUIMessage; s
           return <StepsDisclosure key={i} parts={(it as { parts: ToolPartLike[] }).parts} running={streaming && i === items.length - 1} />;
         }
         if (it.type === "text") {
-          const text = (it as unknown as { text: string }).text;
+          const text = stripCitations((it as unknown as { text: string }).text);
           if (!text.trim()) return null;
           return <TextBlock key={i} text={text} streaming={streaming && i === lastText && i === items.length - 1} />;
         }
@@ -109,7 +109,7 @@ export function MessageParts({ message, streaming }: { message: ChatUIMessage; s
 /** The reply's visible words, for Copy. */
 export function replyText(message: ChatUIMessage): string {
   return (message.parts as Part[])
-    .map((p) => (p.type === "text" ? p.text.trim() : ""))
+    .map((p) => (p.type === "text" ? stripCitations(p.text).trim() : ""))
     .filter(Boolean)
     .join("\n\n");
 }

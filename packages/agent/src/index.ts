@@ -1,5 +1,6 @@
 export { LIMITS } from "./limits";
 export * from "./types";
+export { stripCitations } from "./client/sanitize";
 export type { OpenDocument, TurnContext, VisualsToolDeps } from "./context";
 export { checkMemoryFact, FACT_MAX_CHARS, FACT_MIN_CHARS, type FactCheck } from "./guard";
 export { buildSystemPrompt, loadPromptInput, STATIC_PREFIX, type PromptInput } from "./prompt";

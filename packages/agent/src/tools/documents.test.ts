@@ -292,7 +292,8 @@ describe("updateDocument", () => {
     expect(out).toMatchObject({ id: d.id, version: 3, success: true, contentChanged: true });
     expect(ai.calls).toHaveLength(0);
     const versions = await listDocumentVersions(ctx.profileId, d.id);
-    expect(versions[0]).toMatchObject({ version: 3, source: "RESTORE" });
+    expect(versions).toHaveLength(2); // a restore moves the pointer; it adds no row
+    expect((await getDocument(ctx.profileId, d.id))!.currentVersion).toBe(1);
     expect((await getDocument(ctx.profileId, d.id))!.text).toBe(POST);
     expect(writer.chunks.find((c) => c.type === "data-document")!.data).toMatchObject({ version: 3, text: POST });
 

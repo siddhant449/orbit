@@ -367,7 +367,10 @@ model Document {
   kind      DocumentKind      @default(TEXT)
   status    DocumentStatus    @default(DRAFT)
   title     String
+  /// The current version's number. A restore moves it backwards; the next edit writes max(version) + 1.
   version   Int               @default(1)
+  /// Optimistic-concurrency token: bumped on every save and restore (the version number can't serve, it moves back).
+  revision  Int               @default(1)
   createdAt DateTime          @default(now())
   updatedAt DateTime          @updatedAt
   deletedAt DateTime?

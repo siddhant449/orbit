@@ -1,3 +1,4 @@
+import { stripCitations } from "../client/sanitize";
 import {
   createDocumentForChat,
   DocumentError,
@@ -45,7 +46,7 @@ export type CreateDocumentOutput =
 const failed = (error: string): CreateDocumentOutput => ({ error: `Failed: ${error}` });
 
 /** The panel's view of a post. */
-export const documentData = (d: DocumentSnapshot) => ({ id: d.id, title: d.title, version: d.version, text: d.text });
+export const documentData = (d: DocumentSnapshot) => ({ id: d.id, title: d.title, version: d.version, currentVersion: d.currentVersion, text: d.text });
 
 /**
  * createDocument (design §6.4): the post text comes from the referenced writing handoff, never from the
@@ -80,8 +81,8 @@ export async function createDocumentFromHandoff(ctx: TurnContext, input: CreateD
   try {
     doc = await createDocumentForChat(ctx.profileId, ctx.chatId, {
       title,
-      text: payload.data.draft,
-      hook: payload.data.hook,
+      text: stripCitations(payload.data.draft),
+      hook: payload.data.hook ? stripCitations(payload.data.hook) : payload.data.hook,
       changeSummary: envelope.summary,
     });
   } catch (err) {
@@ -186,7 +187,7 @@ export async function updateDocumentRun(ctx: TurnContext, input: UpdateDocumentI
   // The version the model last saw (the user's at turn start, or this turn's own last save) must still be current.
   if (seen && seen.id === doc.id && seen.version !== doc.version) return staleDocument(doc.version);
   const restore = input.restoreVersion;
-  if (restore !== null && restore === doc.version) return unchanged(doc, `Version ${restore} is already the current version.`);
+  if (restore !== null && restore === doc.currentVersion) return unchanged(doc, `Version ${restore} is already the current version.`);
 
   const write = writerOf(ctx);
   write({ type: "data-updating", data: true, transient: true });
@@ -215,6 +216,7 @@ export async function updateDocumentRun(ctx: TurnContext, input: UpdateDocumentI
       if ("missed" in res) return editRequirementsMissed(res.missed);
       return `Failed: the editor couldn't produce a usable edit (${res.reason}). Ask the user to rephrase or try again.`;
     }
+    res.text = stripCitations(res.text);
     // The polish pass: mechanical fixes, at most one repair, and the character-level rules enforced last. A hard
     // violation the edit introduced is never saved; one the post already had is left for the user to decide.
     const lintCtx = { postType: null, groundingText: null, researchDates: null, personalDetails: "allowed" as const };
@@ -315,7 +317,7 @@ export async function proposeDocumentEditsRun(
       `<passage>\n${defuseTags(input.targetText)}\n</passage>`,
     ].join("\n\n");
     const raw = await ctx.ai.json({ model: "generate", system: PROPOSE_SYSTEM, prompt, schema: z.object({ replacement: z.string() }), abortSignal });
-    const replacement = z.object({ replacement: z.string() }).parse(raw).replacement;
+    const replacement = stripCitations(z.object({ replacement: z.string() }).parse(raw).replacement);
     // A passage can't be linted as a post, but the rules that work on characters apply to it too.
     const tidy = lastResort(mechanicalFix(replacement, grounding.rules, grounding.style.bullet).text, grounding.rules).text;
     if (tidy.length > LIMITS.proposalChars) return "Failed: the suggested passage came back too long. Try a shorter passage.";
