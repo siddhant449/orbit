@@ -1,0 +1,49 @@
+/* Global (plain) CSS: this app compiles every .css through Tailwind, so CSS modules are unavailable; classes are prefixed. */
+/* Line chart (system §6.16, p09): the line draws once on first view (1.2 s out-expo after .3 s), the area fades in. */
+.insights-line {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+  animation: insights-draw var(--dur-line) var(--ease-out) 0.3s both;
+}
+.insights-area {
+  animation: insights-fade var(--dur-line) var(--ease-out) 0.5s both;
+}
+.insights-marker {
+  animation: insights-fade 400ms var(--ease-out) 1.3s both;
+}
+
+@keyframes insights-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes insights-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .insights-line,
+  .insights-area,
+  .insights-marker {
+    animation: none;
+  }
+}
+
+/* Heatmap steps (system §6.16): accent wash, peak cell full accent with Orbit's glow. */
+.insights-cell {
+  height: 16px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent-text) var(--heat, 6%), transparent);
+}
+.insights-peak {
+  background: var(--accent-text);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent-text) 60%, transparent);
+}
