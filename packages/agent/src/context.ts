@@ -23,6 +23,11 @@ export type TurnContext = {
   writer: UIMessageStreamWriter | null;
   /** Specialist envelopes produced this turn, keyed by tool call id. */
   handoffs: Map<string, HandoffEnvelope>;
+  /**
+   * The post version the user had open when they sent the message (`documentContext`), moved forward by this turn's
+   * own saves. updateDocument refuses to edit when the stored post is no longer at this version.
+   */
+  documentContext: { id: string; version: number } | null;
   /** The chat's post: loaded at the start of the turn, replaced when a tool creates or edits it. */
   documentRef: { current: OpenDocument | null };
   now: () => Date;

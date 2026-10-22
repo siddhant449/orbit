@@ -244,15 +244,37 @@ describe("updateDocument", () => {
       return { text: "AI text", changeSummary: "s", unmetRequirements: [] };
     });
     const out = await run(ctx, "updateDocument", edit);
-    expect(out).toBe("STALE_DOCUMENT: The user changed the post while you were editing. Use the new version in your context and ask before editing again.");
+    expect(out).toMatch(/^STALE_DOCUMENT: The user changed the post \(it's now version 2\)/);
+    expect(out).not.toMatch(/in your context/);
     const now = await getDocument(ctx.profileId, d.id);
     expect(now).toMatchObject({ version: 2, text: "The user's own text" });
-    expect(ctx.documentRef.current).toMatchObject({ version: 2, text: "The user's own text" });
+  });
+
+  it("returns STALE_DOCUMENT with the new version, without a model call, when the post changed since the turn started", async () => {
+    const d = await openPost();
+    ctx.documentContext = { id: d.id, version: 1 };
+    await saveDocumentVersion(ctx.profileId, d.id, { text: "Saved in another tab", source: "USER_EDIT", expectedVersion: 1 });
+    const ai = fakeAi({ text: "AI text", changeSummary: "s", unmetRequirements: [] });
+    ctx.ai = ai;
+    expect(await run(ctx, "updateDocument", edit)).toMatch(/^STALE_DOCUMENT: .*version 2/);
+    expect(ai.calls).toHaveLength(0);
+    expect((await getDocument(ctx.profileId, d.id))!.text).toBe("Saved in another tab");
+  });
+
+  it("a second edit in the same turn builds on the first", async () => {
+    const d = await openPost();
+    ctx.documentContext = { id: d.id, version: 1 };
+    let n = 0;
+    ctx.ai = fakeAi(() => ({ text: `Edit ${++n}`, changeSummary: "s", unmetRequirements: [] }));
+    expect(await run(ctx, "updateDocument", edit)).toMatchObject({ version: 2 });
+    expect(await run(ctx, "updateDocument", edit)).toMatchObject({ version: 3 });
   });
 
   it("restores a version through updateDocument", async () => {
     const d = await openPost();
     await saveDocumentVersion(ctx.profileId, d.id, { text: "Second", source: "USER_EDIT", expectedVersion: 1 });
+    // The turn starts after that save.
+    ctx.documentRef.current = await getDocument(ctx.profileId, d.id);
     const ai = fakeAi();
     ctx.ai = ai;
     const out = await run(ctx, "updateDocument", { ...edit, restoreVersion: 1 });
@@ -310,6 +332,12 @@ describe("proposeDocumentEdits", () => {
     });
     expect(ai.calls[0]!.prompt).toContain("Old hook that goes on and on.");
     expect((await getDocument(ctx.profileId, d.id))!.version).toBe(1);
+  });
+
+  it("counts overlapping copies of the passage", async () => {
+    await openPost("ha ha ha");
+    ctx.ai = fakeAi({ replacement: "x" });
+    expect(await run(ctx, "proposeDocumentEdits", { instruction: "Punchier", targetText: "ha ha" })).toMatch(/^Failed: .*2 times/);
   });
 
   it("asks for a longer passage when it appears more than once", async () => {

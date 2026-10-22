@@ -95,6 +95,17 @@ describe("documents", () => {
     expect((await listDocumentVersions(p, d.id)).length).toBe(2);
   });
 
+  it("records a proposal id once per document and lists it", async () => {
+    const d = await createDocumentForChat(p, chat, { title: "T", text: "v1" });
+    await saveDocumentVersion(p, d.id, { text: "v2", source: "PROPOSAL", proposalId: "call_p", expectedVersion: 1 });
+    expect((await listDocumentVersions(p, d.id))[0]).toMatchObject({ version: 2, proposalId: "call_p" });
+    expect((await listDocumentVersions(p, d.id))[1]).toMatchObject({ version: 1, proposalId: null });
+    const again = saveDocumentVersion(p, d.id, { text: "v3", source: "PROPOSAL", proposalId: "call_p", expectedVersion: 2 });
+    await expect(again).rejects.toBeInstanceOf(DocumentError);
+    await expect(again).rejects.toMatchObject({ code: "already_applied" });
+    expect((await getDocument(p, d.id))!.version).toBe(2);
+  });
+
   it("restore writes a new RESTORE version with the old text", async () => {
     const d = await createDocumentForChat(p, chat, { title: "T", text: "v1", hook: "h1" });
     await saveDocumentVersion(p, d.id, { text: "v2", hook: "h2", source: "USER_EDIT", expectedVersion: 1 });

@@ -65,6 +65,7 @@ export async function testContext(over: Partial<TurnContext> = {}): Promise<Turn
     writer: null,
     handoffs: new Map(),
     documentRef: { current: null },
+    documentContext: null,
     now: () => new Date("2026-10-21T09:00:00Z"),
     ...over,
   };

@@ -56,15 +56,19 @@ beforeEach(async () => {
 afterAll(cleanup);
 
 describe("applyProposal", () => {
-  it("applies a proposal once, then reports stale_passage", async () => {
+  it("applies a proposal once; another proposal for the replaced passage is stale_passage", async () => {
     await storeProposal(proposal());
+    await storeProposal(proposal({ proposalId: "call_q", replacement: "Other hook." }), { toolCallId: "call_q" });
     const doc = await applyProposal(me.profileId, docId, { chatId, toolCallId: "call_p", expectedVersion: 1 });
     expect(doc).toMatchObject({ version: 2, text: "Short hook.\n\nThe body stays the same." });
     expect((await listDocumentVersions(me.profileId, docId))[0]).toMatchObject({ version: 2, source: "PROPOSAL" });
 
-    const again = applyProposal(me.profileId, docId, { chatId, toolCallId: "call_p", expectedVersion: 2 });
-    await expect(again).rejects.toBeInstanceOf(ProposalError);
-    await expect(again).rejects.toMatchObject({ code: "stale_passage" });
+    await expect(applyProposal(me.profileId, docId, { chatId, toolCallId: "call_p", expectedVersion: 2 })).rejects.toMatchObject({
+      code: "already_applied",
+    });
+    const stale = applyProposal(me.profileId, docId, { chatId, toolCallId: "call_q", expectedVersion: 2 });
+    await expect(stale).rejects.toBeInstanceOf(ProposalError);
+    await expect(stale).rejects.toMatchObject({ code: "stale_passage" });
     expect((await getDocument(me.profileId, docId))!.version).toBe(2);
   });
 
@@ -107,5 +111,28 @@ describe("applyProposal", () => {
     await expect(applyProposal(me.profileId, docId, { chatId, toolCallId: "call_p", expectedVersion: 2 })).rejects.toMatchObject({
       code: "stale_passage",
     });
+  });
+
+  it("records the proposal on its version and refuses a second apply of an expanding edit", async () => {
+    await storeProposal(proposal({ replacement: "Old hook that goes on and on. And on." }));
+    const doc = await applyProposal(me.profileId, docId, { chatId, toolCallId: "call_p", expectedVersion: 1 });
+    expect(doc.text).toBe("Old hook that goes on and on. And on.\n\nThe body stays the same.");
+    expect((await listDocumentVersions(me.profileId, docId))[0]).toMatchObject({ source: "PROPOSAL", proposalId: "call_p" });
+    const again = applyProposal(me.profileId, docId, { chatId, toolCallId: "call_p", expectedVersion: 2 });
+    await expect(again).rejects.toMatchObject({ code: "already_applied" });
+    expect((await getDocument(me.profileId, docId))!.version).toBe(2);
+  });
+
+  it("lets exactly one of two concurrent applies win; the other is already_applied", async () => {
+    await storeProposal(proposal({ replacement: "Old hook that goes on and on. And on." }));
+    const results = await Promise.allSettled([
+      applyProposal(me.profileId, docId, { chatId, toolCallId: "call_p", expectedVersion: 1 }),
+      applyProposal(me.profileId, docId, { chatId, toolCallId: "call_p", expectedVersion: 1 }),
+    ]);
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    const lost = results.find((r) => r.status === "rejected") as PromiseRejectedResult;
+    expect(lost.reason).toBeInstanceOf(ProposalError);
+    expect(lost.reason).toMatchObject({ code: "already_applied" });
+    expect((await listDocumentVersions(me.profileId, docId)).map((v) => v.version)).toEqual([2, 1]);
   });
 });

@@ -283,8 +283,10 @@ export function DocumentPanel({ ctl, busy }: { ctl: DocumentController; busy: bo
             )}
           </PostSheet>
           {ctl.reload && (
-            <div role={ctl.reload === "failed" ? "alert" : "status"} data-reload className="flex flex-wrap items-center gap-3 text-[13px] text-text-2">
-              {ctl.reload === "failed" ? (
+            <div role={ctl.reload === "loading" ? "status" : "alert"} data-reload className="flex flex-wrap items-center gap-3 text-[13px] text-text-2">
+              {ctl.reload === "missing" ? (
+                <p>This post isn&apos;t available any more. It may have been deleted, or you switched profiles.</p>
+              ) : ctl.reload === "failed" ? (
                 <>
                   <p>The update stopped partway, and the saved post couldn&apos;t be reloaded.</p>
                   <Button variant="secondary" size="sm" onClick={ctl.retryReload}>

@@ -35,9 +35,9 @@ async function readJson(request: Request): Promise<unknown> {
 function fromError(err: unknown): Response {
   if (err instanceof DocumentVersionConflict) return conflict(err.currentVersion);
   if (err instanceof ProposalError) {
-    return err.code === "not_found"
-      ? fail(404, "That suggestion isn't available any more.")
-      : fail(409, "That passage isn't in the post any more, so the suggestion can't be applied.", { code: "stale_passage" });
+    if (err.code === "not_found") return fail(404, "That suggestion isn't available any more.");
+    if (err.code === "already_applied") return fail(409, "That suggestion is already in the post.", { code: "already_applied" });
+    return fail(409, "That passage isn't in the post any more, so the suggestion can't be applied.", { code: "stale_passage" });
   }
   if (err instanceof DocumentError) return err.code === "not_found" ? notFound() : fail(400, err.message);
   throw err;
@@ -53,7 +53,7 @@ export async function getDocumentHandler(_request: Request, { params }: Ctx): Pr
   return doc ? Response.json(doc) : notFound();
 }
 
-/** GET /api/documents/:id/versions: newest first, `{version, source, changeSummary, createdAt, chars}`. */
+/** GET /api/documents/:id/versions: newest first, `{version, source, changeSummary, createdAt, chars, proposalId}`. */
 export async function listVersionsHandler(_request: Request, { params }: Ctx): Promise<Response> {
   const profileId = await currentProfileId();
   if (!profileId) return fail(400, "Create a profile first.");
@@ -112,8 +112,8 @@ const ApplyProposalSchema = z.object({
 
 /**
  * POST /api/documents/:id/apply-proposal: `{chatId, toolCallId, expectedVersion}`. The passage and replacement come
- * from the proposal stored in the chat, never from the request. 200 snapshot, 409 `document_version_conflict` or
- * `stale_passage`, 404 when the proposal or post isn't the caller's.
+ * from the proposal stored in the chat, never from the request. 200 snapshot, 409 `document_version_conflict`,
+ * `stale_passage` or `already_applied`, 404 when the proposal or post isn't the caller's.
  */
 export async function applyProposalHandler(request: Request, { params }: Ctx): Promise<Response> {
   const profileId = await currentProfileId();

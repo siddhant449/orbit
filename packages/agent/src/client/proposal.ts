@@ -1,3 +1,4 @@
+import { countOccurrences } from "../match";
 import type { PanelDoc } from "./document-state";
 
 /**
@@ -13,7 +14,7 @@ export type Proposal = {
   instruction: string;
 };
 
-export type ProposalStatus = "ready" | "applied" | "stale";
+export type ProposalStatus = "ready" | "applied" | "stale" | "checking";
 
 export function parseProposal(output: unknown): Proposal | null {
   if (!output || typeof output !== "object") return null;
@@ -31,17 +32,14 @@ export function parseProposal(output: unknown): Proposal | null {
   };
 }
 
-function count(text: string, needle: string): number {
-  let n = 0;
-  for (let i = text.indexOf(needle); i !== -1; i = text.indexOf(needle, i + needle.length)) n++;
-  return n;
-}
-
-/** Ready while the passage occurs once in the open post; applied once it's replaced; stale otherwise. */
-export function proposalStatus(p: Proposal, doc: PanelDoc | null): ProposalStatus {
+/**
+ * Applied when a saved version records this proposal (`appliedIds`, from the post's version list), never guessed from
+ * the text: an expanding edit keeps the passage and a deletion leaves no trace. Otherwise ready while the passage
+ * occurs exactly once (overlaps counted), stale when it doesn't, and checking while the list hasn't loaded.
+ */
+export function proposalStatus(p: Proposal, doc: PanelDoc | null, appliedIds: readonly string[] | null): ProposalStatus {
+  if (appliedIds?.includes(p.proposalId)) return "applied";
   if (!doc || doc.id !== p.documentId || doc.version < 1) return "ready";
-  const n = count(doc.text, p.targetText);
-  if (n === 1) return "ready";
-  if (n === 0 && p.replacement && doc.text.includes(p.replacement)) return "applied";
-  return "stale";
+  if (countOccurrences(doc.text, p.targetText) === 1) return "ready";
+  return appliedIds === null ? "checking" : "stale";
 }

@@ -12,7 +12,13 @@ function currentChatId(): string | null {
   return m ? decodeURIComponent(m[1]!) : null;
 }
 
-type Local = { kind: "idle" } | { kind: "applying" } | { kind: "applied"; version: number } | { kind: "stale" } | { kind: "gone" };
+type Local =
+  | { kind: "idle" }
+  | { kind: "applying" }
+  | { kind: "applied"; version: number }
+  | { kind: "already" }
+  | { kind: "stale" }
+  | { kind: "gone" };
 
 /**
  * An edit proposal in the thread (design §9; Orbit p05 "Replacing this passage"): the passage as the post has it,
@@ -25,8 +31,14 @@ export function ProposalCard({ proposal, toolCallId }: { proposal: Proposal; too
   const [dismissed, setDismissed] = useState(false);
 
   const doc = ctl?.state.doc ?? null;
-  const fromDoc = proposalStatus(proposal, doc);
-  const status = local.kind === "applied" ? "applied" : local.kind === "stale" || local.kind === "gone" ? "stale" : fromDoc;
+  // Which proposals saved versions record, from the panel's version list (null while it loads). A failed list falls
+  // back to the text, and Apply still can't double-apply: the server answers already_applied.
+  const versions = ctl?.versions ?? null;
+  const sameDoc = doc?.id === proposal.documentId;
+  const appliedIds = !sameDoc ? null : ctl?.versionsError ? [] : versions ? versions.flatMap((v) => (v.proposalId ? [v.proposalId] : [])) : null;
+  const fromDoc = proposalStatus({ ...proposal, proposalId: toolCallId }, doc, appliedIds);
+  const status =
+    local.kind === "applied" || local.kind === "already" ? "applied" : local.kind === "stale" || local.kind === "gone" ? "stale" : fromDoc;
   const streaming = Boolean(ctl && (ctl.state.creating || ctl.state.updating));
   const busy = local.kind === "applying" || streaming || Boolean(ctl?.saving);
 
@@ -49,6 +61,11 @@ export function ProposalCard({ proposal, toolCallId }: { proposal: Proposal; too
         ctl?.onData({ type: "data-document", data: { id: body.id, title: body.title, version: body.version, text: body.text } });
         setLocal({ kind: "applied", version: body.version });
         toast(`Applied as version ${body.version}.`);
+        return;
+      }
+      if (res.status === 409 && body?.code === "already_applied") {
+        setLocal({ kind: "already" });
+        ctl?.retryVersions();
         return;
       }
       if (res.status === 409 && body?.code === "stale_passage") {

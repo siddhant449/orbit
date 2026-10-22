@@ -438,6 +438,7 @@ export async function runChatTurn(
       writer: null,
       handoffs: new Map(),
       documentRef: { current: await getChatDocument(profileId, chatId) },
+      documentContext: body.documentContext ?? null,
       now,
     };
     const tools = tagToolErrors(buildTools(ctx, { webSearchTool: deps.webSearchTool }));

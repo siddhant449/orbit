@@ -4,7 +4,7 @@ import type { VersionSource } from "../generated/prisma/client";
 
 /** Posts (design §4, §9): one per chat, versioned, every read and write scoped to the profile. */
 
-export type DocumentErrorCode = "EXISTING_POST" | "not_found" | "invalid";
+export type DocumentErrorCode = "EXISTING_POST" | "not_found" | "invalid" | "already_applied";
 
 export class DocumentError extends Error {
   readonly code: DocumentErrorCode;
@@ -15,7 +15,9 @@ export class DocumentError extends Error {
           ? "A post already exists in this chat."
           : code === "not_found"
             ? "Document not found."
-            : "Invalid document."),
+            : code === "already_applied"
+              ? "That suggestion was already applied to this post."
+              : "Invalid document."),
     );
     this.name = "DocumentError";
     this.code = code;
@@ -50,6 +52,8 @@ export type DocumentVersionRow = {
   changeSummary: string | null;
   createdAt: Date;
   chars: number;
+  /** The edit proposal a PROPOSAL version applied. */
+  proposalId: string | null;
 };
 
 export const DOCUMENT_TITLE_MAX = 120;
@@ -153,7 +157,13 @@ type SaveInput = {
   source: VersionSource;
   changeSummary?: string;
   expectedVersion: number;
+  /** A PROPOSAL version's proposal (tool call) id: each proposal applies once per document. */
+  proposalId?: string;
 };
+
+function proposalApplied(db: Tx | typeof prisma, documentId: string, proposalId: string): Promise<boolean> {
+  return db.documentVersion.count({ where: { documentId, proposalId } }).then((n) => n > 0);
+}
 
 /**
  * Writes version `expectedVersion + 1`. The compare-and-set on `Document.version` and the unique
@@ -164,6 +174,7 @@ export async function saveDocumentVersion(profileId: string, id: string, input: 
   const title = input.title === undefined ? undefined : cleanTitle(input.title);
   try {
     return await prisma.$transaction(async (tx) => {
+      if (input.proposalId && (await proposalApplied(tx, id, input.proposalId))) throw new DocumentError("already_applied");
       const { count } = await tx.document.updateMany({
         where: { id, profileId, deletedAt: null, version: input.expectedVersion },
         data: { version: input.expectedVersion + 1, ...(title ? { title } : {}) },
@@ -171,6 +182,8 @@ export async function saveDocumentVersion(profileId: string, id: string, input: 
       if (count === 0) {
         const doc = await tx.document.findFirst({ where: { id, profileId, deletedAt: null }, select: { version: true } });
         if (!doc) throw new DocumentError("not_found");
+        // A concurrent apply of the same proposal won the version: report that, not a generic conflict.
+        if (input.proposalId && (await proposalApplied(tx, id, input.proposalId))) throw new DocumentError("already_applied");
         throw new DocumentVersionConflict(doc.version);
       }
       let hook: string | null;
@@ -191,12 +204,14 @@ export async function saveDocumentVersion(profileId: string, id: string, input: 
           hook,
           source: input.source,
           changeSummary: cleanSummary(input.changeSummary),
+          proposalId: input.proposalId ?? null,
         },
       });
       return (await snapshot(tx, profileId, id))!;
     });
   } catch (err) {
     if (isUniqueViolation(err)) {
+      if (input.proposalId && (await proposalApplied(prisma, id, input.proposalId))) throw new DocumentError("already_applied");
       const doc = await prisma.document.findFirst({ where: { id, profileId }, select: { version: true } });
       throw new DocumentVersionConflict(doc?.version ?? input.expectedVersion + 1);
     }
@@ -211,7 +226,7 @@ export async function listDocumentVersions(profileId: string, id: string): Promi
   const rows = await prisma.documentVersion.findMany({
     where: { documentId: doc.id },
     orderBy: { version: "desc" },
-    select: { version: true, source: true, changeSummary: true, createdAt: true, text: true },
+    select: { version: true, source: true, changeSummary: true, createdAt: true, text: true, proposalId: true },
   });
   return rows.map(({ text, ...r }) => ({ ...r, chars: text.length }));
 }

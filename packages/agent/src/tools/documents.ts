@@ -18,12 +18,14 @@ import { editDocumentText } from "../specialists/editing";
 import { findHandoff, PostWritingPayload } from "../specialists/envelope";
 import { buildGrounding, renderGrounding } from "../specialists/grounding";
 import { capOutput } from "./cap";
+import { countOccurrences } from "../match";
 import { isAbort, runTool } from "./run";
 
 export const EXISTING_POST =
   "EXISTING_POST: A post already exists in this chat. Edit it with updateDocument, or suggest the user starts a new chat for a new post.";
-export const STALE_DOCUMENT =
-  "STALE_DOCUMENT: The user changed the post while you were editing. Use the new version in your context and ask before editing again.";
+/** The post changed under the edit. The model's context still shows the old text, so it must not edit again this turn. */
+export const staleDocument = (version: number) =>
+  `STALE_DOCUMENT: The user changed the post (it's now version ${version}) after you last saw it. Don't edit it again in this turn; tell the user and ask them to repeat the request if they still want the change.`;
 export const STALE_SELECTED_PASSAGE =
   "STALE_SELECTED_PASSAGE: That passage isn't in the current draft. Keep the draft unchanged and ask the user which part they mean.";
 export const editRequirementsMissed = (missed: string[]) =>
@@ -112,6 +114,13 @@ export function createDocumentModelOutput(output: unknown): { type: "text"; valu
   };
 }
 
+/** The post version the model last saw: the client's `documentContext`, else the turn-start post. */
+function seenVersion(ctx: TurnContext): { id: string; version: number } | null {
+  if (ctx.documentContext) return ctx.documentContext;
+  const ref = ctx.documentRef.current;
+  return ref ? { id: ref.id, version: ref.version } : null;
+}
+
 /** The chat's post as stored now (never the turn-start copy), kept in `ctx.documentRef`. */
 export async function currentPost(ctx: TurnContext): Promise<DocumentSnapshot | null> {
   const ref = ctx.documentRef.current;
@@ -127,6 +136,7 @@ const writerOf = (ctx: TurnContext): Write => (chunk) => ctx.writer?.write(chunk
 function publish(ctx: TurnContext, doc: DocumentSnapshot) {
   const write = writerOf(ctx);
   ctx.documentRef.current = doc;
+  ctx.documentContext = { id: doc.id, version: doc.version };
   for (let i = 0; i < doc.text.length; i += DELTA_CHARS) {
     write({ type: "data-textDelta", data: { id: doc.id, text: doc.text.slice(i, i + DELTA_CHARS) }, transient: true });
   }
@@ -139,13 +149,8 @@ function hookOf(text: string): string | null {
   return line && line.length <= 200 ? line : null;
 }
 
-/** Non-overlapping occurrences of `needle` in `text`. */
-export function occurrences(text: string, needle: string): number {
-  if (!needle) return 0;
-  let n = 0;
-  for (let i = text.indexOf(needle); i !== -1; i = text.indexOf(needle, i + needle.length)) n++;
-  return n;
-}
+/** Occurrences of a passage in the post, overlaps included (see `countOccurrences`). */
+export const occurrences = countOccurrences;
 
 export type UpdateDocumentInput = {
   description: string;
@@ -173,8 +178,11 @@ const unchanged = (doc: DocumentSnapshot, changeSummary: string): UpdateDocument
  * whole run, so the panel shows the edit in progress and never keeps the flag after a failure.
  */
 export async function updateDocumentRun(ctx: TurnContext, input: UpdateDocumentInput, abortSignal?: AbortSignal): Promise<UpdateDocumentOutput> {
+  const seen = seenVersion(ctx);
   const doc = await currentPost(ctx);
   if (!doc) return NO_POST;
+  // The version the model last saw (the user's at turn start, or this turn's own last save) must still be current.
+  if (seen && seen.id === doc.id && seen.version !== doc.version) return staleDocument(doc.version);
   const restore = input.restoreVersion;
   if (restore !== null && restore === doc.version) return unchanged(doc, `Version ${restore} is already the current version.`);
 
@@ -217,10 +225,7 @@ export async function updateDocumentRun(ctx: TurnContext, input: UpdateDocumentI
     return { id: saved.id, title: saved.title, version: saved.version, success: true, contentChanged: true, changeSummary: res.changeSummary };
   } catch (err) {
     if (isAbort(err)) throw err;
-    if (err instanceof DocumentVersionConflict) {
-      await currentPost(ctx).catch(() => null);
-      return STALE_DOCUMENT;
-    }
+    if (err instanceof DocumentVersionConflict) return staleDocument(err.currentVersion);
     if (err instanceof DocumentError) {
       if (err.code === "not_found" && restore !== null) return `Failed: there is no version ${restore} of this post. Call getPostVersions to see them.`;
       return `Failed: ${err.message}`;

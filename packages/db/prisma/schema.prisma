@@ -327,7 +327,10 @@ model DocumentVersion {
   hook          String?
   source        VersionSource
   changeSummary String?
+  /// The edit proposal (its tool call id) a PROPOSAL version applied; one apply per proposal per document.
+  proposalId    String?
   createdAt     DateTime      @default(now())
 
   @@unique([documentId, version])
+  @@unique([documentId, proposalId])
 }

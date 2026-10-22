@@ -138,6 +138,16 @@ describe("POST /api/documents/:id/apply-proposal", () => {
     expect(versions.versions[0]).toMatchObject({ version: 2, source: "PROPOSAL" });
   });
 
+  it("409s a second apply with already_applied, and lists the proposal on its version", async () => {
+    const { chatId, d } = await withProposal({ replacement: "Old hook. Longer." });
+    expect((await applyProposalHandler(send("POST", { chatId, toolCallId: "call_p", expectedVersion: 1 }), params(d.id))).status).toBe(200);
+    const again = await applyProposalHandler(send("POST", { chatId, toolCallId: "call_p", expectedVersion: 2 }), params(d.id));
+    expect(again.status).toBe(409);
+    expect(await again.json()).toMatchObject({ code: "already_applied" });
+    const versions = await (await listVersionsHandler(new Request("http://test"), params(d.id))).json();
+    expect(versions.versions[0]).toMatchObject({ version: 2, proposalId: "call_p" });
+  });
+
   it("409s a stale version and a stale passage, with distinct codes", async () => {
     const { chatId, d } = await withProposal();
     await saveDocumentVersion(mine.profileId, d.id, { text: "Rewritten entirely.", source: "USER_EDIT", expectedVersion: 1 });

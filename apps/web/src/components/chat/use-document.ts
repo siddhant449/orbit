@@ -22,6 +22,8 @@ export type VersionRow = {
   changeSummary: string | null;
   createdAt: string;
   chars: number;
+  /** The edit proposal this version applied, if any. */
+  proposalId?: string | null;
 };
 
 export type SaveResult =
@@ -33,8 +35,12 @@ export const CONFLICT_TOAST = "This post changed. Reloaded the latest version.";
 
 const enc = encodeURIComponent;
 
-async function fetchDoc(id: string): Promise<PanelDoc | null> {
+/** Thrown for a 404: the post is gone (deleted, or another profile is now current), so retrying won't help. */
+class DocMissing extends Error {}
+
+async function fetchDoc(id: string, opts: { throwMissing?: boolean } = {}): Promise<PanelDoc | null> {
   const res = await fetch(`/api/documents/${enc(id)}`, { cache: "no-store" });
+  if (res.status === 404 && opts.throwMissing) throw new DocMissing();
   if (!res.ok) return null;
   const d = (await res.json()) as PanelDoc;
   return { id: d.id, title: d.title, version: d.version, text: d.text };
@@ -69,7 +75,8 @@ export function useDocument(initial: PanelDoc | null) {
   const [streamSeq, setStreamSeq] = useState(0);
   const [draft, setDraft] = useState<EditDraft | null>(null);
   // After a cut-off stream: the panel's text may be truncated until the saved post is reloaded. Editing waits for it.
-  const [reload, setReload] = useState<{ id: string; status: "loading" | "failed" } | null>(null);
+  // `version` is the panel's version when the reload started: any newer snapshot for the post supersedes the reload.
+  const [reload, setReload] = useState<{ id: string; version: number; status: "loading" | "failed" | "missing" } | null>(null);
   // Where focus goes back to on close: captured when the user asks to open, before the panel takes focus.
   const returnTo = useRef<HTMLElement | null>(null);
 
@@ -110,15 +117,20 @@ export function useDocument(initial: PanelDoc | null) {
   /** Reloads the saved post after a cut-off stream. A newer stream or version that lands meanwhile wins. */
   const reloadSaved = useCallback(
     async (id: string) => {
-      setReload({ id, status: "loading" });
+      const version = stateRef.current.doc?.id === id ? stateRef.current.doc.version : 0;
+      setReload({ id, version, status: "loading" });
       let latest: PanelDoc | null = null;
       try {
-        latest = await fetchDoc(id);
-      } catch {
+        latest = await fetchDoc(id, { throwMissing: true });
+      } catch (err) {
+        if (err instanceof DocMissing) {
+          setReload({ id, version, status: "missing" });
+          return;
+        }
         latest = null;
       }
       if (!latest) {
-        setReload({ id, status: "failed" });
+        setReload({ id, version, status: "failed" });
         return;
       }
       const got = latest;
@@ -142,7 +154,7 @@ export function useDocument(initial: PanelDoc | null) {
   }, [apply, reloadSaved]);
 
   const retryReload = useCallback(() => {
-    if (reload) void reloadSaved(reload.id);
+    if (reload && reload.status === "failed") void reloadSaved(reload.id);
   }, [reload, reloadSaved]);
 
   const open = useCallback(() => {
@@ -252,7 +264,8 @@ export function useDocument(initial: PanelDoc | null) {
     draft,
     setDraft,
     /** The saved post is being reloaded after a cut-off stream, or that reload failed. */
-    reload: reload && state.doc?.id === reload.id ? reload.status : null,
+    // A newer snapshot of the same post (a stream, a save, a restore) supersedes a pending or failed reload.
+    reload: reload && state.doc?.id === reload.id && state.doc.version <= reload.version ? reload.status : null,
     retryReload,
     takeReturnTo,
     settle,

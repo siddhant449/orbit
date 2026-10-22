@@ -57,12 +57,25 @@ describe("runDeterministicChecks", () => {
   it("does not count hashtags as a markdown heading", () => {
     expect(check("Post\n#startups #product", "markdown").passed).toBe(true);
   });
+
+  it("counts __ as markdown only when it wraps text", () => {
+    expect(check("Sign here: ____ and date: ____", "markdown").passed).toBe(true);
+    expect(check("This is __important__ now", "markdown").passed).toBe(false);
+  });
+
+  it("doesn't count # followed by a digit as a hashtag", () => {
+    expect(check("#1 lesson, #2 lesson, #3 lesson, #4 lesson #growth", "hashtags").passed).toBe(true);
+  });
 });
 
 describe("bannedWordsFromRules", () => {
   it("reads bullets under any heading containing 'banned', strips quotes, and stops at the next heading", () => {
     const md = "# Rules\n- No hashtags\n### Never use (banned)\n* \"game-changer\"\n+ `delve`\n\n## Tone\n- Warm";
     expect(bannedWordsFromRules(md)).toEqual(["game-changer", "delve"]);
+  });
+
+  it("splits comma-separated bullets", () => {
+    expect(bannedWordsFromRules("## Banned\n- synergy, leverage , \"deep dive\"")).toEqual(["synergy", "leverage", "deep dive"]);
   });
 
   it("returns nothing without a banned heading", () => {

@@ -46,7 +46,7 @@ export const STATIC_PREFIX = `You are Brandloop's writing partner for one person
 # Errors and how to react
 - EXISTING_POST: this chat already has a post. Edit it with updateDocument instead of creating another, or suggest a new chat for a new post.
 - EDIT_REQUIREMENTS_MISSED: the edit didn't meet every requirement. Tell the user briefly what was missed and offer to try again.
-- STALE_DOCUMENT: the post changed while you worked. Tell the user and try again on the current version if they want.
+- STALE_DOCUMENT: the user changed the post after you last saw it. Don't edit it again in this turn: tell the user, and ask them to repeat the request if they still want the change.
 - STALE_SELECTED_PASSAGE: the passage is no longer in the post. Ask the user to pick the passage again.
 - Output starting with "Failed:": the step didn't work. Recover if the message says how; otherwise tell the user in one sentence.
 - Output starting with "Refused:": the step was not allowed. Don't retry the same call; explain in one sentence if it matters.

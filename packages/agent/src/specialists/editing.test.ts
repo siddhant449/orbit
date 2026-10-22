@@ -29,7 +29,9 @@ describe("editDocumentText", () => {
     const out = await editDocumentText(ai, { ...input, editRequirements: ["Add a CTA"] });
     expect(out).toEqual({ ok: false, missed: ["Add a CTA"] });
     expect(ai.calls).toHaveLength(2);
-    expect(ai.calls[1]!.system).toContain("Add a CTA");
+    // The model's own words go in the user prompt as data, never into the system prompt.
+    expect(ai.calls[1]!.system).not.toContain("Add a CTA");
+    expect(ai.calls[1]!.prompt).toMatch(/<missed_requirements>\n- Add a CTA\n<\/missed_requirements>/);
   });
 
   it("succeeds when the retry meets every requirement", async () => {

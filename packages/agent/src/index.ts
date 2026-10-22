@@ -59,7 +59,7 @@ export {
   getPostVersionsText,
   proposeDocumentEditsRun,
   ProposalOutputSchema,
-  STALE_DOCUMENT,
+  staleDocument,
   STALE_SELECTED_PASSAGE,
   updateDocumentRun,
   type CreateDocumentOutput,

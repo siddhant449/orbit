@@ -9,11 +9,11 @@ export type CheckResult = { id: CheckId; passed: boolean; detail: string };
 
 export const CHECK_LIMITS = { length: 3_000, hook: 200, hashtags: 3, links: 1, emoji: 5 } as const;
 
-const HASHTAG = /(?:^|\s)#[\p{L}\p{N}_]+/gu;
+const HASHTAG = /(?:^|\s)#(?!\d)[\p{L}\p{N}_]+/gu;
 const URL = /\b(?:https?:\/\/|www\.)[^\s<>()]+/gi;
 const EMOJI = /\p{Extended_Pictographic}/gu;
 const PLACEHOLDER = /\[[^\]\n]{1,60}\]|\{[^}\n]{1,60}\}|\bTODO\b|\bXXX\b/g;
-const MARKDOWN = /\*\*|__|^\s{0,3}#{1,6}\s|^\s*```|^\s*~~~/gm;
+const MARKDOWN = /\*\*|__(?=[^\s_])[^\n]*?[^\s_]__|^\s{0,3}#{1,6}\s|^\s*```|^\s*~~~/gm;
 
 const count = (text: string, re: RegExp) => text.match(re)?.length ?? 0;
 const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
@@ -64,7 +64,7 @@ export function runDeterministicChecks(text: string, rules: { bannedWords: strin
 const HEADING = /^\s{0,3}#{1,6}\s+(.*)$/;
 const BULLET = /^\s*[-*+]\s+(.+?)\s*$/;
 
-/** Bullets under any heading whose text contains "banned" (case-insensitive), up to the next heading. */
+/** Bullets (comma-separated lists split) under any heading containing "banned" (case-insensitive), up to the next heading. */
 export function bannedWordsFromRules(markdown: string): string[] {
   const words: string[] = [];
   let inBanned = false;
@@ -77,8 +77,10 @@ export function bannedWordsFromRules(markdown: string): string[] {
     if (!inBanned) continue;
     const bullet = BULLET.exec(line);
     if (!bullet) continue;
-    const word = bullet[1]!.replace(/^["'`“‘]+|["'`”’]+$/g, "").trim();
-    if (word && !words.includes(word)) words.push(word);
+    for (const part of bullet[1]!.split(",")) {
+      const word = part.trim().replace(/^["'`“‘]+|["'`”’]+$/g, "").trim();
+      if (word && !words.includes(word)) words.push(word);
+    }
   }
   return words;
 }
