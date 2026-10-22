@@ -23,6 +23,8 @@ import { getRunRegistry, SCRIPTED_DRAFT, SCRIPTED_TITLE } from "@brandloop/agent
 import { randomUUID } from "node:crypto";
 import {
   deleteChatHandler,
+  getAiModelHandler,
+  putAiModelHandler,
   getChatMessagesHandler,
   getChatStreamHandler,
   getHistoryHandler,
@@ -351,5 +353,32 @@ describe("stop body cap", () => {
       new Request("http://test/api/chat/stop", { method: "POST", body: JSON.stringify({ chatId: "x".repeat(9000), runId: "r" }) }),
     );
     expect(res.status).toBe(413);
+  });
+});
+
+describe("AI model pick", () => {
+  const put = (model: unknown) =>
+    putAiModelHandler(new Request("http://test/api/ai-model", { method: "PUT", body: JSON.stringify({ model }), headers: { "content-type": "application/json" } }));
+
+  it("lists the allowlist, saves a valid pick per profile and rejects anything else", async () => {
+    const first = await (await getAiModelHandler()).json();
+    expect(first).toMatchObject({ model: null, default: "gpt-6.1-sol" });
+    expect(first.models.map((m: { id: string }) => m.id)).toContain("gpt-6-luna");
+    expect((await put("gpt-6-luna")).status).toBe(200);
+    expect((await (await getAiModelHandler()).json()).model).toBe("gpt-6-luna");
+    expect((await put("gpt-9-fake")).status).toBe(400);
+    expect((await put("")).status).toBe(400);
+    expect((await (await getAiModelHandler()).json()).model).toBe("gpt-6-luna");
+    expect((await put(null)).status).toBe(200);
+    expect((await (await getAiModelHandler()).json()).model).toBeNull();
+  });
+
+  it("POST /api/chat rejects a model outside the allowlist", async () => {
+    const res = await postChatHandler(json(chatBody(randomUUID(), "hi", { model: "gpt-9-fake" })));
+    expect(res.status).toBe(400);
+    expect((await res.json()).cause).toMatch(/isn't available/);
+    const ok = await postChatHandler(json(chatBody(randomUUID(), "hi", { model: "gpt-6-luna" })));
+    expect(ok.status).toBe(200);
+    await ok.text();
   });
 });

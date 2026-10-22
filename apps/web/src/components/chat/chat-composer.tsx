@@ -5,6 +5,7 @@ import { Globe, Square } from "lucide-react";
 import { Button, ComposerShell, cn } from "@brandloop/ui";
 import { SendIcon } from "@brandloop/ui/icons";
 import { VoicePicker, type VoiceOption } from "@/components/home/voice-picker";
+import { ModelPicker, type AiModelInfo } from "./model-picker";
 import { KnowledgeChip, KnowledgePicker, type KnowledgeChoice } from "./knowledge-picker";
 
 /** Where the home composer sat when the chat started: the docked composer glides from there. */
@@ -47,6 +48,7 @@ export function ChatComposer({
   onWebSearchChange,
   fromRect,
   inputRef,
+  model,
 }: {
   value: string;
   onValueChange: (v: string) => void;
@@ -61,6 +63,7 @@ export function ChatComposer({
   onWebSearchChange: (on: boolean) => void;
   fromRect?: ComposerRect | null;
   inputRef: RefObject<HTMLTextAreaElement | null>;
+  model?: { current: string | null; info: AiModelInfo | null; onChoose: (id: string) => void };
 }) {
   const sheetRef = useRef<HTMLFormElement>(null);
   useHandoff(sheetRef, fromRect);
@@ -120,6 +123,7 @@ export function ChatComposer({
               <span aria-hidden="true" className={cn("web-switch", webSearch && "web-switch--on")} />
             </Button>
             <VoicePicker voices={voices} selectedId={selectedVoiceId} />
+            {model && <ModelPicker current={model.current} info={model.info} onChoose={model.onChoose} />}
           </div>
           {busy ? (
             <button

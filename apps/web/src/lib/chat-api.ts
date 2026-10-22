@@ -2,6 +2,8 @@ import {
   ChatError,
   RUN_LOCK_STALE_MS,
   deleteChat,
+  getAiModelPref,
+  setAiModelPref,
   getChat,
   getChatDocument,
   listChats,
@@ -19,6 +21,7 @@ import {
   runChatTurn,
 } from "@brandloop/agent";
 import { z } from "zod";
+import { CHAT_MODELS, isChatModel } from "@brandloop/ai";
 import { getAccount } from "@/lib/account";
 import { getChatDeps, isMockMode } from "@/lib/chat-deps";
 import { checkAttachments, readCappedJson } from "@/lib/chat-request";
@@ -58,7 +61,10 @@ export async function postChatHandler(request: Request): Promise<Response> {
   if (!parsed.success) return badRequest();
   const body = checkAttachments(parsed.data);
   if (!body) return badRequest("Attachments must be files uploaded to Brandloop.");
-  return runChatTurn(getChatDeps(), ids, body);
+  if (body.model != null && !isChatModel(body.model)) return badRequest("That model isn't available.");
+  const saved = await getAiModelPref(ids.profileId);
+  const model = body.model ?? (isChatModel(saved) ? saved : null);
+  return runChatTurn(getChatDeps(model), ids, body);
 }
 
 /** GET /api/chat/:id/stream: replay and tail the active run on this instance, or 204. */
@@ -155,4 +161,22 @@ export async function getHistoryHandler(request: Request): Promise<Response> {
   });
   if (!parsed.success) return badRequest();
   return Response.json(await listChats(ids.profileId, parsed.data));
+}
+
+/** GET /api/ai-model: the profile's chosen chat model (null: the default) and the models on offer. */
+export async function getAiModelHandler(): Promise<Response> {
+  const ids = await currentIds();
+  if (!ids) return noProfile();
+  const saved = await getAiModelPref(ids.profileId);
+  return Response.json({ model: isChatModel(saved) ? saved : null, default: CHAT_MODELS[0].id, models: CHAT_MODELS });
+}
+
+/** PUT /api/ai-model {model}: saves the pick for this profile after checking the allowlist. null resets to the default. */
+export async function putAiModelHandler(request: Request): Promise<Response> {
+  const ids = await currentIds();
+  if (!ids) return noProfile();
+  const parsed = z.object({ model: z.string().nullable() }).safeParse(await request.json().catch(() => null));
+  if (!parsed.success || (parsed.data.model !== null && !isChatModel(parsed.data.model))) return badRequest("That model isn't available.");
+  await setAiModelPref(ids.profileId, parsed.data.model);
+  return Response.json({ model: parsed.data.model });
 }

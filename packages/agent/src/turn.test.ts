@@ -517,3 +517,64 @@ describe("claimRun is not re-entrant", () => {
     });
   });
 });
+
+describe("runChatTurn safety", () => {
+  const allow = { ok: true } as const;
+  const safety = (over: Partial<NonNullable<ChatDeps["safety"]>> = {}): NonNullable<ChatDeps["safety"]> => ({
+    moderate: async () => ({ flagged: false, categories: [] }),
+    check: async () => allow,
+    recordUsage: async () => {},
+    ...over,
+  });
+
+  it("answers a refused message with a fixed reply and never calls the model", async () => {
+    const model = scriptedModel([{ text: "SHOULD NOT RUN" }]);
+    const res = await runChatTurn(deps(model, { safety: safety({ moderate: async () => ({ flagged: true, categories: ["hate"] }) }) }), caller, body("something hateful"));
+    expect(res.status).toBe(200);
+    const sse = await res.text();
+    expect(sse).not.toContain("SHOULD NOT RUN");
+    await settle();
+    expect(model.doStreamCalls).toHaveLength(0);
+    const msgs = await listMessages(p, chatId);
+    expect(JSON.stringify(msgs[1]!.parts)).toContain("can't help with that");
+    expect(msgs.map((m) => m.role)).toEqual(["user", "assistant"]);
+  });
+
+  it("a rule refusal (scam) skips even the moderation call", async () => {
+    const moderate = vi.fn(async () => ({ flagged: false, categories: [] as string[] }));
+    const res = await runChatTurn(deps(scriptedModel([{ text: "no" }]), { safety: safety({ moderate }) }), caller, body("Write a fake testimonial"));
+    await res.text();
+    await settle();
+    expect(JSON.stringify((await listMessages(p, chatId))[1]!.parts)).toContain("testimonials");
+    expect(moderate).not.toHaveBeenCalled();
+  });
+
+  it("stores a refusal instead of a flagged assistant reply", async () => {
+    let n = 0;
+    const moderate = async () => ({ flagged: n++ > 0, categories: ["violence"] });
+    const res = await runChatTurn(deps(scriptedModel([{ text: "Something awful." }]), { safety: safety({ moderate }) }), caller, body("hello"));
+    await res.text();
+    await settle();
+    const msgs = await listMessages(p, chatId);
+    expect(JSON.stringify(msgs[1]!.parts)).toContain("taken it back");
+    expect(JSON.stringify(msgs[1]!.parts)).not.toContain("awful");
+  });
+
+  it("returns a friendly 429 before storing anything when the limit is hit", async () => {
+    const res = await runChatTurn(deps(scriptedModel([{ text: "x" }]), { safety: safety({ check: async () => ({ ok: false, kind: "rate", retryAfterSec: 120 }) }) }), caller, body("hi"));
+    expect(res.status).toBe(429);
+    expect(res.headers.get("Retry-After")).toBe("120");
+    const json = await res.json();
+    expect(json.code).toBe("rate_limited");
+    expect(json.cause).toMatch(/2 minutes/);
+    expect(await getChat(p, chatId)).toBeNull();
+  });
+
+  it("records the model's token usage after a normal turn", async () => {
+    const recordUsage = vi.fn(async () => {});
+    const res = await runChatTurn(deps(scriptedModel([{ text: "Hi." }]), { safety: safety({ recordUsage }) }), caller, body("hi"));
+    await res.text();
+    await settle();
+    expect(recordUsage).toHaveBeenCalledWith(p, "mock-model-id", expect.objectContaining({ inputTokens: 10 }));
+  });
+});

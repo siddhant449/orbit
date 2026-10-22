@@ -6,6 +6,8 @@ export type ChatSelections = {
   selectedKnowledgeBaseIds: string[];
   selectedWritingStyleId: string | null;
   webSearchEnabled: boolean;
+  /** The chat model picked in the composer; null: the profile's saved one. */
+  model?: string | null;
 };
 
 /**

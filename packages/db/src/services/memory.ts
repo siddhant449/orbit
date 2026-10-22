@@ -21,7 +21,8 @@ function assertKey(key: string) {
 const normalise = (text: string) => text.toLowerCase().replace(/\s+/g, " ").trim();
 
 export function listMemory(profileId: string): Promise<MemoryDoc[]> {
-  return prisma.memoryDoc.findMany({ where: { profileId }, orderBy: { key: "asc" } });
+  // `prefs/…` rows hold app settings (e.g. the chat model), not memory the user or the AI should see.
+  return prisma.memoryDoc.findMany({ where: { profileId, NOT: { key: { startsWith: "prefs/" } } }, orderBy: { key: "asc" } });
 }
 
 /** Thrown when a write carries an `expectedVersion` that no longer matches the store. */
