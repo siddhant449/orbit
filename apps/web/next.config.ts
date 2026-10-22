@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   // Every app screen is behind sign-in, so Cache Components' static shell buys little here.
-  transpilePackages: ["@brandloop/ui", "@brandloop/db", "@brandloop/ai", "@brandloop/knowledge", "@brandloop/agent", "@brandloop/storage"],
+  transpilePackages: ["@brandloop/ui", "@brandloop/db", "@brandloop/ai", "@brandloop/knowledge", "@brandloop/agent", "@brandloop/storage", "@brandloop/visuals"],
   serverExternalPackages: ["pg", "sharp"],
   // Document parsing runs in a worker thread loaded by path, which file tracing can't see. Only the
   // routes that ingest documents need it (the parse worker is reached via @/lib/knowledge's startIngest).
