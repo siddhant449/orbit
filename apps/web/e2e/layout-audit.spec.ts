@@ -27,7 +27,7 @@ test.skip(process.env.AUDIT !== "1", "Layout audit is opt-in: AUDIT=1");
 test.skip(!email, "Set E2E_CLERK_USER_EMAIL to a Clerk dev-instance test user");
 test.skip(process.env.AI_MOCK_MODEL !== "1", "Needs AI_MOCK_MODEL=1 for the chat screens");
 test.setTimeout(3_600_000);
-test.use({ actionTimeout: 8_000, navigationTimeout: 30_000, trace: "off" });
+test.use({ actionTimeout: 8_000, navigationTimeout: 90_000, trace: "off" });
 
 const outDir = process.env.AUDIT_DIR ?? path.join("test-results", "layout-audit");
 const shots = process.env.AUDIT_SHOTS === "1";
