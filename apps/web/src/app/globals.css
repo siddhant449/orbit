@@ -45,8 +45,12 @@ h1[tabindex="-1"]:focus-visible {
  * activity folds into "Worked through N steps"; memory changes confirm as a mono data-register tag.
  */
 @layer components {
-  /* The chat host fills the Lenis wrapper (whose content div is otherwise content-sized), so the composer docks at the bottom. */
-  .lenis > div:has(> [data-document-host]) {
+  /*
+   * Full-height screens fill the Lenis wrapper (whose content div is otherwise content-sized): the chat host, so the
+   * composer docks at the bottom, and the post editor, so its chat column runs to the bottom of the window (UI1: it
+   * stopped at its content's height). New full-height screens add `data-fill-screen`.
+   */
+  .lenis > div:has(> [data-document-host], > [data-post-editor], > [data-fill-screen]) {
     height: 100%;
   }
 

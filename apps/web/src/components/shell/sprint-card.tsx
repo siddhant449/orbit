@@ -33,14 +33,14 @@ export function SprintCard({ state, active = false, onNavigate }: { state: Sprin
       onClick={onNavigate}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "orbit-panel orbit-panel--interactive flex items-center gap-3.5 !rounded-[16px] p-4",
+        "orbit-panel orbit-panel--interactive flex items-center gap-3 !rounded-[16px] p-4",
         active && "!border-[rgba(124,138,255,0.5)]",
       )}
     >
-      <Ring value={copy.progress} max={SPRINT_DAYS} label="Sprint progress" size={52}>
+      <Ring value={copy.progress} max={SPRINT_DAYS} label="Sprint progress" size={48}>
         {copy.day ?? undefined}
       </Ring>
-      <span className="flex min-w-0 flex-col gap-[3px]">
+      <span className="flex min-w-0 flex-col gap-0.5">
         <span className="text-[11px] text-text-2">{copy.label}</span>
         <span className="text-[14px] font-medium leading-[1.25] text-text">{copy.title}</span>
         <span className="text-[11px] text-text-2">{copy.meta}</span>
@@ -56,7 +56,7 @@ export function SprintPill({ state }: { state: SprintState }) {
     <Link
       href="/challenge"
       aria-label={copy.day ? `30-day sprint, day ${copy.day}` : "30-day sprint, not started"}
-      className="orbit-transition flex h-9 items-center gap-2 rounded-pill bg-panel pl-2.5 pr-3 text-[12px] font-medium text-text shadow-highlight hover:bg-panel-hover"
+      className="orbit-transition flex h-11 items-center gap-2 rounded-pill bg-panel pl-3.5 pr-4 text-[13px] font-medium text-text shadow-highlight hover:bg-panel-hover"
     >
       <Ring value={copy.progress} max={SPRINT_DAYS} label="Sprint progress" size={16} strokeWidth={12} />
       {copy.day ? `Day ${copy.day}` : "Sprint"}
