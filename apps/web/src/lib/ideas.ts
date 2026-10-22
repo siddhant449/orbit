@@ -1,5 +1,6 @@
 import { CONTENT_TYPES, ContentTypeSchema, FORMATS, FormatSchema, type Strategy } from "@brandloop/ai";
 import { z } from "zod";
+import { PROMPT_PARAM_MAX, promptHref } from "@/lib/prompt-param";
 
 /**
  * "Ideas for this week" (screens.md B11, ROADMAP §5): N post ideas generated on demand from the profile's strategy,
@@ -151,11 +152,10 @@ export function ideaDraftPrompt(idea: Idea): string {
 }
 
 /** Ruling A22: home reads `?prompt=` (at most 2000 code points) into a prefilled composer; it is never auto-sent. */
-export const MAX_PROMPT_PARAM = 2000;
+export const MAX_PROMPT_PARAM = PROMPT_PARAM_MAX;
 
 export function ideaDraftHref(idea: Idea): string {
-  const prompt = [...ideaDraftPrompt(idea)].slice(0, MAX_PROMPT_PARAM).join("");
-  return `/?prompt=${encodeURIComponent(prompt)}`;
+  return promptHref(ideaDraftPrompt(idea));
 }
 
 /** The page's per-tab cache, validated: anything malformed is ignored. */
