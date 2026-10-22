@@ -145,9 +145,12 @@ export function DocumentEditor({
         }}
         aria-describedby={hintId}
         aria-invalid={tooLong || undefined}
+        // Typing after Save is clicked would be lost (the save sends the text as it was); hold it until the save lands.
+        readOnly={saving}
+        aria-busy={saving || undefined}
         spellCheck
         rows={8}
-        className="post-sheet__text block min-h-48 w-full resize-none overflow-hidden bg-transparent text-[15px] leading-[1.5] text-text outline-none"
+        className="post-sheet__text block min-h-48 w-full resize-none overflow-hidden bg-transparent text-[15px] leading-[1.5] text-text outline-none read-only:text-text-2"
       />
 
       <div className="flex flex-wrap items-center justify-between gap-3">

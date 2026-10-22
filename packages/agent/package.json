@@ -12,7 +12,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "smoke:chat": "tsx --env-file-if-exists=../../.env scripts/smoke-chat.ts",
-    "smoke:draft": "tsx --env-file-if-exists=../../.env scripts/smoke-draft.ts"
+    "smoke:draft": "tsx --env-file-if-exists=../../.env scripts/smoke-draft.ts",
+    "smoke:edit": "tsx --env-file-if-exists=../../.env scripts/smoke-edit.ts"
   },
   "dependencies": {
     "@brandloop/ai": "workspace:*",

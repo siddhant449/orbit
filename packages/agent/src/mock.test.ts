@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { describe, expect, it } from "vitest";
-import { PostWritingPayload, specialistOutputSchema } from "./specialists/envelope";
+import { EditResultSchema } from "./specialists/editing";
+import { FinalReviewPayload, PostWritingPayload, specialistOutputSchema } from "./specialists/envelope";
 import { createScriptedChatModel, SCRIPTED_DRAFT, scriptedAi, scriptedModel } from "./mock";
 
 type Prompt = { role: string; content: unknown }[];
@@ -67,6 +68,20 @@ describe("createScriptedChatModel", () => {
     expect(textOf(await play(model as never, [user("Hello")], all))).toBe("Mock reply.");
   });
 
+  it("paces a markdown reply asked for 'slowly' so it can be stopped mid-reply", async () => {
+    const model = createScriptedChatModel({ chunkDelayMs: 1 });
+    const t0 = Date.now();
+    const fast = textOf(await play(model as never, [user("Show me markdown")], all));
+    const fastMs = Date.now() - t0;
+    const t1 = Date.now();
+    const slow = textOf(await play(model as never, [user("Show me markdown, slowly")], all));
+    const slowMs = Date.now() - t1;
+    expect(slow).toBe(fast);
+    // About 70 words at 120 ms each: several seconds, against a few milliseconds unpaced.
+    expect(slowMs).toBeGreaterThan(5_000);
+    expect(fastMs).toBeLessThan(1_000);
+  }, 20_000);
+
   it("routes 'draft' to delegateWriting then createDocument, but only with tools it was given", async () => {
     const model = createScriptedChatModel();
     expect(calls(await play(model as never, [user("Draft a post about hiring")], all))[0]!.toolName).toBe("delegateWriting");
@@ -81,7 +96,46 @@ describe("createScriptedChatModel", () => {
   });
 });
 
+describe("createScriptedChatModel: editing", () => {
+  const tools = ["delegateWriting", "createDocument", "updateDocument", "proposeDocumentEdits", "delegateEditing"];
+  const system = {
+    role: "system",
+    content: `Rules.\n<open_document id="d1" version="2" title="T">\nThe opening line here.\n\nThe body.\n</open_document>`,
+  };
+
+  it("routes 'punchier' to proposeDocumentEdits on the open post's first line, then replies", async () => {
+    const model = createScriptedChatModel();
+    const ask = user("Make the opening punchier");
+    expect(calls(await play(model as never, [system, ask], tools))).toEqual([
+      { toolName: "proposeDocumentEdits", input: { instruction: "Make the opening punchier", targetText: "The opening line here." } },
+    ]);
+    const after = await play(model as never, [system, ask, toolResult("proposeDocumentEdits")], tools);
+    expect(calls(after)).toEqual([]);
+    expect(textOf(after)).toMatch(/Apply/);
+  });
+
+  it("routes 'shorter' to updateDocument and 'review' to delegateEditing", async () => {
+    const model = createScriptedChatModel();
+    const edit = calls(await play(model as never, [system, user("Make it shorter")], tools))[0]!;
+    expect(edit.toolName).toBe("updateDocument");
+    expect(edit.input).toMatchObject({ editScope: "whole-document", restoreVersion: null, editRequirements: [expect.any(String)] });
+    const review = calls(await play(model as never, [system, user("Review this post for clarity")], tools))[0]!;
+    expect(review).toMatchObject({ toolName: "delegateEditing", input: { specialty: "final-review" } });
+  });
+});
+
 describe("scriptedAi", () => {
+  it("returns canned edits, proposals and reviews", async () => {
+    const ai = scriptedAi();
+    const edit = await ai.json({ model: "generate", system: "s", prompt: "p", schema: EditResultSchema });
+    expect(edit).toMatchObject({ unmetRequirements: [] });
+    expect((edit as { text: string }).text.length).toBeGreaterThan(0);
+    const proposal = await ai.json({ model: "generate", system: "s", prompt: "p", schema: z.object({ replacement: z.string() }) });
+    expect((proposal as { replacement: string }).replacement).toBeTruthy();
+    const review = await ai.json({ model: "generate", system: "s", prompt: "p", schema: specialistOutputSchema(FinalReviewPayload) });
+    expect(review).toMatchObject({ payload: { qualityReview: { score: expect.any(Number) } } });
+  });
+
   it("returns a title for text and a schema-valid canned object for json", async () => {
     const ai = scriptedAi();
     expect(await ai.text({ model: "extract", system: "s", prompt: "p" })).toBe("Mock chat");

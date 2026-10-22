@@ -25,7 +25,16 @@ export { MEMORY_CONFLICT, runTool } from "./tools/run";
 export { createRunRegistry, getRunRegistry, type RunRegistry } from "./registry";
 export { finalizeAbortedParts, STOPPED_STEP, toStoredParts } from "./persist";
 export { fallbackTitle, titleChat } from "./title";
-export { createScriptedChatModel, SCRIPTED_DRAFT, SCRIPTED_TITLE, scriptedAi, scriptedModel, type ScriptStep } from "./mock";
+export {
+  createScriptedChatModel,
+  SCRIPTED_DRAFT,
+  SCRIPTED_HOOK,
+  SCRIPTED_SHORT,
+  SCRIPTED_TITLE,
+  scriptedAi,
+  scriptedModel,
+  type ScriptStep,
+} from "./mock";
 export {
   findHandoff,
   PostWritingPayload,
@@ -41,7 +50,22 @@ export {
 } from "./specialists/envelope";
 export { buildGrounding, renderGrounding, type Grounding } from "./specialists/grounding";
 export { runSpecialist, type SpecialistResult } from "./specialists/run";
-export { delegateTools } from "./tools/delegate";
-export { createDocumentFromHandoff, documentTools, type CreateDocumentOutput } from "./tools/documents";
+export { bannedWordsFromRules, CHECK_IDS, runDeterministicChecks, type CheckId, type CheckResult } from "./specialists/checks";
+export { editDocumentText, EditResultSchema, FinalReviewPayload, type EditOutcome, type FinalReview } from "./specialists/editing";
+export { delegateEditingRun, delegateTools } from "./tools/delegate";
+export {
+  createDocumentFromHandoff,
+  documentTools,
+  getPostVersionsText,
+  proposeDocumentEditsRun,
+  ProposalOutputSchema,
+  STALE_DOCUMENT,
+  STALE_SELECTED_PASSAGE,
+  updateDocumentRun,
+  type CreateDocumentOutput,
+  type ProposalOutput,
+  type UpdateDocumentOutput,
+} from "./tools/documents";
+export { applyProposal, ProposalError, type ProposalErrorCode } from "./proposals";
 export { chatError, chatErrorResponse, runChatTurn, STREAM_ERROR_TEXT, type ChatDeps } from "./turn";
 export { UI_MESSAGE_STREAM_HEADERS } from "ai";

@@ -15,7 +15,9 @@ export {
   openPanel,
   panelCue,
   POST_CHAR_LIMIT,
+  settleNeedsRefetch,
   withDocument,
   type PanelDoc,
   type PanelState,
 } from "./document-state";
+export { parseProposal, proposalStatus, type Proposal, type ProposalStatus } from "./proposal";

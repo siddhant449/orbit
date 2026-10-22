@@ -74,6 +74,16 @@ export function endStream(state: PanelState): PanelState {
   return { ...state, creating: false, updating: false, restart: false };
 }
 
+/**
+ * At the end of a turn (before `endStream`): the panel's text may be cut short and must be reloaded from the server,
+ * because a create or update stream was still running (a stop or a dropped connection lands between deltas), or the
+ * post never got its snapshot. Without this a later save would write the truncated text over the real post.
+ */
+export function settleNeedsRefetch(state: PanelState): boolean {
+  if (!state.doc) return false;
+  return state.doc.version === 0 || state.creating || state.updating || Boolean(state.restart);
+}
+
 /** The user closed the panel. */
 export function closePanel(state: PanelState): PanelState {
   return { ...state, open: false, dismissed: true };

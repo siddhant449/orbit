@@ -1,9 +1,10 @@
 "use client";
 
 import { lazy, Suspense } from "react";
-import { collapseToolRuns, type ChatUIMessage } from "@brandloop/agent/client";
+import { collapseToolRuns, parseProposal, type ChatUIMessage, type Proposal } from "@brandloop/agent/client";
 import { cn } from "@brandloop/ui";
 import { DraftCard } from "./document-panel";
+import { ProposalCard } from "./proposal-card";
 import { ToolGroup, ToolRow, type ToolPartLike } from "./tool-row";
 
 // Its own chunk, requested as soon as the chat code loads, so stored replies rarely show the plain fallback.
@@ -44,6 +45,7 @@ export function MessageParts({ message, streaming }: { message: ChatUIMessage; s
     if (it.type === "text") lastText = i;
   });
   const draft = createdPost(message.parts as Part[]);
+  const proposals = proposalsIn(message.parts as Part[]);
   return (
     <>
       {items.map((it, i) => {
@@ -57,6 +59,9 @@ export function MessageParts({ message, streaming }: { message: ChatUIMessage; s
         return null;
       })}
       {draft && <DraftCard fallback={draft} />}
+      {proposals.map(({ toolCallId, proposal }) => (
+        <ProposalCard key={toolCallId} toolCallId={toolCallId} proposal={proposal} />
+      ))}
     </>
   );
 }
@@ -71,6 +76,17 @@ function createdPost(parts: Part[]): { id: string; title: string; version: numbe
     }
   }
   return null;
+}
+
+/** Completed edit proposals in this message, in order (shown after the activity rows, even inside a collapsed group). */
+function proposalsIn(parts: Part[]): { toolCallId: string; proposal: Proposal }[] {
+  const out: { toolCallId: string; proposal: Proposal }[] = [];
+  for (const p of parts as (ToolPartLike & { toolCallId?: string })[]) {
+    if (p.type !== "tool-proposeDocumentEdits" || p.state !== "output-available" || typeof p.toolCallId !== "string") continue;
+    const proposal = parseProposal(p.output);
+    if (proposal) out.push({ toolCallId: p.toolCallId, proposal });
+  }
+  return out;
 }
 
 export function wordCount(message: ChatUIMessage): number {

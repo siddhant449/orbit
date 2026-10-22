@@ -11,9 +11,9 @@ const env = vi.hoisted(() => {
 });
 vi.mock("@/lib/account", () => ({ getAccount: async () => env.account }));
 
-import { createDocumentForChat, ensureAccount, getOrCreateChat, prisma } from "@brandloop/db";
+import { createDocumentForChat, ensureAccount, getOrCreateChat, prisma, saveAssistantMessage, saveDocumentVersion } from "@brandloop/db";
 import { randomUUID } from "node:crypto";
-import { getDocumentHandler, listVersionsHandler, patchDocumentHandler, restoreDocumentHandler } from "./documents-api";
+import { applyProposalHandler, getDocumentHandler, listVersionsHandler, patchDocumentHandler, restoreDocumentHandler } from "./documents-api";
 
 const CLERK = "user_test_webdocs";
 let mine: { userId: string; profileId: string };
@@ -100,5 +100,62 @@ describe("documents routes", () => {
     expect((await restoreDocumentHandler(send("POST", { version: 1, expectedVersion: 2 }), params(d.id))).status).toBe(409);
     expect((await restoreDocumentHandler(send("POST", { version: 9, expectedVersion: 3 }), params(d.id))).status).toBe(404);
     expect((await restoreDocumentHandler(send("POST", { version: "1" }), params(d.id))).status).toBe(400);
+  });
+});
+
+describe("POST /api/documents/:id/apply-proposal", () => {
+  async function withProposal(over: Record<string, unknown> = {}) {
+    const chatId = randomUUID();
+    await getOrCreateChat(mine.profileId, mine.userId, chatId);
+    const d = await createDocumentForChat(mine.profileId, chatId, { title: "Post", text: "Old hook.\n\nBody." });
+    await saveAssistantMessage(chatId, {
+      id: randomUUID(),
+      runId: randomUUID(),
+      metadata: null,
+      context: null,
+      parts: [
+        {
+          type: "tool-proposeDocumentEdits",
+          toolCallId: "call_p",
+          state: "output-available",
+          input: {},
+          output: { proposalId: "call_p", documentId: d.id, documentVersion: 1, targetText: "Old hook.", replacement: "New hook.", instruction: "Punchier", ...over },
+        },
+      ],
+    });
+    return { chatId, d };
+  }
+
+  it("applies the stored replacement and returns the snapshot; client text is ignored", async () => {
+    const { chatId, d } = await withProposal();
+    const res = await applyProposalHandler(
+      send("POST", { chatId, toolCallId: "call_p", expectedVersion: 1, replacement: "Injected", text: "Injected" }),
+      params(d.id),
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ id: d.id, version: 2, text: "New hook.\n\nBody." });
+    const versions = await (await listVersionsHandler(new Request("http://test"), params(d.id))).json();
+    expect(versions.versions[0]).toMatchObject({ version: 2, source: "PROPOSAL" });
+  });
+
+  it("409s a stale version and a stale passage, with distinct codes", async () => {
+    const { chatId, d } = await withProposal();
+    await saveDocumentVersion(mine.profileId, d.id, { text: "Rewritten entirely.", source: "USER_EDIT", expectedVersion: 1 });
+    const stale = await applyProposalHandler(send("POST", { chatId, toolCallId: "call_p", expectedVersion: 1 }), params(d.id));
+    expect(stale.status).toBe(409);
+    expect(await stale.json()).toMatchObject({ code: "document_version_conflict", version: 2 });
+    const gone = await applyProposalHandler(send("POST", { chatId, toolCallId: "call_p", expectedVersion: 2 }), params(d.id));
+    expect(gone.status).toBe(409);
+    expect(await gone.json()).toMatchObject({ code: "stale_passage" });
+  });
+
+  it("404s another profile, an unknown proposal and another chat; 400s a bad body", async () => {
+    const { chatId, d } = await withProposal();
+    expect((await applyProposalHandler(send("POST", { chatId, toolCallId: "call_nope", expectedVersion: 1 }), params(d.id))).status).toBe(404);
+    expect((await applyProposalHandler(send("POST", { chatId: randomUUID(), toolCallId: "call_p", expectedVersion: 1 }), params(d.id))).status).toBe(404);
+    expect((await applyProposalHandler(send("POST", { chatId, toolCallId: "call_p" }), params(d.id))).status).toBe(400);
+    expect((await applyProposalHandler(send("POST", "{"), params(d.id))).status).toBe(400);
+    env.account = { user: { id: theirs.userId }, currentProfile: { id: theirs.profileId } };
+    expect((await applyProposalHandler(send("POST", { chatId, toolCallId: "call_p", expectedVersion: 1 }), params(d.id))).status).toBe(404);
   });
 });

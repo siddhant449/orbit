@@ -9,6 +9,7 @@ import {
   endStream,
   openPanel,
   panelCue,
+  settleNeedsRefetch,
   withDocument,
   type PanelDoc,
   type PanelState,
@@ -67,6 +68,8 @@ export function useDocument(initial: PanelDoc | null) {
   // Bumped when a stream starts, so the sheet types it out even if the whole burst lands in one render.
   const [streamSeq, setStreamSeq] = useState(0);
   const [draft, setDraft] = useState<EditDraft | null>(null);
+  // After a cut-off stream: the panel's text may be truncated until the saved post is reloaded. Editing waits for it.
+  const [reload, setReload] = useState<{ id: string; status: "loading" | "failed" } | null>(null);
   // Where focus goes back to on close: captured when the user asks to open, before the panel takes focus.
   const returnTo = useRef<HTMLElement | null>(null);
 
@@ -104,17 +107,43 @@ export function useDocument(initial: PanelDoc | null) {
     [apply],
   );
 
+  /** Reloads the saved post after a cut-off stream. A newer stream or version that lands meanwhile wins. */
+  const reloadSaved = useCallback(
+    async (id: string) => {
+      setReload({ id, status: "loading" });
+      let latest: PanelDoc | null = null;
+      try {
+        latest = await fetchDoc(id);
+      } catch {
+        latest = null;
+      }
+      if (!latest) {
+        setReload({ id, status: "failed" });
+        return;
+      }
+      const got = latest;
+      apply((s) =>
+        s.doc?.id === got.id && !s.creating && !s.updating && s.doc.version <= got.version ? withDocument(s, got) : s,
+      );
+      setReload(null);
+    },
+    [apply],
+  );
+
   /**
-   * The turn ended (finished, failed, stopped or dropped). No flag stays on, and a post that was streaming when it
-   * ended is reloaded from the server, where it was saved before its text streamed.
+   * The turn ended (finished, failed, stopped or dropped). No flag stays on, and a post whose create or update
+   * stream was cut off is reloaded from the server (where it was saved before its text streamed), so truncated text
+   * never stays on screen for a later save to write over the real post. A failed reload offers a retry.
    */
   const settle = useCallback(async () => {
-    const next = apply(endStream);
-    const partial = next.doc && next.doc.version === 0 ? next.doc.id : null;
-    if (!partial) return;
-    const latest = await fetchDoc(partial);
-    if (latest) apply((s) => (s.doc?.id === latest.id && s.doc.version === 0 ? withDocument(s, latest) : s));
-  }, [apply]);
+    const cut = settleNeedsRefetch(stateRef.current) ? stateRef.current.doc!.id : null;
+    apply(endStream);
+    if (cut) await reloadSaved(cut);
+  }, [apply, reloadSaved]);
+
+  const retryReload = useCallback(() => {
+    if (reload) void reloadSaved(reload.id);
+  }, [reload, reloadSaved]);
 
   const open = useCallback(() => {
     if (document.activeElement instanceof HTMLElement && document.activeElement !== document.body) {
@@ -222,6 +251,9 @@ export function useDocument(initial: PanelDoc | null) {
     retryVersions: () => void refreshVersions(),
     draft,
     setDraft,
+    /** The saved post is being reloaded after a cut-off stream, or that reload failed. */
+    reload: reload && state.doc?.id === reload.id ? reload.status : null,
+    retryReload,
     takeReturnTo,
     settle,
     onData,

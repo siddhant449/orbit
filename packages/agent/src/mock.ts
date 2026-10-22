@@ -7,7 +7,12 @@ import { MockLanguageModelV4 } from "ai/test";
  * and `AI_MOCK_MODEL=1` (dev and e2e only; ignored in production) swaps them in for the real ones.
  */
 
-export type ScriptStep = { text?: string; toolCalls?: { toolCallId?: string; toolName: string; input: unknown }[] };
+/** One model step. `chunkDelayMs` overrides the model's pace for this step only. */
+export type ScriptStep = {
+  text?: string;
+  toolCalls?: { toolCallId?: string; toolName: string; input: unknown }[];
+  chunkDelayMs?: number;
+};
 
 type CallOptions = Parameters<MockLanguageModelV4["doStream"]>[0];
 type StreamPart = Awaited<ReturnType<MockLanguageModelV4["doStream"]>>["stream"] extends ReadableStream<infer P> ? P : never;
@@ -40,7 +45,8 @@ function stepParts(step: ScriptStep): StreamPart[] {
   return parts;
 }
 
-function play(step: ScriptStep, chunkDelayMs: number | undefined) {
+function play(step: ScriptStep, modelDelayMs: number | undefined) {
+  const chunkDelayMs = step.chunkDelayMs ?? modelDelayMs;
   return {
     stream: simulateReadableStream({
       chunks: stepParts(step),
@@ -84,10 +90,21 @@ function toolResultsThisTurn(prompt: Prompt): { toolName: string; toolCallId: st
   return out;
 }
 
+/** The first line of the `<open_document>` in the system prompt, or null when no post is open. */
+function openDocumentFirstLine(prompt: Prompt): string | null {
+  const system = prompt.find((m) => m.role === "system");
+  const content = typeof system?.content === "string" ? system.content : "";
+  const body = /<open_document[^>]*>\n([\s\S]*?)\n<\/open_document>/.exec(content)?.[1];
+  return body?.split("\n").find((l) => l.trim())?.trim() ?? null;
+}
+
 const AFTER_TOOL: Record<string, string> = {
   saveMemory: "Saved that to your memory.",
   searchKB: "Here is what I found in your knowledge base.",
   createDocument: "Your draft is open on the right.",
+  proposeDocumentEdits: "Here is a punchier opening. Apply it if you like it.",
+  updateDocument: "Done. The shorter version is in the panel.",
+  delegateEditing: "The review is ready.",
 };
 
 /** A formatted reply for exercising the chat's markdown rendering offline. */
@@ -105,6 +122,12 @@ const MARKDOWN_REPLY = [
   "",
   "Read more in [the guide](https://example.com/guide) or [this one](javascript:alert(1)).",
 ].join("\n");
+
+/**
+ * The gap between words for a markdown reply asked for "slowly": slow enough that e2e can see it live and stop it mid-reply (the
+ * default 5 ms pace finishes the markdown reply in well under a second, faster than a click lands).
+ */
+const SLOW_CHUNK_MS = 120;
 
 /** Decides the next step from the conversation so far: a keyword router for offline end-to-end runs. */
 function route(opts: CallOptions): ScriptStep {
@@ -126,10 +149,23 @@ function route(opts: CallOptions): ScriptStep {
     return call("saveMemory", { category: "about", topic: null, facts: [fact] });
   }
   if (/\bknowledge\b/i.test(text)) return call("searchKB", { query: text.slice(0, 200), limit: 5 });
+  const firstLine = openDocumentFirstLine(opts.prompt);
+  if (firstLine && /\bpunchier\b/i.test(text)) {
+    return call("proposeDocumentEdits", { instruction: text.slice(0, 1_000), targetText: firstLine });
+  }
+  if (firstLine && /\bshorter\b/i.test(text)) {
+    return call("updateDocument", {
+      description: text.slice(0, 2_000),
+      editRequirements: ["Make the post shorter"],
+      editScope: "whole-document",
+      restoreVersion: null,
+    });
+  }
+  if (firstLine && /\breview\b/i.test(text)) return call("delegateEditing", { request: text.slice(0, 4_000), specialty: "final-review" });
   if (/\bdraft\b/i.test(text)) {
     return call("delegateWriting", { request: `Write a short LinkedIn post for the user. Their request: ${text.slice(0, 2_000)}`, specialty: "post" });
   }
-  if (/\bmarkdown\b/i.test(text)) return { text: MARKDOWN_REPLY };
+  if (/\bmarkdown\b/i.test(text)) return { text: MARKDOWN_REPLY, ...(/\bslowly\b/i.test(text) && { chunkDelayMs: SLOW_CHUNK_MS }) };
   return { text: "Mock reply." };
 }
 
@@ -171,6 +207,24 @@ const CANNED: unknown[] = [
     },
   },
 ];
+
+/** The mock editor's replacement opening line and shortened post. */
+export const SCRIPTED_HOOK = "Founders: stop building proofs of concept.";
+export const SCRIPTED_SHORT = SCRIPTED_DRAFT.split("\n\n").slice(0, 2).join("\n\n");
+
+CANNED.push(
+  { replacement: SCRIPTED_HOOK },
+  { text: SCRIPTED_SHORT, changeSummary: "Cut the closing paragraph", unmetRequirements: [] },
+  {
+    summary: "A clear, short post.",
+    findings: [],
+    recommendation: "Share the result with the user.",
+    missingInput: [],
+    confidence: "medium",
+    parentAction: "respond",
+    payload: { qualityReview: { passed: true, score: 84, issues: [], deterministicChecks: [] } },
+  },
+);
 
 /** A specialist client for mock mode: `text` names chats, `json` returns the first canned output the schema accepts. */
 export function scriptedAi(): AiClient {

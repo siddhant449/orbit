@@ -7,6 +7,7 @@ import {
   endStream,
   panelCue,
   POST_CHAR_LIMIT,
+  settleNeedsRefetch,
   withDocument,
   type PanelState,
 } from "./document-state";
@@ -158,5 +159,20 @@ describe("panelCue", () => {
     expect(panelCue(s, closePanel(s))).toBeNull();
     const c = applyDataPart(empty, { type: "data-creating", data: true });
     expect(panelCue(c, applyDataPart(c, { type: "data-textDelta", data: { id: "d1", text: "x" } }))).toBeNull();
+  });
+});
+
+describe("settleNeedsRefetch", () => {
+  it("refetches a post whose create or update stream was cut off, at any version", () => {
+    expect(settleNeedsRefetch({ ...empty, doc: { ...doc, version: 0 } })).toBe(true);
+    expect(settleNeedsRefetch({ ...empty, updating: true, doc: { ...doc, version: 4, text: "Trunc" } })).toBe(true);
+    expect(settleNeedsRefetch({ ...empty, creating: true, doc })).toBe(true);
+    expect(settleNeedsRefetch({ ...empty, restart: true, doc })).toBe(true);
+  });
+
+  it("leaves a settled post alone", () => {
+    expect(settleNeedsRefetch({ ...empty, doc })).toBe(false);
+    expect(settleNeedsRefetch(empty)).toBe(false);
+    expect(settleNeedsRefetch({ ...empty, updating: true })).toBe(false);
   });
 });

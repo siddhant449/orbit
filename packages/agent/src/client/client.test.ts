@@ -71,6 +71,10 @@ describe("isToolError", () => {
     expect(isToolError("✓ Updated about with 1 item")).toBe(false);
     expect(isToolError({ success: true })).toBe(false);
     expect(isToolError(null)).toBe(false);
+    expect(isToolError("EDIT_REQUIREMENTS_MISSED: Complete these omitted requirements: Add a CTA")).toBe(true);
+    expect(isToolError("STALE_DOCUMENT: The user changed the post")).toBe(true);
+    expect(isToolError("STALE_SELECTED_PASSAGE: That passage isn't in the current draft.")).toBe(true);
+    expect(isToolError("EXISTING_POST: A post already exists")).toBe(true);
     expect(isToolError(undefined)).toBe(false);
   });
 });

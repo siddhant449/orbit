@@ -26,6 +26,8 @@ export const LIMITS = {
   postChars: 3_000,
   /** What a document version may store. */
   postStoredChars: 10_000,
+  /** An edit proposal's passage and its replacement. */
+  proposalChars: 3_000,
   /** Document and chat titles. */
   titleChars: 120,
   /** A run lock older than this is stale. */

@@ -28,9 +28,11 @@ export const FinalReviewPayload = z.object({
     passed: z.boolean(),
     score: z.number().min(0).max(100),
     issues: z.array(z.object({ severity: z.enum(["low", "medium", "high"]), text: z.string(), quote: z.string().nullable() })).max(12),
-    deterministicChecks: z.array(z.object({ name: z.string(), passed: z.boolean() })),
+    // The server overwrites these with `runDeterministicChecks` (specialists/checks.ts); the model's copy is never trusted.
+    deterministicChecks: z.array(z.object({ id: z.string(), passed: z.boolean(), detail: z.string() })).max(12),
   }),
 });
+export type FinalReview = z.infer<typeof FinalReviewPayload>;
 
 export const PersonalGroundingPayload = z.object({
   readiness: z.enum(["ready", "needs-user-input"]),

@@ -8,6 +8,7 @@ import {
   restoreDocumentVersion,
   saveDocumentVersion,
 } from "@brandloop/db";
+import { applyProposal, ProposalError } from "@brandloop/agent";
 import { z } from "zod";
 import { getAccount } from "@/lib/account";
 
@@ -33,6 +34,11 @@ async function readJson(request: Request): Promise<unknown> {
 
 function fromError(err: unknown): Response {
   if (err instanceof DocumentVersionConflict) return conflict(err.currentVersion);
+  if (err instanceof ProposalError) {
+    return err.code === "not_found"
+      ? fail(404, "That suggestion isn't available any more.")
+      : fail(409, "That passage isn't in the post any more, so the suggestion can't be applied.", { code: "stale_passage" });
+  }
   if (err instanceof DocumentError) return err.code === "not_found" ? notFound() : fail(400, err.message);
   throw err;
 }
@@ -93,6 +99,29 @@ export async function restoreDocumentHandler(request: Request, { params }: Ctx):
   if (!parsed.success) return fail(400, "Send version and expectedVersion as whole numbers.");
   try {
     return Response.json(await restoreDocumentVersion(profileId, (await params).id, parsed.data.version, parsed.data.expectedVersion));
+  } catch (err) {
+    return fromError(err);
+  }
+}
+
+const ApplyProposalSchema = z.object({
+  chatId: z.string().min(1).max(200),
+  toolCallId: z.string().min(1).max(200),
+  expectedVersion: version,
+});
+
+/**
+ * POST /api/documents/:id/apply-proposal: `{chatId, toolCallId, expectedVersion}`. The passage and replacement come
+ * from the proposal stored in the chat, never from the request. 200 snapshot, 409 `document_version_conflict` or
+ * `stale_passage`, 404 when the proposal or post isn't the caller's.
+ */
+export async function applyProposalHandler(request: Request, { params }: Ctx): Promise<Response> {
+  const profileId = await currentProfileId();
+  if (!profileId) return fail(400, "Create a profile first.");
+  const parsed = ApplyProposalSchema.safeParse(await readJson(request));
+  if (!parsed.success) return fail(400, "Send chatId, toolCallId and expectedVersion.");
+  try {
+    return Response.json(await applyProposal(profileId, (await params).id, parsed.data));
   } catch (err) {
     return fromError(err);
   }

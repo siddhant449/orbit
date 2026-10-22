@@ -282,15 +282,31 @@ export function DocumentPanel({ ctl, busy }: { ctl: DocumentController; busy: bo
               <PostText text={shown} caret={revealing} />
             )}
           </PostSheet>
+          {ctl.reload && (
+            <div role={ctl.reload === "failed" ? "alert" : "status"} data-reload className="flex flex-wrap items-center gap-3 text-[13px] text-text-2">
+              {ctl.reload === "failed" ? (
+                <>
+                  <p>The update stopped partway, and the saved post couldn&apos;t be reloaded.</p>
+                  <Button variant="secondary" size="sm" onClick={ctl.retryReload}>
+                    Reload post
+                  </Button>
+                </>
+              ) : (
+                <p>Reloading the saved post…</p>
+              )}
+            </div>
+          )}
           {!isEditing && version && (
             <div className="flex flex-wrap items-center gap-3">
-              <Button ref={editRef} variant="secondary" size="sm" onClick={() => setEditing(true)} disabled={streaming}>
+              <Button ref={editRef} variant="secondary" size="sm" onClick={() => setEditing(true)} disabled={streaming || ctl.reload !== null}>
                 <PencilIcon />
                 {kept ? "Resume edit" : "Edit"}
               </Button>
               {kept && (
                 <p data-kept-edit className="text-[13px] text-text-2">
-                  You have an unsaved edit to this post.
+                  {kept.base < version
+                    ? `You have an unsaved edit based on version ${kept.base}. The post is now at version ${version}; saving will ask which one to keep.`
+                    : "You have an unsaved edit to this post."}
                 </p>
               )}
             </div>

@@ -57,9 +57,12 @@ export const HIDDEN_OUTPUT_TOOLS: ReadonlySet<string> = new Set([
   "readKB",
 ]);
 
-const ERROR_TEXT = /^\s*(Failed|Refused|⚠)/;
+const ERROR_TEXT = /^\s*(Failed|Refused|⚠|EDIT_REQUIREMENTS_MISSED:|STALE_DOCUMENT:|STALE_SELECTED_PASSAGE:|EXISTING_POST:)/;
 
-/** A tool output reads as a failure: a `Failed` / `Refused` / `⚠` string, or an object with `error` or `success: false`. */
+/**
+ * A tool output reads as a failure: a `Failed` / `Refused` / `⚠` string or one of the document error codes, or an
+ * object with `error` or `success: false`.
+ */
 export function isToolError(output: unknown): boolean {
   if (typeof output === "string") return ERROR_TEXT.test(output);
   if (output && typeof output === "object") {
