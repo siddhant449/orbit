@@ -19,10 +19,12 @@ export type AutosaveSnapshot = {
   error: string | null;
 };
 
+export type SaveOptions = { keepalive?: boolean };
+
 type Options = {
   doc: AutosaveDoc;
   delay?: number;
-  save: (text: string, expectedVersion: number) => Promise<AutosaveResult>;
+  save: (text: string, expectedVersion: number, opts?: SaveOptions) => Promise<AutosaveResult>;
   onChange?: (s: AutosaveSnapshot) => void;
   /** The editor must show this text (a version adopted from elsewhere, or use-latest). */
   onReplace?: (text: string) => void;
@@ -37,7 +39,10 @@ export class Autosave {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private inFlight = false;
   private paused = false;
-  private disposed = false;
+  /** Closed between unmount and the next mount (StrictMode mounts twice): nothing is scheduled. */
+  private closed = false;
+  /** The save in flight, so an exclusive write can wait for it. */
+  private flight: Promise<void> | null = null;
   private conflict: AutosaveDoc | null = null;
   private error: string | null = null;
   private readonly delay: number;
@@ -101,20 +106,21 @@ export class Autosave {
 
   private schedule() {
     this.clearTimer();
-    if (this.disposed || this.paused || this.conflict || !this.dirty || !this.text.trim()) return;
+    if (this.closed || this.paused || this.conflict || !this.dirty || !this.text.trim()) return;
     this.timer = setTimeout(() => {
       this.timer = null;
       this.run();
     }, this.delay);
   }
 
-  private run(expected = this.version) {
-    if (this.disposed || this.inFlight || !this.dirty || !this.text.trim()) return;
+  private run(expected = this.version, opts?: SaveOptions) {
+    if (this.inFlight || !this.dirty || !this.text.trim()) return;
     const text = this.text;
     this.inFlight = true;
     this.error = null;
     this.emit();
-    void this.opts.save(text, expected).then(
+    const call = opts ? this.opts.save(text, expected, opts) : this.opts.save(text, expected);
+    this.flight = call.then(
       (res) => this.settle(text, res),
       () => this.settle(text, { ok: false, error: "Your edit couldn't be saved. Check your connection." }),
     );
@@ -122,7 +128,7 @@ export class Autosave {
 
   private settle(text: string, res: AutosaveResult) {
     this.inFlight = false;
-    if (this.disposed) return;
+    this.flight = null;
     if (res.ok) {
       this.version = Math.max(this.version, res.version);
       this.savedText = text;
@@ -147,10 +153,44 @@ export class Autosave {
     this.schedule();
   }
 
-  /** Save now (leaving the page, Cmd+S). */
-  flush() {
+  /** Save now (Cmd+S, before a send). */
+  flush(opts?: SaveOptions) {
     this.clearTimer();
-    if (!this.paused && !this.conflict) this.run();
+    if (!this.paused && !this.conflict) this.run(this.version, opts);
+  }
+
+  /**
+   * A write of its own (a rename) that must carry the editor's text and the current version: it waits for any save in
+   * flight, cancels the pending autosave, and moves the base like a save. Refused while the conflict choice is open.
+   */
+  async exclusive(task: (text: string, expectedVersion: number) => Promise<AutosaveResult>): Promise<AutosaveResult> {
+    while (this.flight) await this.flight;
+    if (this.conflict) return { ok: false, error: "Choose which version to keep first." };
+    this.clearTimer();
+    const text = this.text;
+    this.inFlight = true;
+    this.error = null;
+    this.emit();
+    let res: AutosaveResult;
+    try {
+      res = await task(text, this.version);
+    } catch {
+      res = { ok: false, error: "That change couldn't be saved. Check your connection." };
+    }
+    this.settle(text, res);
+    return res;
+  }
+
+  /** Unmount: send the pending edit now (keepalive when the page is going away), then schedule nothing. */
+  close(opts?: SaveOptions) {
+    this.flush(opts);
+    this.closed = true;
+  }
+
+  /** Mount (again): scheduling resumes. Results of saves sent before the close still land. */
+  open() {
+    this.closed = false;
+    this.schedule();
   }
 
   retry() {
@@ -197,7 +237,7 @@ export class Autosave {
 
   /** A version saved elsewhere (stream snapshot, applied suggestion, restore, our own save echoing back). */
   remote(doc: AutosaveDoc) {
-    if (this.disposed || doc.version <= this.version) return;
+    if (doc.version <= this.version) return;
     if (doc.text === this.text) {
       // Already showing it: only the base moves.
       this.clearTimer();
@@ -228,8 +268,9 @@ export class Autosave {
     this.schedule();
   }
 
+  /** Stops without saving. */
   dispose() {
-    this.disposed = true;
+    this.closed = true;
     this.clearTimer();
   }
 }

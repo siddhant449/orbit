@@ -191,4 +191,82 @@ describe("Autosave", () => {
     vi.advanceTimersByTime(5000);
     expect(calls).toHaveLength(0);
   });
+
+  describe("lifecycle", () => {
+    it("close() sends the pending edit, then stops", () => {
+      const { a, calls } = setup();
+      a.edit("typed just before leaving");
+      a.close();
+      expect(calls).toHaveLength(1);
+      expect(calls[0]).toMatchObject({ text: "typed just before leaving", expectedVersion: 3 });
+      a.edit("after close");
+      vi.advanceTimersByTime(5000);
+      expect(calls).toHaveLength(1);
+    });
+
+    it("close({ keepalive }) asks the save to outlive the page", () => {
+      const { a, save } = setup();
+      a.edit("unload");
+      a.close({ keepalive: true });
+      expect(save).toHaveBeenCalledWith("unload", 3, { keepalive: true });
+    });
+
+    it("survives mount → cleanup → mount (StrictMode): open() after close() autosaves again", async () => {
+      const { a, calls, last } = setup();
+      a.close();
+      a.open();
+      a.edit("still saving");
+      vi.advanceTimersByTime(800);
+      expect(calls).toHaveLength(1);
+      calls[0]!.resolve({ ok: true, version: 4 });
+      await vi.waitFor(() => expect(last()).toMatchObject({ phase: "saved", version: 4 }));
+    });
+
+    it("a save in flight across close → open still lands", async () => {
+      const { a, calls, last } = setup();
+      a.edit("in flight");
+      a.close();
+      a.open();
+      calls[0]!.resolve({ ok: true, version: 4 });
+      await vi.waitFor(() => expect(last()).toMatchObject({ phase: "saved", version: 4, dirty: false }));
+    });
+  });
+
+  describe("exclusive (rename)", () => {
+    it("runs with the current text and version once nothing is in flight, and moves the base", async () => {
+      const { a, calls, last } = setup();
+      a.edit("edited");
+      vi.advanceTimersByTime(800);
+      const task = vi.fn<(text: string, v: number) => Promise<AutosaveResult>>(async () => ({ ok: true, version: 5 }));
+      const done = a.exclusive(task);
+      expect(task).not.toHaveBeenCalled();
+      calls[0]!.resolve({ ok: true, version: 4 });
+      await expect(done).resolves.toEqual({ ok: true, version: 5 });
+      expect(task).toHaveBeenCalledWith("edited", 4);
+      expect(last()).toMatchObject({ phase: "saved", version: 5 });
+      a.edit("edited again");
+      vi.advanceTimersByTime(800);
+      expect(calls[1]).toMatchObject({ text: "edited again", expectedVersion: 5 });
+    });
+
+    it("carries unsaved text in the same write and cancels the pending autosave", async () => {
+      const { a, calls, last } = setup();
+      a.edit("unsaved");
+      const task = vi.fn(async (): Promise<AutosaveResult> => ({ ok: true, version: 4 }));
+      await a.exclusive(task);
+      expect(task).toHaveBeenCalledWith("unsaved", 3);
+      vi.advanceTimersByTime(5000);
+      expect(calls).toHaveLength(0);
+      expect(last()).toMatchObject({ phase: "saved", dirty: false, version: 4 });
+    });
+
+    it("refuses while the conflict choice is open", async () => {
+      const { a } = setup();
+      a.edit("mine");
+      a.remote({ id: "d1", version: 4, text: "theirs" });
+      const task = vi.fn();
+      await expect(a.exclusive(task)).resolves.toMatchObject({ ok: false });
+      expect(task).not.toHaveBeenCalled();
+    });
+  });
 });

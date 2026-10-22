@@ -14,7 +14,8 @@ import { DocumentPanelContext, PostSheet } from "@/components/chat/document-pane
 import { ThreadPlaceContext } from "@/components/chat/thread-context";
 import { useDocument } from "@/components/chat/use-document";
 import { relativeTime, VersionList } from "@/components/chat/version-list";
-import { Autosave, type AutosaveResult, type AutosaveSnapshot } from "./autosave";
+import { Autosave, type AutosaveResult, type AutosaveSnapshot, type SaveOptions } from "./autosave";
+import { inertOthers } from "./inert-others";
 import { EditorToolbar, type PreviewView } from "./editor-toolbar";
 import { foldPoint, hookOf } from "./fold";
 import { pmText, postExtensions } from "./post-extensions";
@@ -33,7 +34,10 @@ export type EditorDoc = PanelDoc & { updatedAt: string };
 const CLOCK_MS = 30_000;
 /** Late-bound pieces the autosave reaches at call time (never during render). */
 class Bridge {
-  save: (text: string, expectedVersion: number) => Promise<AutosaveResult> = async () => ({ ok: false, error: "Not ready." });
+  save: (text: string, expectedVersion: number, opts?: SaveOptions) => Promise<AutosaveResult> = async () => ({
+    ok: false,
+    error: "Not ready.",
+  });
   editor: Editor | null = null;
   version = 0;
   bind(save: Bridge["save"], editor: Editor | null) {
@@ -52,7 +56,7 @@ function createAutosave(
   bridge.version = doc.version;
   return new Autosave({
     doc,
-    save: (t, v) => bridge.save(t, v),
+    save: (t, v, o) => bridge.save(t, v, o),
     onChange: (s) => {
       if (s.version > bridge.version) setSavedAt(new Date().toISOString());
       bridge.version = s.version;
@@ -117,11 +121,15 @@ export function PostEditorView({
   selectedVoiceId,
 }: {
   doc: EditorDoc;
-  chat: { id: string; linked: boolean; messages: ChatUIMessage[] };
+  /** The post's live chat, or `id: null` when it has none (its chat was deleted). */
+  chat: { id: string | null; messages: ChatUIMessage[] };
   voices: VoiceOption[];
   selectedVoiceId: string | null;
 }) {
   const ctl = useDocument(initialDoc);
+  // A post without a chat gets one id per visit, kept across refreshes of this view; the first send links it.
+  const [freshChatId] = useState(() => crypto.randomUUID());
+  const chatId = chat.id ?? freshChatId;
   const desktop = useMediaQuery(DESKTOP_EDITOR);
   const editorId = useId();
   const [busy, setBusy] = useState(false);
@@ -139,7 +147,11 @@ export function PostEditorView({
     return { bridge: b, autosave: createAutosave(initialDoc, b, setSave, setSavedAt) };
   });
   const snap = save ?? autosave.snapshot();
-  useEffect(() => () => autosave.dispose(), [autosave]);
+  // Per mount (StrictMode mounts twice): open, and on unmount send the pending edit before closing.
+  useEffect(() => {
+    autosave.open();
+    return () => autosave.close();
+  }, [autosave]);
 
   const editor = useEditor({
     extensions: useMemo(() => postExtensions(), []),
@@ -204,20 +216,17 @@ export function PostEditorView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, docText, docVersion, streaming, autosave, initialDoc.id]);
 
-  // Leaving: save now, and warn while an edit is still unsaved.
+  // Closing the tab or reloading: send the pending edit with keepalive, and warn while it is unsaved.
   useEffect(() => {
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
       const s = autosave.snapshot();
       if (s.dirty || s.phase === "saving") {
-        autosave.flush();
+        autosave.flush({ keepalive: true });
         e.preventDefault();
       }
     };
     window.addEventListener("beforeunload", onBeforeUnload);
-    return () => {
-      window.removeEventListener("beforeunload", onBeforeUnload);
-      autosave.flush();
-    };
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [autosave]);
 
   // ---- conflict choice ------------------------------------------------------------------------------------------
@@ -273,31 +282,30 @@ export function PostEditorView({
   async function rename(title: string) {
     const next = title.trim();
     if (!next || next === doc.title) return true;
-    if (!settled()) {
-      toast("Saving your edit first.");
-      return false;
-    }
-    const expectedVersion = autosave.snapshot().version;
-    try {
-      const res = await fetch(`/api/documents/${encodeURIComponent(doc.id)}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ text: autosave.currentText, title: next, expectedVersion }),
-      });
-      if (res.status === 409) {
-        await ctl.refetch();
-        toast("This post changed. Check the latest version and rename it again.");
-        return false;
+    // Through the autosave: it waits for a save in flight, carries the editor's text and the current version, and
+    // moves the base, so the next autosave can't send a stale expectedVersion.
+    const res = await autosave.exclusive(async (current, expectedVersion) => {
+      try {
+        const r = await fetch(`/api/documents/${encodeURIComponent(doc.id)}`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ text: current, title: next, expectedVersion }),
+        });
+        if (r.status === 409) {
+          const latest = await ctl.refetch();
+          return latest ? { ok: false, conflict: latest } : { ok: false, error: "This post changed. Reload it and try again." };
+        }
+        if (!r.ok) return { ok: false, error: "The post couldn't be renamed. Try again." };
+        const { version } = (await r.json()) as { version: number };
+        ctl.onData({ type: "data-document", data: { id: doc.id, title: next, version, text: current } });
+        return { ok: true, version };
+      } catch {
+        return { ok: false, error: "The post couldn't be renamed. Check your connection and try again." };
       }
-      if (!res.ok) throw new Error(String(res.status));
-      const { version } = (await res.json()) as { version: number };
-      ctl.onData({ type: "data-document", data: { id: doc.id, title: next, version, text: autosave.currentText } });
-      toast("Renamed.");
-      return true;
-    } catch {
-      toast("The post couldn't be renamed. Try again.");
-      return false;
-    }
+    });
+    if (res.ok) toast("Renamed.");
+    else toast("conflict" in res ? "This post changed. Choose which version to keep, then rename it again." : res.error);
+    return res.ok;
   }
 
   useEffect(() => {
@@ -326,15 +334,17 @@ export function PostEditorView({
     setChatOpen(false);
     requestAnimationFrame(() => chatToggleRef.current?.focus());
   }, []);
+  const chatRef = useRef<HTMLElement>(null);
   useEffect(() => {
-    if (!chatSheet) return;
+    const el = chatRef.current;
+    if (!chatSheet || !el) return;
+    // Everything else (shell header, tab bar, sidebar, the editor) is inert while the sheet covers it.
+    const restore = inertOthers(el);
     requestAnimationFrame(() => document.getElementById("chat-composer")?.focus());
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && closeChat();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [chatSheet, closeChat]);
+    return restore;
+  }, [chatSheet]);
 
-  const place = useMemo(() => ({ chatId: chat.id, inPostEditor: true }), [chat.id]);
+  const place = useMemo(() => ({ chatId, inPostEditor: true }), [chatId]);
   const docContext = useMemo(() => ({ id: initialDoc.id, version: snap.version }), [initialDoc.id, snap.version]);
   const line = saveLine(snap, streaming);
 
@@ -345,7 +355,16 @@ export function PostEditorView({
           <div className="post-editor relative flex h-full min-h-0" data-post-editor="">
             <aside
               aria-labelledby="post-chat-title"
+              ref={chatRef}
               role={chatSheet ? "dialog" : undefined}
+              onKeyDown={(e) => {
+                // Escape belongs to the sheet only; a popover opened from it (portalled, so outside it in the DOM)
+                // closes itself first.
+                if (chatSheet && e.key === "Escape" && !e.defaultPrevented && chatRef.current?.contains(e.target as Node)) {
+                  e.stopPropagation();
+                  closeChat();
+                }
+              }}
               aria-modal={chatSheet || undefined}
               data-post-chat=""
               className={cn(
@@ -355,10 +374,10 @@ export function PostEditorView({
               )}
             >
               <PostChat
-                key={chat.id}
+                key={chatId}
                 documentId={initialDoc.id}
-                chatId={chat.id}
-                linked={chat.linked}
+                chatId={chatId}
+                linked={chat.id !== null}
                 initialMessages={chat.messages}
                 voices={voices}
                 selectedVoiceId={selectedVoiceId}
@@ -366,13 +385,12 @@ export function PostEditorView({
                 documentContext={docContext}
                 beforeSend={settled}
                 onBusyChange={setBusy}
-                onClose={desktop ? undefined : closeChat}
+                onClose={closeChat}
               />
             </aside>
 
             <section
               aria-labelledby="post-title"
-              inert={chatSheet || undefined}
               data-lenis-prevent
               className="post-editor__main min-w-0 flex-1 overflow-y-auto overscroll-contain"
             >
@@ -463,19 +481,19 @@ export function PostEditorView({
                 </div>
 
                 <div className="flex shrink-0 flex-wrap items-center gap-2">
-                  {!desktop && (
-                    <Button
-                      ref={chatToggleRef}
-                      variant="secondary"
-                      size="md"
-                      onClick={() => setChatOpen(true)}
-                      aria-haspopup="dialog"
-                      aria-expanded={chatOpen}
-                    >
-                      <ChatIcon />
-                      Chat
-                    </Button>
-                  )}
+                  {/* Shown by CSS below 1024 px, so it never flashes in or out on hydration. */}
+                  <Button
+                    ref={chatToggleRef}
+                    variant="secondary"
+                    size="md"
+                    className="lg:hidden"
+                    onClick={() => setChatOpen(true)}
+                    aria-haspopup="dialog"
+                    aria-expanded={chatOpen}
+                  >
+                    <ChatIcon />
+                    Chat
+                  </Button>
                   <Button variant="secondary" size="icon" onClick={() => void copy()} aria-label="Copy post" title="Copy post">
                     <CopyIcon />
                   </Button>
@@ -539,7 +557,7 @@ export function PostEditorView({
                   style={{ maxWidth: SHEET_WIDTH[view] }}
                   data-preview={view}
                 >
-                  <PostSheet caption={streaming ? "Writing · LinkedIn preview" : "Just now · LinkedIn preview"}>
+                  <PostSheet caption={streaming ? "Writing · LinkedIn preview" : updated ? `Edited ${updated} · LinkedIn preview` : "LinkedIn preview"}>
                     <div hidden={view === "hook"}>
                       <EditorContent editor={editor} />
                       {!editor && <div className="post-editor__text whitespace-pre-wrap">{initialDoc.text}</div>}

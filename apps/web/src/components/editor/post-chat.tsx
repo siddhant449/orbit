@@ -177,7 +177,7 @@ export function PostChat({
             </span>
           )}
           {onClose && (
-            <Button variant="ghost" size="icon" className="size-9 border border-line-3" onClick={onClose} aria-label="Close chat">
+            <Button variant="ghost" size="icon" className="size-9 border border-line-3 lg:hidden" onClick={onClose} aria-label="Close chat">
               <CloseIcon />
             </Button>
           )}

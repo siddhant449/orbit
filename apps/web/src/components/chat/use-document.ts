@@ -190,7 +190,7 @@ export function useDocument(initial: PanelDoc | null) {
   }, [id, apply]);
 
   const save = useCallback(
-    async (text: string, expectedVersion: number): Promise<SaveResult> => {
+    async (text: string, expectedVersion: number, opts: { keepalive?: boolean } = {}): Promise<SaveResult> => {
       if (!id) return { ok: false, error: "This post isn't saved yet." };
       setSaving(true);
       try {
@@ -198,6 +198,8 @@ export function useDocument(initial: PanelDoc | null) {
           method: "PATCH",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ text, expectedVersion }),
+          // Leaving the page: the request outlives it (posts are at most 10,000 characters, inside the 64 KB limit).
+          keepalive: opts.keepalive,
         });
         if (res.status === 409) {
           const latest = await fetchDoc(id);
