@@ -11,3 +11,4 @@ export * from "./services/retrieval";
 export * from "./services/knowledge";
 export * from "./services/chat";
 export * from "./services/documents";
+export * from "./services/progress";
