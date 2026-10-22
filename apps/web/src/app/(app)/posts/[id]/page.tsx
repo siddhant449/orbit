@@ -27,7 +27,7 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
   return (
     <PostEditorView
       key={doc.id}
-      doc={{ id: doc.id, title: doc.title, version: doc.version, text: doc.text, updatedAt: doc.updatedAt.toISOString() }}
+      doc={{ id: doc.id, title: doc.title, version: doc.version, currentVersion: doc.currentVersion, text: doc.text, updatedAt: doc.updatedAt.toISOString() }}
       chat={{ id: doc.chatId, messages: initialMessages }}
       voices={voices.map((v) => ({ id: v.id, name: v.name, tagline: v.tagline, own: v.kind === "OWN" }))}
       selectedVoiceId={selected?.id ?? null}

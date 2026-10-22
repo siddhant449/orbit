@@ -4,7 +4,8 @@
  * `data-textDelta` chunks, and the final `data-document` snapshot.
  */
 
-export type PanelDoc = { id: string; title: string; version: number; text: string };
+/** `version` is the concurrency token (it only goes up); `currentVersion` is the number of the version being shown. */
+export type PanelDoc = { id: string; title: string; version: number; currentVersion?: number; text: string };
 
 export type PanelState = {
   open: boolean;
@@ -28,7 +29,7 @@ function asDoc(v: unknown): PanelDoc | null {
   if (!isObj(v)) return null;
   const { id, title, version, text } = v;
   if (typeof id !== "string" || typeof title !== "string" || typeof version !== "number" || typeof text !== "string") return null;
-  return { id, title, version, text };
+  return { id, title, version, ...(typeof v.currentVersion === "number" ? { currentVersion: v.currentVersion } : {}), text };
 }
 
 /** Folds one stream part into the panel. Parts it doesn't know, or with malformed data, leave it as it is. */

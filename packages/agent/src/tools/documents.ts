@@ -44,7 +44,7 @@ export type CreateDocumentOutput =
 const failed = (error: string): CreateDocumentOutput => ({ error: `Failed: ${error}` });
 
 /** The panel's view of a post. */
-export const documentData = (d: DocumentSnapshot) => ({ id: d.id, title: d.title, version: d.version, text: d.text });
+export const documentData = (d: DocumentSnapshot) => ({ id: d.id, title: d.title, version: d.version, currentVersion: d.currentVersion, text: d.text });
 
 /**
  * createDocument (design §6.4): the post text comes from the referenced writing handoff, never from the
@@ -185,7 +185,7 @@ export async function updateDocumentRun(ctx: TurnContext, input: UpdateDocumentI
   // The version the model last saw (the user's at turn start, or this turn's own last save) must still be current.
   if (seen && seen.id === doc.id && seen.version !== doc.version) return staleDocument(doc.version);
   const restore = input.restoreVersion;
-  if (restore !== null && restore === doc.version) return unchanged(doc, `Version ${restore} is already the current version.`);
+  if (restore !== null && restore === doc.currentVersion) return unchanged(doc, `Version ${restore} is already the current version.`);
 
   const write = writerOf(ctx);
   write({ type: "data-updating", data: true, transient: true });

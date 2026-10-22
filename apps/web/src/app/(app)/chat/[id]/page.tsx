@@ -30,7 +30,7 @@ export default async function ChatPage({ params }: { params: Promise<{ id: strin
       initialMessages={initialMessages}
       voices={voices.map((v) => ({ id: v.id, name: v.name, tagline: v.tagline, own: v.kind === "OWN" }))}
       selectedVoiceId={selected?.id ?? null}
-      initialDocument={doc ? { id: doc.id, title: doc.title, version: doc.version, text: doc.text } : null}
+      initialDocument={doc ? { id: doc.id, title: doc.title, version: doc.version, currentVersion: doc.currentVersion, text: doc.text } : null}
     />
   );
 }

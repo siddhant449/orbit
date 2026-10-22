@@ -24,7 +24,7 @@ export class DocumentError extends Error {
   }
 }
 
-/** The save carried an `expectedVersion` that is no longer current. */
+/** The save carried an `expectedVersion` (the document's revision, as the clients hold it) that is no longer current. */
 export class DocumentVersionConflict extends Error {
   readonly currentVersion: number;
   constructor(currentVersion: number) {
@@ -39,7 +39,10 @@ export type DocumentSnapshot = {
   title: string;
   kind: "TEXT";
   status: "DRAFT";
+  /** The concurrency token (`Document.revision`): moves up on every save and restore. Clients echo it as `expectedVersion`. */
   version: number;
+  /** The number of the version whose text is current. A restore moves it back; the next save writes max + 1. */
+  currentVersion: number;
   text: string;
   hook: string | null;
   chatId: string | null;
@@ -96,7 +99,8 @@ async function snapshot(db: Tx | typeof prisma, profileId: string, id: string): 
     title: doc.title,
     kind: doc.kind,
     status: doc.status,
-    version: doc.version,
+    version: doc.revision,
+    currentVersion: doc.version,
     text: current.text,
     hook: current.hook,
     chatId: doc.chat && !doc.chat.deletedAt ? doc.chat.id : null,
@@ -155,6 +159,7 @@ export type PostSummary = {
   title: string;
   status: "DRAFT";
   version: number;
+  currentVersion: number;
   text: string;
   /** The live chat beside the post, or null once it was deleted (the editor links a new one on first send). */
   chatId: string | null;
@@ -176,7 +181,7 @@ export async function listPosts(profileId: string, opts: { limit?: number } = {}
       where,
       orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
       take: limit,
-      select: { id: true, title: true, status: true, version: true, createdAt: true, updatedAt: true, chat: { select: { id: true, deletedAt: true } } },
+      select: { id: true, title: true, status: true, version: true, revision: true, createdAt: true, updatedAt: true, chat: { select: { id: true, deletedAt: true } } },
     }),
     prisma.document.count({ where }),
   ]);
@@ -190,7 +195,8 @@ export async function listPosts(profileId: string, opts: { limit?: number } = {}
     id: r.id,
     title: r.title,
     status: r.status,
-    version: r.version,
+    version: r.revision,
+    currentVersion: r.version,
     text: textOf.get(r.id) ?? "",
     chatId: r.chat && !r.chat.deletedAt ? r.chat.id : null,
     createdAt: r.createdAt,
@@ -216,8 +222,8 @@ function proposalApplied(db: Tx | typeof prisma, documentId: string, proposalId:
 }
 
 /**
- * Writes version `expectedVersion + 1`. The compare-and-set on `Document.version` and the unique
- * `(documentId, version)` both reject a stale writer with `DocumentVersionConflict`; the newer text stays.
+ * Writes version max(version) + 1 and makes it current. The compare-and-set on `Document.revision` (and the unique
+ * `(documentId, version)`) reject a stale writer with `DocumentVersionConflict`; the newer text stays.
  */
 export async function saveDocumentVersion(profileId: string, id: string, input: SaveInput): Promise<DocumentSnapshot> {
   const text = checkText(input.text);
@@ -225,21 +231,24 @@ export async function saveDocumentVersion(profileId: string, id: string, input: 
   try {
     return await prisma.$transaction(async (tx) => {
       if (input.proposalId && (await proposalApplied(tx, id, input.proposalId))) throw new DocumentError("already_applied");
+      const before = await tx.document.findFirst({ where: { id, profileId, deletedAt: null }, select: { version: true } });
       const { count } = await tx.document.updateMany({
-        where: { id, profileId, deletedAt: null, version: input.expectedVersion },
-        data: { version: input.expectedVersion + 1, ...(title ? { title } : {}) },
+        where: { id, profileId, deletedAt: null, revision: input.expectedVersion },
+        data: { revision: input.expectedVersion + 1, ...(title ? { title } : {}) },
       });
-      if (count === 0) {
-        const doc = await tx.document.findFirst({ where: { id, profileId, deletedAt: null }, select: { version: true } });
+      if (count === 0 || !before) {
+        const doc = await tx.document.findFirst({ where: { id, profileId, deletedAt: null }, select: { revision: true } });
         if (!doc) throw new DocumentError("not_found");
-        // A concurrent apply of the same proposal won the version: report that, not a generic conflict.
+        // A concurrent apply of the same proposal won: report that, not a generic conflict.
         if (input.proposalId && (await proposalApplied(tx, id, input.proposalId))) throw new DocumentError("already_applied");
-        throw new DocumentVersionConflict(doc.version);
+        throw new DocumentVersionConflict(doc.revision);
       }
+      const max = await tx.documentVersion.aggregate({ where: { documentId: id }, _max: { version: true } });
+      const next = (max._max.version ?? before.version) + 1;
       let hook: string | null;
       if (input.hook === undefined) {
         const prev = await tx.documentVersion.findUnique({
-          where: { documentId_version: { documentId: id, version: input.expectedVersion } },
+          where: { documentId_version: { documentId: id, version: before.version } },
           select: { hook: true },
         });
         hook = prev?.hook ?? null;
@@ -249,7 +258,7 @@ export async function saveDocumentVersion(profileId: string, id: string, input: 
       await tx.documentVersion.create({
         data: {
           documentId: id,
-          version: input.expectedVersion + 1,
+          version: next,
           text,
           hook,
           source: input.source,
@@ -257,13 +266,14 @@ export async function saveDocumentVersion(profileId: string, id: string, input: 
           proposalId: input.proposalId ?? null,
         },
       });
+      await tx.document.update({ where: { id }, data: { version: next } });
       return (await snapshot(tx, profileId, id))!;
     });
   } catch (err) {
     if (isUniqueViolation(err)) {
       if (input.proposalId && (await proposalApplied(prisma, id, input.proposalId))) throw new DocumentError("already_applied");
-      const doc = await prisma.document.findFirst({ where: { id, profileId }, select: { version: true } });
-      throw new DocumentVersionConflict(doc?.version ?? input.expectedVersion + 1);
+      const doc = await prisma.document.findFirst({ where: { id, profileId }, select: { revision: true } });
+      throw new DocumentVersionConflict(doc?.revision ?? input.expectedVersion + 1);
     }
     throw err;
   }
@@ -281,25 +291,40 @@ export async function listDocumentVersions(profileId: string, id: string): Promi
   return rows.map(({ text, ...r }) => ({ ...r, chars: text.length }));
 }
 
-/** Copies an old version's text and hook into a new RESTORE version. History is never rewritten. */
+/** Moves the current pointer to an old version. No row is written: history is untouched, the next save is max + 1. */
 export async function restoreDocumentVersion(
   profileId: string,
   id: string,
   version: number,
   expectedVersion: number,
 ): Promise<DocumentSnapshot> {
-  const old = await prisma.documentVersion.findFirst({
+  return prisma.$transaction(async (tx) => {
+    const old = await tx.documentVersion.findFirst({
+      where: { version, document: { id, profileId, deletedAt: null } },
+      select: { version: true },
+    });
+    if (!old) throw new DocumentError("not_found", "That version doesn't exist.");
+    const { count } = await tx.document.updateMany({
+      where: { id, profileId, deletedAt: null, revision: expectedVersion },
+      data: { version, revision: expectedVersion + 1 },
+    });
+    if (count === 0) {
+      const doc = await tx.document.findFirst({ where: { id, profileId, deletedAt: null }, select: { revision: true } });
+      if (!doc) throw new DocumentError("not_found");
+      throw new DocumentVersionConflict(doc.revision);
+    }
+    return (await snapshot(tx, profileId, id))!;
+  });
+}
+
+/** One version's text and hook, for the read-only preview. */
+export async function getDocumentVersion(profileId: string, id: string, version: number): Promise<{ version: number; text: string; hook: string | null }> {
+  const row = await prisma.documentVersion.findFirst({
     where: { version, document: { id, profileId, deletedAt: null } },
-    select: { text: true, hook: true },
+    select: { version: true, text: true, hook: true },
   });
-  if (!old) throw new DocumentError("not_found", "That version doesn't exist.");
-  return saveDocumentVersion(profileId, id, {
-    text: old.text,
-    hook: old.hook,
-    source: "RESTORE",
-    changeSummary: `Restored version ${version}`,
-    expectedVersion,
-  });
+  if (!row) throw new DocumentError("not_found", "That version doesn't exist.");
+  return row;
 }
 
 export type DocumentListRow = Omit<DocumentSnapshot, "hook" | "kind">;
@@ -323,7 +348,8 @@ export async function listDocuments(profileId: string, opts: { limit?: number } 
     id: d.id,
     title: d.title,
     status: d.status,
-    version: d.version,
+    version: d.revision,
+    currentVersion: d.version,
     text: textOf.get(d.id) ?? "",
     chatId: d.chat && !d.chat.deletedAt ? d.chat.id : null,
     updatedAt: d.updatedAt,

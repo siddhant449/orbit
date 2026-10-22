@@ -4,6 +4,7 @@ import {
   DocumentError,
   DocumentVersionConflict,
   getDocument,
+  getDocumentVersion,
   linkChatToDocument,
   listDocumentVersions,
   restoreDocumentVersion,
@@ -148,6 +149,20 @@ export async function linkChatHandler(request: Request, { params }: Ctx): Promis
     if (err instanceof DocumentError && err.code === "EXISTING_POST") {
       return fail(409, "That chat already has a post.", { code: "existing_post" });
     }
+    return fromError(err);
+  }
+}
+
+/** GET /api/documents/:id/versions/:version: that version's text, for the read-only preview. */
+export async function getVersionHandler(_request: Request, { params }: { params: Promise<{ id: string; version: string }> }): Promise<Response> {
+  const profileId = await currentProfileId();
+  if (!profileId) return fail(400, "Create a profile first.");
+  const { id, version: raw } = await params;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 1) return fail(400, "Send a whole version number.");
+  try {
+    return Response.json(await getDocumentVersion(profileId, id, n));
+  } catch (err) {
     return fromError(err);
   }
 }

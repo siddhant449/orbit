@@ -34,6 +34,8 @@ export function VersionList({
   error,
   busy,
   onRestore,
+  onPreview,
+  previewing,
   onRetry,
 }: {
   versions: VersionRow[] | null;
@@ -41,6 +43,9 @@ export function VersionList({
   error: boolean;
   busy: boolean;
   onRestore: (version: number) => void;
+  /** Opens that version read-only. */
+  onPreview?: (version: number) => void;
+  previewing?: number | null;
   onRetry: () => void;
 }) {
   if (error)
@@ -54,7 +59,18 @@ export function VersionList({
     );
   if (!versions) return <p className="type-ui text-text-2">Loading versions…</p>;
   return (
-    <ol aria-label="Versions" className="flex flex-col">
+    <ol
+      aria-label="Versions"
+      className="flex flex-col"
+      onKeyDown={(e) => {
+        if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+        const rows = [...e.currentTarget.querySelectorAll<HTMLElement>("[data-version-open]")];
+        const at = rows.indexOf(document.activeElement as HTMLElement);
+        if (at < 0) return;
+        e.preventDefault();
+        rows[Math.min(rows.length - 1, Math.max(0, at + (e.key === "ArrowDown" ? 1 : -1)))]?.focus();
+      }}
+    >
       {versions.map((v) => {
         const isCurrent = v.version === current;
         return (
@@ -67,7 +83,14 @@ export function VersionList({
             )}
           >
             <span className="w-10 shrink-0 font-mono text-xs tabular-nums text-text-2">v{v.version}</span>
-            <div className="min-w-0 flex-1">
+            <button
+              type="button"
+              data-version-open={v.version}
+              aria-label={`View version ${v.version}`}
+              aria-current={previewing === v.version ? "true" : undefined}
+              onClick={() => onPreview?.(v.version)}
+              className="min-w-0 flex-1 rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-accent-text"
+            >
               <p className="truncate text-sm font-medium text-text">
                 {SOURCE[v.source] ?? "Saved"}
                 {isCurrent && <span className="ml-2 text-xs font-normal text-accent-text">Current</span>}
@@ -77,7 +100,7 @@ export function VersionList({
                   .filter(Boolean)
                   .join(" · ")}
               </p>
-            </div>
+            </button>
             {!isCurrent && (
               <Button
                 variant="micro"
