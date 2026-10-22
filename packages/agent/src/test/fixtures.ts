@@ -5,7 +5,7 @@ import { ensureAccount, prisma } from "@brandloop/db";
 import type { TurnContext } from "../context";
 
 /** Every fixture user starts with this, so cleanup never touches other packages' test data. */
-const CLERK_PREFIX = "user_test_agent";
+const CLERK_PREFIX = "user_wr_agent";
 
 /** A fresh user, team and profile. Same `n` in one run returns the same profile (call `cleanup` between tests). */
 export async function testProfile(n = 1): Promise<{ userId: string; profileId: string }> {

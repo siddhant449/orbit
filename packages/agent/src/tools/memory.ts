@@ -15,6 +15,7 @@ import {
 } from "@brandloop/db";
 import { tool } from "ai";
 import { z } from "zod";
+import { learningGuard } from "../learning";
 import type { TurnContext } from "../context";
 import { oneLine } from "../data";
 import { checkMemoryFact } from "../guard";
@@ -79,6 +80,8 @@ export async function searchMemoryText(profileId: string, query: string): Promis
 export async function saveMemoryFacts(
   profileId: string,
   input: { category: MemoryCategory; topic: string | null; facts: string[] },
+  /** The user's own words this turn. When given, the learning guard runs: nothing is learned from a task's framing. */
+  userText?: string,
 ): Promise<string> {
   let key: string;
   if (input.category === "topic") {
@@ -90,9 +93,18 @@ export async function saveMemoryFacts(
   }
   if (!isAgentWritable(key)) return `Refused: ${keyToPath(key)} can't be changed from chat. Nothing was saved.`;
 
+  let facts = input.facts;
+  if (userText !== undefined) {
+    const verdict = learningGuard(userText, input.facts);
+    if (verdict.allowed.length === 0) {
+      console.info(`[agent] learning guard: refused ${verdict.refused.length} fact(s): ${[...new Set(verdict.refused.map((r) => r.reason))].join(", ")}`);
+      return `Refused: nothing was saved (${verdict.refused[0]?.reason ?? "not a lasting fact about the user"}). Memory only keeps what the user states about themselves, not what a request implies. Don't retry.`;
+    }
+    facts = verdict.allowed;
+  }
   const accepted: string[] = [];
   const reasons: string[] = [];
-  for (const fact of input.facts) {
+  for (const fact of facts) {
     const check = checkMemoryFact(fact);
     if (check.ok) accepted.push(check.text);
     else reasons.push(check.reason);
@@ -181,7 +193,7 @@ export function memoryTools(ctx: TurnContext) {
         topic: z.string().max(80).nullable(),
         facts: z.array(z.string().max(1000)).min(1).max(10),
       }),
-      execute: (input) => runTool("saveMemory", null, () => saveMemoryFacts(profileId, input)),
+      execute: (input) => runTool("saveMemory", null, () => saveMemoryFacts(profileId, input, ctx.userText)),
     }),
     editMemory: tool({
       description:
