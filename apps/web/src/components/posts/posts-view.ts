@@ -84,6 +84,26 @@ export function boardColumns(posts: PostRow[]): BoardColumn[] {
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
+/** Text sent to the client per post (excerpt and search only), in code points. */
+export const CLIENT_TEXT_MAX = 2500;
+
+export function clipText(text: string, max = CLIENT_TEXT_MAX): string {
+  if (text.length <= max) return text;
+  const chars = Array.from(text);
+  return chars.length <= max ? text : chars.slice(0, max).join("");
+}
+
+/** The profile's timezone if the runtime knows it, otherwise UTC (a bad value must not break the screen). */
+export function safeTimeZone(tz: string | null | undefined): string {
+  if (!tz) return "UTC";
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: tz });
+    return tz;
+  } catch {
+    return "UTC";
+  }
+}
+
 /** Wall-clock date (YYYY-MM-DD), hour and minute of `date` in `timeZone`. */
 export function zonedParts(date: Date, timeZone: string): { date: string; hour: number; minute: number } {
   const parts = new Intl.DateTimeFormat("en-US", {
@@ -117,7 +137,16 @@ export function weekStartOf(iso: string): string {
 }
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
-const isRealDate = (iso: string) => ISO_DATE.test(iso) && !Number.isNaN(toUTC(iso).getTime()) && fromUTC(toUTC(iso)) === iso;
+/** Weeks the calendar will show: real dates in a sane range, so week arithmetic never leaves 4-digit years. */
+const MIN_YEAR = 1970;
+const MAX_YEAR = 2999;
+const isRealDate = (iso: string) => {
+  if (!ISO_DATE.test(iso)) return false;
+  const year = Number(iso.slice(0, 4));
+  if (year < MIN_YEAR || year > MAX_YEAR) return false;
+  const d = toUTC(iso);
+  return !Number.isNaN(d.getTime()) && fromUTC(d) === iso;
+};
 
 /** `?week=` to its Monday; today's week when missing or not a real date. */
 export function parseWeek(raw: string | string[] | undefined, todayISO: string): string {

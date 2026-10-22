@@ -122,9 +122,10 @@ export function PostsScreen({
         </header>
       )}
 
-      {total > posts.length && view !== "calendar" && (
+      {total > posts.length && (
         <p className="px-5 pb-3 text-[12px] text-text-3 md:px-8">
-          Showing the {posts.length} most recently edited posts.
+          Showing the {posts.length} most recently edited posts of {total}
+          {view === "calendar" ? ", so older weeks can look emptier than they are." : "."}
         </p>
       )}
 

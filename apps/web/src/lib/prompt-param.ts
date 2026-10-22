@@ -7,5 +7,6 @@ export const PROMPT_PARAM_MAX = 2000;
 export function promptParam(raw: string | string[] | undefined): string | undefined {
   const v = Array.isArray(raw) ? raw[0] : raw;
   if (!v || !v.trim()) return undefined;
-  return v.slice(0, PROMPT_PARAM_MAX);
+  const chars = Array.from(v);
+  return chars.length <= PROMPT_PARAM_MAX ? v : chars.slice(0, PROMPT_PARAM_MAX).join("");
 }

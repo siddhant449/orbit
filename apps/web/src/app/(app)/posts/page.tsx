@@ -2,6 +2,7 @@ import { listPosts } from "@brandloop/db";
 import { getAccount } from "@/lib/account";
 import { EmptyState, PageBody, PageHeader } from "@/components/page";
 import { PostsScreen } from "@/components/posts/posts-screen";
+import { clipText, safeTimeZone } from "@/components/posts/posts-view";
 
 export const metadata = { title: "Posts" };
 
@@ -26,12 +27,13 @@ export default async function Page() {
         title: p.title,
         status: p.status,
         version: p.version,
-        text: p.text,
+        // Only the excerpt and search use the text; the full post stays on the server.
+        text: clipText(p.text),
         chatId: p.chatId,
         updatedAt: p.updatedAt.toISOString(),
       }))}
       total={total}
-      timeZone={profile.timezone}
+      timeZone={safeTimeZone(profile.timezone)}
       nowISO={new Date().toISOString()}
     />
   );

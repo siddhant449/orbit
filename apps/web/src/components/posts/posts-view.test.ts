@@ -9,6 +9,8 @@ import {
   monthLabel,
   moveSlot,
   agendaPlanHour,
+  clipText,
+  safeTimeZone,
   parseView,
   parseWeek,
   placeByLastEdit,
@@ -116,6 +118,9 @@ describe("zoned dates", () => {
     expect(parseWeek(undefined, "2026-10-21")).toBe("2026-10-19");
     expect(parseWeek("garbage", "2026-10-21")).toBe("2026-10-19");
     expect(parseWeek("2026-13-40", "2026-10-21")).toBe("2026-10-19");
+    expect(parseWeek("9999-12-31", "2026-10-21")).toBe("2026-10-19");
+    expect(parseWeek("0001-01-01", "2026-10-21")).toBe("2026-10-19");
+    expect(parseWeek("2099-12-31", "2026-10-21")).toBe("2099-12-28");
   });
 
   it("labels the month, spanning two when the week does", () => {
@@ -191,5 +196,25 @@ describe("agendaPlanHour", () => {
     expect(agendaPlanHour("2026-10-20", now, "Asia/Kolkata")).toBeNull();
     expect(agendaPlanHour("2026-10-21", new Date("2026-10-21T17:00:00Z"), "Asia/Kolkata")).toBe(23);
     expect(agendaPlanHour("2026-10-21", new Date("2026-10-21T18:31:00Z"), "Asia/Kolkata")).toBeNull();
+  });
+});
+
+describe("clipText", () => {
+  it("caps the text sent to the client by code points, without splitting a surrogate pair", () => {
+    expect(clipText("short")).toBe("short");
+    const long = "a".repeat(2499) + "😀😀";
+    const clipped = clipText(long);
+    expect(Array.from(clipped)).toHaveLength(2500);
+    expect(clipped.endsWith("😀")).toBe(true);
+    expect(clipped).not.toMatch(/\uD83D$/);
+  });
+});
+
+describe("safeTimeZone", () => {
+  it("keeps a real IANA zone and falls back to UTC otherwise", () => {
+    expect(safeTimeZone("Asia/Kolkata")).toBe("Asia/Kolkata");
+    expect(safeTimeZone("Mars/Olympus")).toBe("UTC");
+    expect(safeTimeZone("")).toBe("UTC");
+    expect(safeTimeZone(null)).toBe("UTC");
   });
 });

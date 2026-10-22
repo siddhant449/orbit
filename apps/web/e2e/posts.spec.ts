@@ -69,6 +69,9 @@ test("board, list and calendar show the real post and honest empty columns", asy
   await expect(page.getByRole("heading", { level: 1, name: /^Posts \d+$/ })).toBeVisible();
   const draft = page.getByRole("region", { name: "Board columns" }).getByRole("region", { name: /^Draft/ });
   await expect(draft.locator(`a[href="/chat/${chatId}"]`)).toContainText("Draft");
+  // All posts mirrors Draft today, so its cards carry a status chip.
+  const all = page.getByRole("region", { name: "Board columns" }).getByRole("region", { name: /^All posts/ });
+  await expect(all.locator(`a[href="/chat/${chatId}"] .rounded-pill`)).toHaveText("Draft");
   await expect(page.getByText("Scheduling arrives with LinkedIn publishing.", { exact: false })).toBeVisible();
   await expect(page.getByText("Nothing published yet")).toBeVisible();
   await expect(page.getByRole("button", { name: "All labels" })).toHaveAttribute("aria-disabled", "true");
@@ -110,6 +113,13 @@ test("board, list and calendar show the real post and honest empty columns", asy
   await expectNoHorizontalScroll(page);
   await both(page);
   await captureSet(page, "posts-calendar");
+
+  // An out-of-range ?week= falls back to this week instead of breaking the page.
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/posts?view=calendar&week=9999-12-31");
+  await expect(page.getByRole("grid")).toBeVisible();
+  await expect(grid.locator(`a[href="/chat/${chatId}"]`)).toHaveCount(1);
+  await page.goto("/posts?view=calendar");
 
   // Keyboard: the grid is one tab stop; arrows move to an open slot later this week, Enter plans a post there.
   await page.setViewportSize({ width: 1440, height: 900 });

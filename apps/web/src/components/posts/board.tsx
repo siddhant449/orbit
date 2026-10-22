@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
-import { cn } from "@brandloop/ui";
+import { StatusPill, cn } from "@brandloop/ui";
 import { PlusIcon } from "@brandloop/ui/icons";
 import { boardColumns, excerpt, relativeTime, type ColumnId, type PostRow } from "./posts-view";
 import { postHref } from "./shared";
@@ -105,14 +105,15 @@ function Column({ id, posts, now, filtered }: { id: ColumnId; posts: PostRow[]; 
     <ul className="flex flex-col gap-2.5">
       {posts.map((p) => (
         <li key={p.id}>
-          <PostCard post={p} now={now} />
+          <PostCard post={p} now={now} showStatus={id === "all"} />
         </li>
       ))}
     </ul>
   );
 }
 
-export function PostCard({ post, now }: { post: PostRow; now: Date }) {
+/** `showStatus`: in All posts each card carries its status chip, so its twin in Draft reads as the same post. */
+export function PostCard({ post, now, showStatus = false }: { post: PostRow; now: Date; showStatus?: boolean }) {
   const line = excerpt(post.text, post.title);
   return (
     <Link
@@ -121,8 +122,15 @@ export function PostCard({ post, now }: { post: PostRow; now: Date }) {
     >
       <span className="text-[14px] font-medium leading-[1.3]">{post.title}</span>
       {line && <span className="line-clamp-2 text-[13px] leading-[1.45] text-text-2">{line}</span>}
-      <span className="flex justify-between text-[11px] text-text-3">
-        <span>Draft</span>
+      <span className="flex items-center justify-between text-[11px] text-text-3">
+        {showStatus ? (
+          <StatusPill className="min-h-5 px-2 text-[10px]">
+            <span aria-hidden="true" className="size-1.5 rounded-full bg-faint" />
+            Draft
+          </StatusPill>
+        ) : (
+          <span>Draft</span>
+        )}
         <span>
           <span className="sr-only">Edited </span>
           {relativeTime(post.updatedAt, now)}
