@@ -9,6 +9,7 @@ import { toolLabel, type ChatUIMessage, type PanelDoc } from "@brandloop/agent/c
 import { Button, useMediaQuery } from "@brandloop/ui";
 import { PostsIcon } from "@brandloop/ui/icons";
 import type { VoiceOption } from "@/components/home/voice-picker";
+import { useAiModel } from "./model-picker";
 import { ChatComposer, type ComposerRect } from "./chat-composer";
 import type { KnowledgeChoice } from "./knowledge-picker";
 import { MessageList } from "./message-list";
@@ -104,6 +105,7 @@ export function ChatView({
   const [draft, setDraft] = useState("");
   const [knowledge, setKnowledge] = useState<KnowledgeChoice[]>([]);
   const [webSearch, setWebSearch] = useState(true);
+  const aiModel = useAiModel();
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const initialIds = useMemo(() => new Set(initialMessages.map((m) => m.id)), [initialMessages]);
 
@@ -116,6 +118,7 @@ export function ChatView({
       selectedKnowledgeBaseIds: knowledge.map((k) => k.id),
       selectedWritingStyleId: selectedVoiceId,
       webSearchEnabled: webSearch,
+      model: aiModel.current,
     },
     onRestoreDraft: (text) => setDraft((d) => d || text),
     onFirstFinish,
@@ -312,6 +315,7 @@ export function ChatView({
             onWebSearchChange={setWebSearch}
             fromRect={fromRect}
             inputRef={inputRef}
+            model={{ current: aiModel.current, info: aiModel.info, onChoose: (id) => void aiModel.choose(id) }}
           />
         </div>
       </div>

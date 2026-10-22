@@ -1,4 +1,5 @@
 import { EmptyState, PageBody, PageHeader } from "@/components/page";
+import { AiModelSetting } from "@/components/settings/ai-model-setting";
 import { AccountSettingsForm } from "@/components/settings/account-settings-form";
 import { getAccount } from "@/lib/account";
 
@@ -12,10 +13,15 @@ export default async function AccountSettingsPage() {
       <PageHeader className="max-w-[760px]" title="Manage account" />
       <PageBody className="max-w-[760px]">
         {profile ? (
-          <AccountSettingsForm
-            email={account.user.email}
-            profile={{ id: profile.id, name: profile.name, language: profile.language, timezone: profile.timezone }}
-          />
+          <>
+            <AccountSettingsForm
+              email={account.user.email}
+              profile={{ id: profile.id, name: profile.name, language: profile.language, timezone: profile.timezone }}
+            />
+            <div className="max-w-[760px]">
+              <AiModelSetting />
+            </div>
+          </>
         ) : (
           <EmptyState title="No profile yet" body="Add a profile to change its settings." />
         )}

@@ -89,6 +89,7 @@ describe("POST /api/visuals", () => {
     // skipping also unblocks, and useBrandColours:false never asks
     await prisma.brandTheme.deleteMany({ where: { profileId: a.profileId } });
     expect((await post(body({ useBrandColours: false }))).status).toBe(202);
+    await idleJobs(); // at most two images may be in flight per team
     await setDecision(a.profileId, false);
     expect((await post(body({ useBrandColours: true }))).status).toBe(202);
   });

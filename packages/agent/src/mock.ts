@@ -140,6 +140,10 @@ function route(opts: CallOptions): ScriptStep {
   const call = (toolName: string, input: unknown): ScriptStep =>
     has.has(toolName) ? { toolCalls: [{ toolName, input }] } : { text: "Mock reply." };
 
+  // Scope rule (see SAFETY_RULES): an unrelated request gets a one-line redirect instead of the task.
+  if (/\b(recipe|lasagna|football score|homework|tax return)\b/i.test(text)) {
+    return { text: "I focus on your LinkedIn writing, so I can't help with that. Want to turn it into a post idea instead?" };
+  }
   const last = results.at(-1);
   if (last) {
     if (last.toolName === "delegateWriting") {

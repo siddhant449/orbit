@@ -18,3 +18,4 @@ export * from "./services/visuals";
 export * from "./services/brand-theme";
 export * from "./services/reference-images";
 export * from "./services/post-media";
+export * from "./services/prefs";

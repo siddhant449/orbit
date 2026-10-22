@@ -26,6 +26,11 @@ export function getModel(alias: ModelAlias, apiKey?: string): LanguageModel {
   return apiKey ? createOpenAI({ apiKey })(id) : openai(id);
 }
 
+/** A specific chat model by ID (the user's pick). The caller checks the ID against `isChatModel` first. */
+export function getModelById(id: string, apiKey?: string): LanguageModel {
+  return apiKey ? createOpenAI({ apiKey })(id) : openai(id);
+}
+
 /** Embedding model ID. Override with AI_MODEL_EMBED. */
 export function resolveEmbeddingModel(): string {
   return process.env.AI_MODEL_EMBED ?? "text-embedding-3-small";

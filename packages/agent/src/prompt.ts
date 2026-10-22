@@ -3,6 +3,7 @@ import { getSelectedVoice, getStrategy, listMemory, prisma, renderMemoryIndex } 
 import type { TurnContext } from "./context";
 import { defuseTags } from "./data";
 import { renderActiveTask } from "./ledger";
+import { SAFETY_RULES } from "./safety";
 import type { ActiveTask } from "./types";
 
 export type PromptInput = {
@@ -58,7 +59,7 @@ export const STATIC_PREFIX = `You are Orbit's writing partner for one person's L
 - STALE_SELECTED_PASSAGE: the passage is no longer in the post. Ask the user to pick the passage again.
 - Output starting with "Failed:": the step didn't work. Recover if the message says how; otherwise tell the user in one sentence.
 - Output starting with "Refused:": the step was not allowed. Don't retry the same call; explain in one sentence if it matters.
-`;
+${SAFETY_RULES}`;
 
 const data = defuseTags;
 

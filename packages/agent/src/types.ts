@@ -40,6 +40,8 @@ export const ChatRequestSchema = z.object({
   selectedKnowledgeBaseIds: z.array(z.string().min(1)).max(LIMITS.knowledgeSelections).default([]),
   selectedWritingStyleId: z.string().min(1).nullable().default(null),
   webSearchEnabled: z.boolean().default(true),
+  /** The chat model the user picked; the web route checks it against its allowlist. */
+  model: z.string().min(1).max(60).nullish(),
   documentContext: z.object({ id: z.string().min(1), version: z.number().int().min(1) }).optional(),
   quickLinkKey: z.string().min(1).optional(),
   flowType: z.string().min(1).nullable().optional(),

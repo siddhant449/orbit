@@ -2,10 +2,11 @@ import { beginEdit, getVisual, prisma, VisualError } from "@brandloop/db";
 import { checkVisualRequest } from "@brandloop/visuals";
 import { enqueue } from "@/lib/jobs";
 import { getVisualDeps, visualsEnabled } from "./deps";
+import { checkVisualLimits } from "./limits";
 
 export type StartEditResult =
   | { ok: true; remainingEdits: number }
-  | { ok: false; status: 404 | 409 | 422 | 503; code: string; message: string; category?: string };
+  | { ok: false; status: 404 | 409 | 422 | 429 | 503; code: string; message: string; category?: string };
 
 /**
  * The one way an edit starts, shared by the edit route and the chat's editVisual tool: image switch, safety check,
@@ -19,6 +20,10 @@ export async function startVisualEdit(profileId: string, visualId: string, instr
   const deps = getVisualDeps();
   const verdict = await checkVisualRequest(deps.ai, instruction, { log: deps.log });
   if (!verdict.allowed) return { ok: false, status: 422, code: "refused", message: verdict.message, category: verdict.category };
+
+  const profile = await prisma.profile.findUnique({ where: { id: profileId }, select: { id: true, teamId: true } });
+  const limit = profile ? await checkVisualLimits(profile) : null;
+  if (limit && !limit.ok) return { ok: false, status: limit.status, code: limit.code, message: limit.message };
 
   try {
     await beginEdit(profileId, visualId, "edit", { instruction });
