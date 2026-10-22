@@ -6,7 +6,7 @@ import { axeCheck, expectNoHorizontalScroll } from "./helpers/shots";
 
 /**
  * Carousel studio (O7, p07 / p20). Runs against the mock model (AI_MOCK_MODEL=1): "Generate slides" returns the
- * scripted five slides. Nothing reaches the database; the spec clears its browser draft at the end.
+ * scripted five slides. The studio now saves; the spec deletes the carousels it created.
  */
 const email = process.env.E2E_CLERK_USER_EMAIL;
 test.skip(!email, "Set E2E_CLERK_USER_EMAIL to a Clerk dev-instance test user");
@@ -21,6 +21,12 @@ const clearDraft = (page: Page) =>
   page.evaluate(() => {
     for (const k of Object.keys(localStorage)) if (k.startsWith("orbit-carousel-draft")) localStorage.removeItem(k);
   });
+
+test.afterEach(async ({ page }) => {
+  const res = await page.request.get("/api/carousels").catch(() => null);
+  const list = res?.ok() ? ((await res.json()) as { carousels: { id: string }[] }).carousels : [];
+  for (const c of list) await page.request.delete(`/api/carousels/${c.id}`).catch(() => {});
+});
 
 test("carousel studio: generate, edit, reorder, export, restore", async ({ page }) => {
   await page.goto("/sign-in");

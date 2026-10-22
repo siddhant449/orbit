@@ -1,8 +1,8 @@
-import { listPosts } from "@brandloop/db";
+import { listCarousels, listPosts } from "@brandloop/db";
 import { getAccount } from "@/lib/account";
 import { EmptyState, PageBody, PageHeader } from "@/components/page";
 import { PostsScreen } from "@/components/posts/posts-screen";
-import { clipText, safeTimeZone } from "@/components/posts/posts-view";
+import { clipText, safeTimeZone, type PostRow } from "@/components/posts/posts-view";
 
 export const metadata = { title: "Posts" };
 
@@ -19,20 +19,33 @@ export default async function Page() {
       </>
     );
   }
-  const { posts, total } = await listPosts(profile.id);
+  const [{ posts, total }, carousels] = await Promise.all([listPosts(profile.id), listCarousels(profile.id)]);
+  const rows: PostRow[] = [
+    ...posts.map((p) => ({
+      id: p.id,
+      title: p.title,
+      status: p.status,
+      version: p.version,
+      // Only the excerpt and search use the text; the full post stays on the server.
+      text: clipText(p.text),
+      chatId: p.chatId,
+      updatedAt: p.updatedAt.toISOString(),
+    })),
+    ...carousels.map((c) => ({
+      id: c.id,
+      title: c.title,
+      status: "DRAFT" as const,
+      version: 1,
+      text: `${c.slideCount} ${c.slideCount === 1 ? "slide" : "slides"}. ${c.firstSlide}`,
+      chatId: null,
+      updatedAt: c.updatedAt.toISOString(),
+      kind: "carousel" as const,
+    })),
+  ].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   return (
     <PostsScreen
-      posts={posts.map((p) => ({
-        id: p.id,
-        title: p.title,
-        status: p.status,
-        version: p.version,
-        // Only the excerpt and search use the text; the full post stays on the server.
-        text: clipText(p.text),
-        chatId: p.chatId,
-        updatedAt: p.updatedAt.toISOString(),
-      }))}
-      total={total}
+      posts={rows}
+      total={total + carousels.length}
       timeZone={safeTimeZone(profile.timezone)}
       nowISO={new Date().toISOString()}
     />

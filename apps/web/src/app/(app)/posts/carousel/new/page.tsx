@@ -7,7 +7,7 @@ export const metadata = { title: "Carousel studio" };
 /**
  * Carousel studio (screens.md B4, p07 / p20). `?document=<id>` starts from one of the profile's posts (the chat's
  * "Make a carousel"); another profile's id simply isn't found. The profile's own name, title and company sign the
- * slides; nothing is stored server-side.
+ * slides; the studio saves the carousel as soon as it has slides.
  */
 export default async function CarouselNewPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const account = await getAccount();

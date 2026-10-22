@@ -5,7 +5,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { StatusPill, cn } from "@brandloop/ui";
 import { PlusIcon } from "@brandloop/ui/icons";
 import { boardColumns, excerpt, relativeTime, type ColumnId, type PostRow } from "./posts-view";
-import { postHref } from "./shared";
+import { CarouselBadge, rowHref } from "./shared";
 import { promptHref } from "@/lib/prompt-param";
 
 const IDEAS_PROMPT = "Give me five post ideas for this week based on my strategy.";
@@ -118,10 +118,13 @@ export function PostCard({ post, now, showStatus = false }: { post: PostRow; now
   const line = excerpt(post.text, post.title);
   return (
     <Link
-      href={postHref(post.id)}
+      href={rowHref(post)}
       className="orbit-panel orbit-panel--interactive flex flex-col gap-2.5 rounded-card-sm p-4 text-text"
     >
-      <span className="text-[14px] font-medium leading-[1.3]">{post.title}</span>
+      <span className="flex items-start justify-between gap-2 text-[14px] font-medium leading-[1.3]">
+        {post.title}
+        {post.kind === "carousel" && <CarouselBadge />}
+      </span>
       {line && <span className="line-clamp-2 text-[13px] leading-[1.45] text-text-2">{line}</span>}
       <span className="flex items-center justify-between text-[11px] text-text-3">
         {showStatus ? (

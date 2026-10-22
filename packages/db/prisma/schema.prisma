@@ -84,6 +84,7 @@ model Profile {
   backgroundJobs      BackgroundJob[]
   chats               Chat[]
   documents           Document[]
+  carousels           Carousel[]
   storageObjects      StorageObject[]
   visuals             Visual[]
   brandTheme          BrandTheme?
@@ -327,6 +328,7 @@ model Document {
   chat      Chat?
   visuals   Visual[]
   media     PostMedia[]
+  carousels Carousel[]
 
   @@index([profileId, deletedAt, updatedAt])
 }
@@ -583,4 +585,31 @@ model PostMedia {
   @@unique([documentId, visualId])
   @@index([documentId, position])
   @@index([visualId])
+}
+
+/// A saved carousel from the studio. `slides` is the studio's slide list; `revision` is the optimistic-concurrency token.
+model Carousel {
+  id            String    @id @default(cuid())
+  profile       Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  profileId     String
+  /// The post it was made from or attached to.
+  document      Document? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  documentId    String?
+  title         String
+  template      String
+  aspect        String
+  /// Everything else the studio holds besides slides: kit and logo.
+  options       Json      @default("{}")
+  slides        Json
+  version       Int       @default(1)
+  revision      Int       @default(1)
+  /// The StorageObject id of the last exported PDF (public, unguessable key).
+  pdfStorageKey String?
+  pdfUrl        String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  @@index([profileId, deletedAt, updatedAt])
+  @@index([documentId])
 }

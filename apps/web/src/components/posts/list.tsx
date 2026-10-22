@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { excerpt, relativeTime, type PostRow } from "./posts-view";
-import { postHref } from "./shared";
+import { CarouselBadge, rowHref } from "./shared";
 
 const fullDate = (iso: string, timeZone: string) =>
   new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone }).format(
@@ -40,11 +40,14 @@ export function List({ posts, now, timeZone, filtered }: { posts: PostRow[]; now
               return (
                 <li key={p.id} className="border-b border-line-row last:border-b-0">
                   <Link
-                    href={postHref(p.id)}
+                    href={rowHref(p)}
                     className="orbit-transition grid gap-x-4 gap-y-1.5 px-5 py-4 hover:bg-panel-hover md:grid-cols-[minmax(0,1fr)_88px_64px_120px] md:items-center"
                   >
                     <span className="flex min-w-0 flex-col gap-1">
-                      <span className="truncate text-[14px] font-medium text-text">{p.title}</span>
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className="truncate text-[14px] font-medium text-text">{p.title}</span>
+                        {p.kind === "carousel" && <CarouselBadge />}
+                      </span>
                       {line && <span className="truncate text-[13px] text-text-2">{line}</span>}
                     </span>
                     <span className="flex items-center gap-3 text-[12px] text-text-3 md:contents">

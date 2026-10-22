@@ -39,6 +39,13 @@ const TEMPLATE_OPTIONS: { id: TemplateId; label: string }[] = [
   { id: "mixed", label: "Mixed: ink covers, paper inside" },
 ];
 
+const SAVE_LABEL = { idle: "Not saved yet", saving: "Saving", saved: "Saved", error: "Not saved", conflict: "Out of date" } as const;
+
+/** What a save stores (the active slide is view state and isn't saved). */
+function contentJson(s: CarouselState): string {
+  return JSON.stringify({ slides: s.slides, template: s.template, aspect: s.aspect, kit: s.kit, logo: s.logo });
+}
+
 type GenerateBody = { source?: string; rewrite?: RewriteId; slides?: { title: string; body: string }[] };
 
 async function requestSlides(body: GenerateBody): Promise<{ ok: true; slides: { title: string; body: string }[] } | { ok: false; error: string }> {
@@ -65,20 +72,33 @@ function readRaw(key: string): string | null {
  * header says so and the work is kept as a browser draft. Slides are painted on canvas by the same code as the PDF
  * export, so the preview is the PDF.
  */
+export type SavedCarousel = { id: string; revision: number; state: CarouselState; pdfUrl: string | null };
+
 export function CarouselStudio({
   profileId,
   author,
   source,
   identities,
+  saved,
 }: {
+  /** An already-saved carousel being reopened. */
+  saved?: SavedCarousel;
   profileId: string;
   /** The person's name, written into the PDF as its author. */
   author: string;
   source: SourcePost | null;
   identities: Record<Kit, Identity>;
 }) {
-  const [state, dispatch] = useReducer(carouselReducer, undefined, initialCarousel);
+  const [state, dispatch] = useReducer(carouselReducer, saved?.state, (init) => init ?? initialCarousel());
   const restored = useRef(false);
+  // Saving: the id and revision the server holds, what was last saved (to tell edits from no-ops), and one save at a time.
+  const savedId = useRef<string | null>(saved?.id ?? null);
+  const revision = useRef(saved?.revision ?? 0);
+  const lastSaved = useRef<string | null>(saved ? contentJson(saved.state) : null);
+  const saving = useRef<Promise<boolean> | null>(null);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error" | "conflict">(saved ? "saved" : "idle");
+  const [persisted, setPersisted] = useState(Boolean(saved));
+  const [pdfUrl, setPdfUrl] = useState<string | null>(saved?.pdfUrl ?? null);
   const [busy, setBusy] = useState<null | "generate" | RewriteId | "export">(null);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   /** A draft from another post (or a blank carousel): offered, never applied on its own. */
@@ -93,16 +113,19 @@ export function CarouselStudio({
 
   // The browser draft: read once after mount (the server can't see it), then written on every change.
   useEffect(() => {
+    if (savedId.current) {
+      restored.current = true;
+      return;
+    }
     const { restore, other } = draftFor(readRaw(key), sourceId);
     if (restore) dispatch({ type: "load", state: restore });
     // Reading browser storage is the external system here; it can only happen after mount.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setOtherDraft(other);
     restored.current = true;
   }, [key, sourceId]);
   // Debounced, so the first run (still the empty state, before the restored draft renders) is cancelled by the next.
   useEffect(() => {
-    if (!restored.current) return;
+    if (!restored.current || savedId.current) return;
     const t = window.setTimeout(() => {
       try {
         if (state.slides.length) window.localStorage.setItem(key, serializeDraft(state, sourceId));
@@ -114,6 +137,74 @@ export function CarouselStudio({
     }, 300);
     return () => window.clearTimeout(t);
   }, [state, key, sourceId, otherDraft]);
+
+  /** Saves the current state (creating the carousel the first time). Resolves true when the server holds it. */
+  const save = useCallback(
+    async (snapshot: CarouselState): Promise<boolean> => {
+      while (saving.current) await saving.current.catch(() => false);
+      const json = contentJson(snapshot);
+      if (savedId.current && json === lastSaved.current) return true;
+      const run = (async () => {
+        setSaveStatus("saving");
+        const first = snapshot.slides[0];
+        const title = (source?.title ?? (first ? plainText(first.title) : "")).trim().slice(0, TITLE_MAX) || "Untitled carousel";
+        const content = {
+          title,
+          template: snapshot.template,
+          aspect: snapshot.aspect,
+          options: { kit: snapshot.kit, logo: snapshot.logo },
+          slides: snapshot.slides,
+        };
+        try {
+          const creating = !savedId.current;
+          const res = await fetch(creating ? "/api/carousels" : `/api/carousels/${savedId.current}`, {
+            method: creating ? "POST" : "PATCH",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(creating ? { ...content, documentId: sourceId } : { ...content, expectedRevision: revision.current }),
+          });
+          const body = (await res.json().catch(() => ({}))) as { id?: string; revision?: number; error?: string };
+          if (res.status === 409) {
+            setSaveStatus("conflict");
+            return false;
+          }
+          if (!res.ok || !body.id || !body.revision) throw new Error(body.error ?? "save failed");
+          revision.current = body.revision;
+          lastSaved.current = json;
+          if (creating) {
+            savedId.current = body.id;
+            setPersisted(true);
+            try {
+              window.localStorage.removeItem(key);
+            } catch {
+              /* storage blocked */
+            }
+            window.history.replaceState(null, "", `/posts/carousel/${body.id}`);
+          }
+          setSaveStatus("saved");
+          return true;
+        } catch {
+          setSaveStatus("error");
+          return false;
+        }
+      })();
+      saving.current = run;
+      try {
+        return await run;
+      } finally {
+        saving.current = null;
+      }
+    },
+    [key, source?.title, sourceId],
+  );
+
+  // Autosave: shortly after the last change, once there is something to keep.
+  useEffect(() => {
+    if (!restored.current || state.slides.length === 0) return;
+    if (savedId.current && contentJson(state) === lastSaved.current) return;
+    if (saveStatus === "conflict") return;
+    const t = window.setTimeout(() => void save(state), 1500);
+    return () => window.clearTimeout(t);
+  }, [state, save, saveStatus]);
 
   const { slides, activeId } = state;
   const activeIndex = slides.findIndex((s) => s.id === activeId);
@@ -232,6 +323,12 @@ export function CarouselStudio({
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 10_000);
       toast(`Exported ${slides.length} ${slides.length === 1 ? "page" : "pages"} as a PDF. Upload it to LinkedIn as a document post.`);
+      // Keep a copy with the saved carousel (saving it first if it is new).
+      if (await save(state)) {
+        const up = await fetch(`/api/carousels/${savedId.current}/pdf`, { method: "POST", headers: { "content-type": "application/pdf" }, body: blob }).catch(() => null);
+        const out = (await up?.json().catch(() => ({}))) as { pdfUrl?: string | null } | undefined;
+        if (up?.ok && out?.pdfUrl) setPdfUrl(out.pdfUrl);
+      }
     } catch (err) {
       toast(err instanceof Error && err.message ? err.message : "The PDF couldn't be made in this browser.");
     } finally {
@@ -265,6 +362,9 @@ export function CarouselStudio({
             <Download aria-hidden="true" />
             {busy === "export" && progress ? `Exporting ${Math.min(progress.done + 1, progress.total)} of ${progress.total}` : "Export PDF"}
           </Button>
+          <Button variant="secondary" onClick={() => void save(state)} disabled={!slides.length || working || saveStatus === "saving"}>
+            {saveStatus === "saving" ? "Saving…" : "Save"}
+          </Button>
           <Button aria-disabled="true" aria-describedby="carousel-storage-note" tabIndex={0} onClick={(e) => e.preventDefault()}>
             Attach to post
           </Button>
@@ -272,8 +372,21 @@ export function CarouselStudio({
       </header>
 
       <div id="carousel-storage-note" className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[13px] text-text-2">
-        <StatusPill>Not saved yet</StatusPill>
-        <span>Carousels save once storage lands. Until then this carousel stays as a draft in this browser, and attaching it to a post isn&apos;t available.</span>
+        <StatusPill>{SAVE_LABEL[saveStatus]}</StatusPill>
+        <span role="status" data-testid="carousel-save-note">
+          {saveStatus === "conflict"
+            ? "This carousel changed somewhere else. Reload to get the latest version."
+            : saveStatus === "error"
+              ? "Couldn't save. Your work is still on this page; Save tries again."
+              : persisted
+                ? "Saved to your posts. Changes save automatically."
+                : "Saves to your posts as soon as you have slides."}
+        </span>
+        {pdfUrl && (
+          <a href={pdfUrl} target="_blank" rel="noreferrer" className="font-medium text-accent-text underline-offset-4 hover:underline">
+            Open the saved PDF
+          </a>
+        )}
         <span id="carousel-pdf-note">The PDF flattens each slide into an image, so its text can&apos;t be selected or searched.</span>
       </div>
 

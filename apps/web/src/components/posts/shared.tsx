@@ -7,6 +7,15 @@ import { ChevronUpIcon } from "@brandloop/ui/icons";
 
 /** Where a post opens: its editor (O6a). A post whose chat was deleted gets a new chat there on first send. */
 export const postHref = (id: string) => `/posts/${encodeURIComponent(id)}`;
+/** Where a board/list row opens: carousels open in the studio. */
+export const rowHref = (p: { id: string; kind?: "carousel" }) => (p.kind === "carousel" ? `/posts/carousel/${encodeURIComponent(p.id)}` : postHref(p.id));
+
+/** Small "Carousel" marker on a row. */
+export function CarouselBadge() {
+  return (
+    <span className="inline-flex min-h-5 shrink-0 items-center rounded-pill border border-line-control px-2 text-[10px] font-medium uppercase tracking-[0.06em] text-text-2">Carousel</span>
+  );
+}
 
 /** Ghost control pill (p08 "All labels", p15 "Today"): `line-control` outline per A17. */
 export const ghostPill =

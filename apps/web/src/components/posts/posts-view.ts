@@ -16,6 +16,8 @@ export type PostRow = {
   text: string;
   chatId: string | null;
   updatedAt: string;
+  /** A saved carousel rather than a written post: opens in the carousel studio. */
+  kind?: "carousel";
 };
 
 export const VIEWS: readonly { value: PostsView; label: string }[] = [
