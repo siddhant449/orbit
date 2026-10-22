@@ -1,4 +1,4 @@
-import { getProgressSignals, listMemory, memoryLines } from "@brandloop/db";
+import { getProgressSignals } from "@brandloop/db";
 import { addDays, countByDay, dayKeyIn, type DayKey } from "./days";
 import type { DraftsByDay } from "./activity";
 
@@ -22,14 +22,14 @@ export async function loadProgress(profile: { id: string; timezone: string }, no
   const today = dayKeyIn(now, timeZone);
   // A day of slack on the window edge; the timezone decides which local day each draft lands on.
   const since = new Date(Date.parse(`${addDays(today, -HISTORY_DAYS - 1)}T00:00:00Z`));
-  const [signals, memory] = await Promise.all([getProgressSignals(profile.id, since), listMemory(profile.id)]);
+  const signals = await getProgressSignals(profile.id, since);
   return {
     timeZone,
     today,
     drafts: countByDay(signals.draftDates, timeZone),
     draftTotal: signals.draftTotal,
     strategy: signals.hasStrategy,
-    identity: memory.some((d) => d.key.startsWith("identity/") && memoryLines(d.content).length > 0),
+    identity: signals.hasIdentity,
     knowledge: signals.knowledgeReady > 0,
     voice: signals.hasOwnVoice,
   };

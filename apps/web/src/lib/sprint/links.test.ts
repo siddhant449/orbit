@@ -1,24 +1,31 @@
 import { describe, expect, it } from "vitest";
 import { SPRINT_FORMATS } from "./curriculum";
-import { sprintDraftHref, sprintPromptFromQuery } from "./links";
+import { PROMPT_MAX, sprintDraftHref } from "./links";
+import { buildSprint } from "./plan";
+
+const promptOf = (href: string) => new URL(href, "http://x").searchParams.get("prompt");
 
 describe("sprint draft links", () => {
-  const f = SPRINT_FORMATS[1]!;
-
-  it("round-trips a format and day through the home link", () => {
-    const href = sprintDraftHref(f.id, 2);
-    expect(href).toBe(`/?draft=${f.id}&day=2`);
-    const query = Object.fromEntries(new URL(href, "http://x").searchParams);
-    const prompt = sprintPromptFromQuery(query)!;
-    expect(prompt).toContain(f.title);
-    expect(prompt).toContain("Day 2");
+  it("prefills home with the day's own format and day number", () => {
+    const sprint = buildSprint({ start: "2026-10-20", today: "2026-10-20", drafts: {} });
+    const day = sprint.days[6]!; // Monday, day 7, fifth format
+    const href = sprintDraftHref(day);
+    expect(href.startsWith("/?prompt=")).toBe(true);
+    const prompt = promptOf(href)!;
+    expect(prompt).toContain("Day 7 of my 30-day sprint");
+    expect(prompt).toContain(day.format!.title);
+    expect(prompt).toContain(SPRINT_FORMATS[4]!.title);
   });
 
-  it("ignores unknown formats and out-of-range days", () => {
-    expect(sprintPromptFromQuery({ draft: "made-up" })).toBeNull();
-    expect(sprintPromptFromQuery({})).toBeNull();
-    expect(sprintPromptFromQuery({ draft: [f.id] })).toBeNull();
-    expect(sprintPromptFromQuery({ draft: f.id, day: "99" })).not.toContain("Day 99");
-    expect(sprintDraftHref(f.id)).toBe(`/?draft=${f.id}`);
+  it("links rest days to plain home", () => {
+    const sprint = buildSprint({ start: "2026-10-20", today: "2026-10-20", drafts: {} });
+    expect(sprintDraftHref(sprint.days[4]!)).toBe("/");
+  });
+
+  it("keeps every prompt within the home handoff cap", () => {
+    for (const format of SPRINT_FORMATS) {
+      const prompt = promptOf(sprintDraftHref({ day: 30, format }))!;
+      expect([...prompt].length).toBeLessThanOrEqual(PROMPT_MAX);
+    }
   });
 });

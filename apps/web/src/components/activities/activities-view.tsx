@@ -9,6 +9,7 @@ import { CheckIcon, ChevronLeftIcon, ChevronRightIcon } from "@brandloop/ui/icon
 import { dialogContentClass, dialogDescriptionClass, dialogOverlayClass, dialogTitleClass } from "@/components/dialog-classes";
 import { nextMilestone, weekStrip, type ChecklistItem, type DraftsByDay, type Milestone, type MilestoneId } from "@/lib/progress/activity";
 import { dayLabel, type DayKey } from "@/lib/progress/days";
+import type { SprintFormat } from "@/lib/sprint/curriculum";
 import { sprintDraftHref } from "@/lib/sprint/links";
 
 const rise = (i: number) => ({ "--rise-delay": `${i * 80}ms` }) as CSSProperties;
@@ -33,7 +34,8 @@ export type ActivitiesProps = {
   milestones: Milestone[];
   checklist: { items: ChecklistItem[]; done: number };
   resets: string;
-  todayFormat: { id: string; title: string } | null;
+  /** Today's sprint day as a sprint starting today would have it: its number and format travel together. */
+  todayPost: { day: number; format: SprintFormat } | null;
 };
 
 /** Activities (screens.md B8): three summary panels, the week strip, getting started and today's routine. */
@@ -95,7 +97,7 @@ function StreakPanel({ streak, weekDrafts }: { streak: number; weekDrafts: numbe
           {streak}
         </span>
         <span className="text-[14px] text-text-2">
-          day streak · {weekDrafts} of {WEEK_GOAL} drafts this week
+          weekday streak · {weekDrafts} of {WEEK_GOAL} drafts this week
         </span>
       </p>
       <div role="img" aria-label={`${filled} of ${WEEK_GOAL} drafts this week`} className="relative flex gap-1.5">
@@ -105,7 +107,7 @@ function StreakPanel({ streak, weekDrafts }: { streak: number; weekDrafts: numbe
       </div>
       <p className="relative text-[13px] text-text-soft">
         {streak > 0 ? "Start a draft on the next weekday to keep it going." : "Start a draft today to begin a streak."}{" "}
-        <span className="text-text-3">Weekends never break it.</span>
+        <span className="text-text-3">Weekends don&apos;t count either way.</span>
       </p>
     </Panel>
   );
@@ -366,7 +368,7 @@ function ChecklistPanel({ checklist }: { checklist: { items: ChecklistItem[]; do
   );
 }
 
-function TodayPanel({ today, drafts, resets, todayFormat }: ActivitiesProps) {
+function TodayPanel({ today, drafts, resets, todayPost }: ActivitiesProps) {
   const draftedToday = (drafts[today] ?? 0) > 0;
   const routines = [
     { title: "Comment on 8 posts", detail: "Thoughtful comments on posts in your field put your name in front of new readers." },
@@ -392,13 +394,13 @@ function TodayPanel({ today, drafts, resets, todayFormat }: ActivitiesProps) {
               {draftedToday && <span className="sr-only"> (done)</span>}
             </span>
             <span className="text-[12px] text-text-2">
-              {todayFormat
-                ? `Try the sprint's opening format, ${todayFormat.title.replace(/^The /, "the ")}. Orbit drafts it with you.`
+              {todayPost
+                ? `Try the sprint's opening format, ${todayPost.format.title.replace(/^The /, "the ")}. Orbit drafts it with you.`
                 : "Drafting on the days you plan keeps the streak alive. Orbit drafts it with you."}
             </span>
           </span>
           <Button asChild size="sm" variant={draftedToday ? "secondary" : "primary"} className="shrink-0 text-[12px]">
-            <Link href={todayFormat ? sprintDraftHref(todayFormat.id) : "/"}>{draftedToday ? "Draft another" : "Draft"}</Link>
+            <Link href={todayPost ? sprintDraftHref(todayPost) : "/"}>{draftedToday ? "Draft another" : "Draft"}</Link>
           </Button>
         </li>
         {routines.map((r) => (

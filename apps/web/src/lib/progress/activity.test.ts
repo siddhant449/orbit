@@ -20,9 +20,13 @@ describe("weekdayStreak", () => {
   it("doesn't break on a today without a draft yet", () => {
     expect(weekdayStreak({ "2026-10-20": 1, "2026-10-21": 1 }, THU)).toBe(2);
   });
-  it("skips weekends without breaking, and counts weekend drafts", () => {
+  it("skips weekends: they neither break the streak nor add to it", () => {
     expect(weekdayStreak({ "2026-10-16": 1, "2026-10-19": 1 }, "2026-10-19")).toBe(2);
-    expect(weekdayStreak({ "2026-10-16": 1, "2026-10-17": 1, "2026-10-19": 1 }, "2026-10-19")).toBe(3);
+    expect(weekdayStreak({ "2026-10-16": 1, "2026-10-17": 1, "2026-10-19": 1 }, "2026-10-19")).toBe(2);
+    expect(weekdayStreak({ "2026-10-16": 1, "2026-10-17": 1 }, "2026-10-18")).toBe(1);
+  });
+  it("can be limited to days on or after a start date", () => {
+    expect(weekdayStreak({ "2026-10-20": 1, "2026-10-21": 1, [THU]: 1 }, THU, "2026-10-21")).toBe(2);
   });
   it("is zero after a missed weekday", () => {
     expect(weekdayStreak({ "2026-10-20": 1 }, THU)).toBe(0);
@@ -32,7 +36,7 @@ describe("weekdayStreak", () => {
 
 describe("bestWeekdayStreak", () => {
   it("finds the longest run with the same rules", () => {
-    const drafts = { "2026-10-01": 1, "2026-10-02": 1, "2026-10-05": 1, "2026-10-06": 1, "2026-10-08": 1 };
+    const drafts = { "2026-10-01": 1, "2026-10-02": 1, "2026-10-04": 1, "2026-10-05": 1, "2026-10-06": 1, "2026-10-08": 1 };
     expect(bestWeekdayStreak(drafts, THU)).toBe(4);
     expect(bestWeekdayStreak({}, THU)).toBe(0);
   });

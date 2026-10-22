@@ -46,7 +46,7 @@ export default async function Page() {
       milestones={milestones({ total: p.draftTotal, best, fullWeek: hadFullWeek(p.drafts) })}
       checklist={gettingStarted({ strategy: p.strategy, identity: p.identity, knowledge: p.knowledge, voice: p.voice, drafts: p.draftTotal })}
       resets={resetsIn(now, p.timeZone)}
-      todayFormat={focus?.format ? { id: focus.format.id, title: focus.format.title } : null}
+      todayPost={focus?.format ? { day: focus.day, format: focus.format } : null}
     />
   );
 }

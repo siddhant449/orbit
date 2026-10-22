@@ -1,3 +1,4 @@
+import { weekdayStreak } from "@/lib/progress/activity";
 import { addDays, isWeekend, weekdayOf, type DayKey } from "@/lib/progress/days";
 import { SPRINT_FORMATS, type SprintFormat } from "./curriculum";
 
@@ -33,7 +34,7 @@ export type Sprint = {
   postDays: number;
   drafted: number;
   missed: number;
-  /** Post days in a row with a draft, ending today (or at the last post day when today has no draft yet). */
+  /** The weekday streak (see `weekdayStreak`), counted from the start date. */
   streak: number;
 };
 
@@ -69,13 +70,8 @@ export function buildSprint({ start, today, drafts }: { start: DayKey; today: Da
   const focus = days.find((d) => d.kind === "post" && d.key >= today) ?? null;
   const post = days.filter((d) => d.kind === "post");
 
-  let streak = 0;
-  for (const d of [...post].reverse()) {
-    if (d.key > today) continue;
-    if (d.key === today && d.drafts === 0) continue;
-    if (d.drafts === 0) break;
-    streak++;
-  }
+  // Same streak as Activities, counted from the sprint's first day.
+  const streak = phase === "upcoming" ? 0 : weekdayStreak(drafts, today > finish ? finish : today, start);
 
   return {
     start,

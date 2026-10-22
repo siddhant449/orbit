@@ -39,18 +39,21 @@ test("sprint: 30-day calendar, day selection, draft link starts a chat with the 
   await expect(other).toHaveAttribute("aria-pressed", "true");
   await expect(formatHeading).not.toHaveText(before ?? "");
 
-  // Keep today as day 1, then end the sprint through the confirmation.
-  await page.getByRole("link", { name: "Keep today as day 1" }).click();
-  await expect(page).toHaveURL(/\/challenge\?start=\d{4}-\d{2}-\d{2}$/);
+  // Keep today as day 1, then end the sprint through the confirmation. The link carries today in the profile's
+  // timezone, which the date maths below starts from.
+  const keep = page.getByRole("link", { name: "Keep today as day 1" });
+  const today = (await keep.getAttribute("href"))!.match(/start=(\d{4}-\d{2}-\d{2})$/)![1]!;
+  await keep.click();
+  await expect(page).toHaveURL(new RegExp(`/challenge\\?start=${today}$`));
   await page.getByRole("button", { name: "End sprint" }).click();
   await expect(page.getByRole("alertdialog", { name: "End this sprint?" })).toBeVisible();
   await page.getByRole("alertdialog").getByRole("button", { name: "End sprint" }).click();
   await expect(page).toHaveURL(/\/challenge$/);
 
   // A start date in the past shows missed days and the catch-up action.
-  const past = new Date(Date.now() - 9 * 86_400_000).toISOString().slice(0, 10);
+  const past = new Date(Date.parse(`${today}T00:00:00Z`) - 9 * 86_400_000).toISOString().slice(0, 10);
   await page.goto(`/challenge?start=${past}`);
-  await expect(page.getByText(/You've missed \d+ days?\.|Keep the chain going\./)).toBeVisible();
+  await expect(page.getByText(/Pick up where you left off\.|On track\./)).toBeVisible();
   await expect(page.getByText("Day 10/30")).toBeVisible();
 
   await axeBothThemes(page);
@@ -61,23 +64,19 @@ test("sprint: 30-day calendar, day selection, draft link starts a chat with the 
   await captureSet(page, "progress-challenge");
   await page.setViewportSize({ width: 1280, height: 720 });
 
-  // "Draft today's post" opens home and sends the format prompt. The request is stopped before it reaches the
-  // server, so the shared test user gets no new chat or draft.
-  let sent: { messages?: { parts?: { text?: string }[] }[]; message?: { parts?: { text?: string }[] } } | null = null;
-  await page.route("**/api/chat", async (route) => {
-    if (route.request().method() === "POST") {
-      sent = route.request().postDataJSON();
-      await route.abort();
-    } else await route.continue();
-  });
-  await page.getByRole("button", { name: /^Day 1 · / }).click();
+  // "Draft today's post" prefills the home composer with the day's own format prompt (`/?prompt=`, never auto-sent).
+  // The first post day: day 1, or the following Monday when the preview starts on a weekend.
+  const firstPost = page.getByRole("button", { name: /^Day \d+ · / }).filter({ hasNotText: "No post planned" }).first();
+  const n = (await firstPost.textContent())!.match(/^Day (\d+)/)![1];
+  await firstPost.click();
+  const title = (await formatHeading.textContent())!;
   const draft = page.getByRole("link", { name: /Draft (today's|this) post/ });
-  const href = await draft.getAttribute("href");
-  expect(href).toMatch(/^\/\?draft=[a-z-]+&day=1$/);
-  await draft.click();
-  await expect.poll(() => sent !== null, { timeout: 20_000 }).toBe(true);
-  expect(JSON.stringify(sent)).toContain("Day 1 of my 30-day sprint");
-  await expect(page).not.toHaveURL(/draft=/);
+  const href = (await draft.getAttribute("href"))!;
+  expect(href).toMatch(/^\/\?prompt=/);
+  const prompt = new URL(href, "http://x").searchParams.get("prompt")!;
+  expect(prompt).toContain(`Day ${n} of my 30-day sprint`);
+  expect(prompt).toContain(title);
+  expect([...prompt].length).toBeLessThanOrEqual(2000);
 });
 
 test("activities: derived streak, goals, milestones, strip and checklist", async ({ page }) => {
@@ -87,7 +86,10 @@ test("activities: derived streak, goals, milestones, strip and checklist", async
   for (const name of ["Streak", "This week's goals", "Milestones", /^Getting started/, /^Today \w{3} \d+ \w{3}$/]) {
     await expect(page.getByRole("heading", { name })).toBeVisible();
   }
-  await expect(page.getByText("Not tracked yet")).toHaveCount(3);
+  // The drafts goal is counted; every other goal row shows a count or says it isn't tracked yet.
+  const goals = page.getByRole("list", { name: "This week's goals" }).getByRole("listitem");
+  await expect(goals.first()).toContainText(/Draft \d+ posts\s*\d+ \/ \d+/);
+  for (const row of await goals.all()) await expect(row).toContainText(/\d+ \/ \d+|Not tracked yet/);
   await expect(page.getByRole("button", { name: "Add activity" })).toHaveAttribute("aria-disabled", "true");
 
   // Week strip: today is marked, the next week is out of reach, the previous one is not.
@@ -105,7 +107,7 @@ test("activities: derived streak, goals, milestones, strip and checklist", async
   await expect(page.getByRole("dialog")).toHaveCount(0);
 
   const draft = page.getByRole("region", { name: /^Today / }).getByRole("link", { name: /^Draft( another)?$/ });
-  await expect(draft).toHaveAttribute("href", /^\/\?draft=[a-z-]+$/);
+  await expect(draft).toHaveAttribute("href", /^\/\?prompt=.*30-day\+sprint/);
 
   await axeBothThemes(page);
   await page.setViewportSize({ width: 390, height: 844 });

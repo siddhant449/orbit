@@ -138,11 +138,11 @@ function StatusLine({ sprint, pinned, onCatchUp }: { sprint: Sprint; pinned: boo
     lead = "Not started yet.";
     rest = `Day 1 is ${dayLabel(sprint.start)}.`;
   } else if (sprint.missed > 0) {
-    lead = "Don't break the chain.";
-    rest = `You've missed ${sprint.missed} ${sprint.missed === 1 ? "day" : "days"}. Drafting today still counts.`;
+    lead = "Pick up where you left off.";
+    rest = `${sprint.missed} ${sprint.missed === 1 ? "weekday has" : "weekdays have"} no draft yet. Any of them can still be written, and today's counts as usual.`;
   } else {
-    lead = "Keep the chain going.";
-    rest = sprint.drafted ? `${sprint.drafted} drafted so far.` : "Today's format is below.";
+    lead = "On track.";
+    rest = sprint.drafted ? `${sprint.drafted} drafted so far, none skipped.` : "Today's format is below.";
   }
   return (
     <div
@@ -218,7 +218,7 @@ function FormatPanel({ day }: { day: SprintDay }) {
         {format && (
           <div className="flex flex-col items-start gap-2 md:items-end md:pt-6">
             <Button asChild>
-              <Link href={sprintDraftHref(format.id, day.day)}>{day.isToday ? "Draft today's post" : "Draft this post"}</Link>
+              <Link href={sprintDraftHref(day)}>{day.isToday ? "Draft today's post" : "Draft this post"}</Link>
             </Button>
             <span className="text-[12px] text-text-3">
               {day.drafts > 0
@@ -305,7 +305,7 @@ function FinishCard({ sprint }: { sprint: Sprint }) {
       <div className="flex flex-col items-end gap-0.5">
         <span className="font-display text-[34px] font-medium leading-none tracking-[-0.03em] tabular-nums text-text">{sprint.streak}</span>
         <span className="text-[11px] text-text-2">
-          day streak · {toGo} to go
+          weekday streak · {toGo} to go
         </span>
       </div>
     </div>

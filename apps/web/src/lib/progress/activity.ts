@@ -6,15 +6,17 @@ export type DraftsByDay = Record<DayKey, number>;
 const has = (drafts: DraftsByDay, key: DayKey) => (drafts[key] ?? 0) > 0;
 
 /**
- * Weekdays in a row with at least one draft, ending today, or at the last weekday when today has no draft yet.
- * Weekends never break a streak; a weekend draft still adds to it.
+ * The one streak Orbit shows (Activities and the sprint): weekdays in a row with at least one draft, ending today, or
+ * at the last weekday when today has no draft yet. Weekends neither break it nor add to it. `from` limits it to days
+ * on or after a date (the sprint's start).
  */
-export function weekdayStreak(drafts: DraftsByDay, today: DayKey): number {
-  let cursor = has(drafts, today) ? today : addDays(today, -1);
+export function weekdayStreak(drafts: DraftsByDay, today: DayKey, from?: DayKey): number {
+  let cursor = has(drafts, today) && !isWeekend(today) ? today : addDays(today, -1);
   let streak = 0;
-  for (let i = 0; i < 800; i++, cursor = addDays(cursor, -1)) {
-    if (has(drafts, cursor)) streak++;
-    else if (!isWeekend(cursor)) break;
+  for (let i = 0; i < 800 && (!from || cursor >= from); i++, cursor = addDays(cursor, -1)) {
+    if (isWeekend(cursor)) continue;
+    if (!has(drafts, cursor)) break;
+    streak++;
   }
   return streak;
 }
@@ -26,8 +28,9 @@ export function bestWeekdayStreak(drafts: DraftsByDay, today: DayKey): number {
   let best = 0;
   let run = 0;
   for (let k = keys[0]!; k <= today; k = addDays(k, 1)) {
+    if (isWeekend(k)) continue;
     if (has(drafts, k)) best = Math.max(best, ++run);
-    else if (!isWeekend(k)) run = 0;
+    else run = 0;
   }
   return best;
 }

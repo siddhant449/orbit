@@ -52,7 +52,8 @@ describe("buildSprint", () => {
     expect(s.drafted).toBe(1);
   });
 
-  it("counts the streak back over post days, skipping rest days and an undrafted today", () => {
+  it("uses the weekday streak (as Activities does), counted from the sprint's start", () => {
+    expect(buildSprint({ start: "2026-10-22", today: "2026-10-23", drafts: { "2026-10-21": 1, "2026-10-22": 1, "2026-10-23": 1 } }).streak).toBe(2);
     const drafts = { "2026-10-22": 1, "2026-10-23": 1, "2026-10-26": 1 };
     expect(buildSprint({ start: TUE, today: "2026-10-27", drafts }).streak).toBe(3);
     expect(buildSprint({ start: TUE, today: "2026-10-26", drafts }).streak).toBe(3);

@@ -1,18 +1,14 @@
-import { findSprintFormat, sprintDraftPrompt } from "./curriculum";
-import { SPRINT_LENGTH } from "./plan";
+import { sprintDraftPrompt, type SprintFormat } from "./curriculum";
 
-/** Home link that starts a chat drafting a sprint format (`/?draft=<id>&day=<n>`). */
-export function sprintDraftHref(formatId: string, day?: number | null): string {
-  const q = new URLSearchParams({ draft: formatId });
-  if (day) q.set("day", String(day));
-  return `/?${q}`;
-}
+/** The home handoff's cap on `?prompt=` (code points), shared by every screen that links to the composer. */
+export const PROMPT_MAX = 2000;
 
-/** The opening prompt for a `?draft=` link, or null when the link names no known format. */
-export function sprintPromptFromQuery(query: Record<string, string | string[] | undefined>): string | null {
-  const id = typeof query.draft === "string" ? query.draft : undefined;
-  const format = findSprintFormat(id);
-  if (!format) return null;
-  const day = typeof query.day === "string" && /^\d{1,2}$/.test(query.day) ? Number(query.day) : undefined;
-  return sprintDraftPrompt(format, day && day >= 1 && day <= SPRINT_LENGTH ? day : undefined);
+/**
+ * Home link that prefills the composer with a sprint day's prompt (`/?prompt=`). The day and its format travel
+ * together, so the number in the prompt always matches the format. Rest days have no format and go to plain home.
+ */
+export function sprintDraftHref(day: { day: number | null; format: SprintFormat | null }): string {
+  if (!day.format) return "/";
+  const prompt = [...sprintDraftPrompt(day.format, day.day ?? undefined)].slice(0, PROMPT_MAX).join("");
+  return `/?${new URLSearchParams({ prompt })}`;
 }

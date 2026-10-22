@@ -46,4 +46,11 @@ describe("day keys", () => {
     expect(resetsIn(new Date("2026-10-22T23:35:00Z"), "UTC")).toBe("resets in 25m");
     expect(resetsIn(new Date("2026-10-22T17:00:00Z"), "Asia/Kolkata")).toBe("resets in 1h");
   });
+
+  it("counts the real hours left on a daylight-saving change day", () => {
+    // 1 Nov 2026, New York falls back at 02:00: 01:00 EDT is 24 real hours before the next midnight.
+    expect(resetsIn(new Date("2026-11-01T05:00:00Z"), "America/New_York")).toBe("resets in 24h");
+    // 8 Mar 2026, clocks spring forward: 01:00 EST is 22 real hours before midnight.
+    expect(resetsIn(new Date("2026-03-08T06:00:00Z"), "America/New_York")).toBe("resets in 22h");
+  });
 });

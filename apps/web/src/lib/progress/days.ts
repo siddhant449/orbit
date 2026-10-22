@@ -72,10 +72,24 @@ export function dayLabel(key: DayKey, { weekday = true }: { weekday?: boolean } 
   return weekday ? `${wd} ${day} ${month}` : `${day} ${month}`;
 }
 
-/** Time left in the profile's local day: "resets in 7h", or minutes in the last hour. */
+/** The instant a local calendar day begins in `timeZone`, found by correcting a UTC guess by the zone's offset. */
+function startOfDay(key: DayKey, timeZone: string): number {
+  const target = toUtc(key);
+  let guess = target;
+  for (let i = 0; i < 3; i++) {
+    const p = partsIn(new Date(guess), timeZone);
+    const localAsUtc = toUtc(p.key) + (p.h * 3600 + p.m * 60 + p.s) * 1000;
+    const diff = localAsUtc - target;
+    if (diff === 0) break;
+    guess -= diff;
+  }
+  return guess;
+}
+
+/** Real time left in the profile's local day (DST-safe): "resets in 7h", or minutes in the last hour. */
 export function resetsIn(now: Date, timeZone: string): string {
-  const { h, m, s } = partsIn(now, timeZone);
-  const left = 86_400 - (h * 3600 + m * 60 + s);
+  const next = startOfDay(addDays(dayKeyIn(now, timeZone), 1), timeZone);
+  const left = Math.max(0, Math.round((next - now.getTime()) / 1000));
   if (left < 3600) return `resets in ${Math.max(1, Math.round(left / 60))}m`;
   return `resets in ${Math.floor(left / 3600)}h`;
 }

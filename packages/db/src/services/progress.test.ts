@@ -43,6 +43,7 @@ describe("getProgressSignals", () => {
       hasStrategy: false,
       knowledgeReady: 0,
       hasOwnVoice: false,
+      hasIdentity: false,
     });
   });
 
@@ -54,6 +55,9 @@ describe("getProgressSignals", () => {
     await prisma.document.update({ where: { id: gone.id }, data: { deletedAt: new Date() } });
     await prisma.strategy.create({ data: { profileId } });
     await prisma.voiceStyle.create({ data: { profileId, kind: "OWN", name: "Mine", samplePosts: [] } });
+    await prisma.memoryDoc.create({ data: { profileId, key: "identity/about", content: "" } });
+    expect((await getProgressSignals(profileId, new Date(0))).hasIdentity).toBe(false);
+    await prisma.memoryDoc.updateMany({ where: { profileId, key: "identity/about" }, data: { content: "- Runs a design studio" } });
 
     const s = await getProgressSignals(profileId, new Date("2025-01-01T00:00:00Z"));
     expect(s.draftDates).toHaveLength(1);
@@ -61,5 +65,11 @@ describe("getProgressSignals", () => {
     expect(s.hasStrategy).toBe(true);
     expect(s.hasOwnVoice).toBe(true);
     expect(s.knowledgeReady).toBe(0);
+    expect(s.hasIdentity).toBe(true);
+  });
+
+  it("counts only a voice learned from the writer's own posts", async () => {
+    await prisma.voiceStyle.create({ data: { profileId, kind: "URL", name: "Link", samplePosts: [] } });
+    expect((await getProgressSignals(profileId, new Date(0))).hasOwnVoice).toBe(false);
   });
 });

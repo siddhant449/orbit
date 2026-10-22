@@ -16,25 +16,10 @@ type Started = { id: string; text: string; from: ComposerRect | null };
  * composer glides down from where the landing one sat. Once the first reply ends, the address becomes
  * `/chat/<id>` without remounting anything.
  */
-export function HomeChat({
-  initialPrompt = null,
-  ...props
-}: Omit<ComponentProps<typeof Composer>, "onSend"> & {
-  /** Starts the chat on arrival with this message (a sprint "Draft today's post" link, `/?draft=`). */
-  initialPrompt?: string | null;
-}) {
+export function HomeChat(props: Omit<ComponentProps<typeof Composer>, "onSend">) {
   const pathname = usePathname();
   const [started, setStarted] = useState<Started | null>(null);
   const moved = useRef(false);
-  const autoStarted = useRef<string | null>(null);
-
-  // A `?draft=` link: send its prompt once, and drop the query so a reload doesn't send it again.
-  useEffect(() => {
-    if (!initialPrompt || autoStarted.current === initialPrompt) return;
-    autoStarted.current = initialPrompt;
-    window.history.replaceState(null, "", "/");
-    setStarted({ id: crypto.randomUUID(), text: initialPrompt, from: null });
-  }, [initialPrompt]);
 
   // Warm the chat chunk once the page is idle, so the first send doesn't wait on it.
   useEffect(() => {
