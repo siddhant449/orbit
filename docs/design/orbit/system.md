@@ -206,6 +206,47 @@ but every Orbit number sample uses -0.03 to -0.045em; use the per-step values ab
   `0 40px 120px rgba(10,10,11,.28)` [p00].
 - **Focus ring**: not specified in Orbit. Brandloop default: `outline: 2px solid var(--accent-text); outline-offset: 2px` on
   `:focus-visible` (6.0+ contrast on ground in both themes). The composer uses its own focus treatment (6.4).
+  Scroll containers that hold focusable rows at their edges keep 4 px of room for the ring (`-mx-1 px-1`), e.g. the
+  sidebar chat history and the section sub-nav.
+
+### 5.1 Layout rhythm (UI1, corrects Orbit)
+
+Orbit's artboards are the visual language, not the layout spec: several of their sizes are off the 4 px grid or
+inconsistent between neighbours. These rules were measured with `apps/web/e2e/layout-audit.spec.ts` and win over
+the per-component values below where they disagree.
+
+- **Gutter**: one page gutter, `--gutter` = 20 px under 768, 32 px from 768 (`px-(--gutter)`), for the page header and
+  body, home, the chat header, thread and composer dock, the post editor, the top bar and the mobile header. (Orbit
+  and the earlier build mixed 16, 20, 24 and 32 by screen.)
+- **Header line**: every shell header row is 68 px (`--header-row`) with its content centred 34 px from the top: top
+  bar, sidebar logo row, rail logo, section sub-nav title, chat header, post-chat header and the post editor's title
+  line. (Orbit's sidebar header and rail centred at 38 px, 4 px below the top bar beside them.)
+- **Control heights** (one height per row, never mixed in a toolbar): 24 micro, 32 small pill / chrome pill, 36 chip
+  and nav row, 40 medium button and icon button, 44 composer controls and every touch target under 768 px, 52 CTA.
+  Padding is on the 2 px half-step (micro 10 px, was 9).
+- **Nav rows**: 36 px with 4 px gaps (40 px rhythm) for the main nav, section sub-nav and chat history (Orbit: 38 + 2,
+  38.3 from 9 px padding, 34.8); the history row menu button sits centred (2 px inset). Profile footer 48 px with
+  symmetric padding (was 12 / 4).
+- **Composer footer**: all controls share `--composer-control` (home 44; thread 40 when the composer is at least 448 px
+  wide, 44 below) and Send is a circle (Orbit's 46x44 and 42x40 Send pills were taller than their 40 px neighbours).
+  The composer is a size container: labels ("Knowledge", "Web", the voice name) drop by the composer's own width, so
+  the post editor's 400 px chat column fits (it overflowed by 108 px).
+- **Thread edge**: the thread keeps a stable scrollbar gutter; the header and composer dock add the measured gutter on
+  the right so bubbles, header actions and composer share one right edge (they were 15 px apart).
+- **Page header**: actions centre on the title line and wrap below it; the subtitle sits under the title; the body
+  starts 32 px below. (Orbit bottom-aligned actions with the subtitle's last line.)
+- **Panels**: padding 20 px, 24 px from 640 px. Empty states are centred in their panel (title, up to 52ch of copy,
+  actions), 40-48 px vertical padding.
+- **Home cards**: `minmax(min(192px,100%),1fr)` so 768 px gets three columns instead of two and an orphan; every card's
+  header line is 24 px (with or without its status pill) and the internal gap is 12 px.
+- **Sprint card**: ring 48 px (was 52) and 12 px gap, so "Start when you're ready" fits on one line in the 240 px
+  sidebar.
+- **Wide/narrow by container**: two-column settings rows and the content-mix chart switch on the panel's own width
+  (container queries), not the viewport: beside the settings sub-nav on a tablet the panel is narrow.
+- **Dialogs** keep a 20 px margin from the viewport edge on phones (was 16).
+- **Optical label centring** was measured, not assumed: rasterised "HHHHHH" probes put Geist labels in pills within
+  0.5 px of the box centre, so no optical offset is applied. Remaining ±0.5-1 px variation comes from controls landing
+  on fractional y positions (inherited 1.45 line-heights such as 18.85 and 20.3 px); see the UI1 report.
 
 ---
 
