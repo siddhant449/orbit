@@ -8,7 +8,7 @@ const H = 240;
 
 /**
  * Line chart (system §6.16, p09): this period in `accent-text` with a soft glow and gradient area, the previous
- * period as a thin `line-hover` line, three hairline gridlines, a ringed marker on the peak, date ticks underneath.
+ * period as a thin `line-control` line (3:1 against the panel), three hairline gridlines, a ringed marker on the peak, date ticks underneath.
  * `summary` is the text alternative (the SVG is `role="img"`).
  */
 export function LineChart({
@@ -51,7 +51,7 @@ export function LineChart({
           ))}
         </g>
         {g.previous && (
-          <path d={g.previous.line} fill="none" stroke="var(--line-hover)" strokeWidth="1.5" data-series="previous" />
+          <path d={g.previous.line} fill="none" stroke="var(--line-control)" strokeWidth="1.5" data-series="previous" />
         )}
         <path className="insights-area" d={g.current.area} fill={`url(#fill-${id})`} />
         <path

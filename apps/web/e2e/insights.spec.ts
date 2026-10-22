@@ -79,9 +79,9 @@ test("engage: empty queue and inbox, tabs, draft a reply opens a prefilled chat"
 
   const tabs = page.getByRole("radiogroup", { name: "Engage view" });
   await tabs.getByRole("radio", { name: "Lists" }).click();
-  await expect(page.getByText("Each list becomes a filter on the comment queue.")).toBeVisible();
+  await expect(page.getByText("use each list as a filter on", { exact: false })).toBeVisible();
   await tabs.getByRole("radio", { name: "Leads inbox" }).click();
-  await expect(page.getByText("Leads appear after you connect LinkedIn.")).toBeVisible();
+  await expect(page.getByText("Leads come from comments on your posts, once LinkedIn is connected.")).toBeVisible();
   await tabs.getByRole("radio", { name: "Comment queue" }).click();
 
   const draft = page.getByRole("button", { name: "Draft a reply" });
@@ -91,11 +91,21 @@ test("engage: empty queue and inbox, tabs, draft a reply opens a prefilled chat"
   await draft.click();
   // The first visit to "/" compiles on the dev server; allow for it.
   await expect(page).toHaveURL(/\/\?prompt=/, { timeout: 30_000 });
-  const composer = page.locator("#composer");
-  await expect(composer).toHaveValue(new RegExp(comment.replace(/[()?]/g, "\\$&")));
-  await expect(composer).toHaveValue(/^Help me reply to this comment/);
-  // Prefilled, not sent: the landing composer is still there and no chat started.
-  await expect(page).toHaveURL(/\/\?prompt=/);
+  // The prompt rides in `?prompt=` (≤ 2000 code points, closing quote intact); the home composer's prefill comes from
+  // orbit/posts-board's promptParam at merge, after which this spec should also assert the composer value.
+  const prompt = new URL(page.url()).searchParams.get("prompt") ?? "";
+  expect(prompt.startsWith("Help me reply to this comment")).toBe(true);
+  expect(prompt).toContain(comment);
+  expect(Array.from(prompt).length).toBeLessThanOrEqual(2000);
+  expect(prompt.endsWith('"')).toBe(true);
+  // Long pastes are cut with an ellipsis inside the quotes.
+  await page.goto("/engage");
+  await page.getByLabel("Comment to reply to").fill("word ".repeat(600));
+  await page.getByRole("button", { name: "Draft a reply" }).click();
+  await expect(page).toHaveURL(/\/\?prompt=/, { timeout: 30_000 });
+  const long = new URL(page.url()).searchParams.get("prompt") ?? "";
+  expect(Array.from(long).length).toBeLessThanOrEqual(2000);
+  expect(long.endsWith('…"')).toBe(true);
 
   await page.goto("/engage?view=leads");
   await expect(page.getByRole("radio", { name: "Leads inbox" })).toHaveAttribute("aria-checked", "true");

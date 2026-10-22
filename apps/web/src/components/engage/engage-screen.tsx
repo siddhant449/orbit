@@ -65,7 +65,7 @@ export function EngageScreen({
         <div className="flex min-w-0 flex-col gap-1.5">
           <h1 className="type-page-title text-text focus-visible:outline-none">Engage</h1>
           <p className="text-[13px] text-text-2">
-            Twenty minutes a day. Comment on the people in your plan, answer the people who showed intent.
+            Twenty minutes a day. Answer the people who comment on your posts.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -132,7 +132,7 @@ export function EngageScreen({
           {tab === "leads" && (
             <>
               <LeadsInbox leads={data.leads} />
-              {!connected && <ConnectNote what="Leads appear after you connect LinkedIn." />}
+              {!connected && <ConnectNote what="Leads come from comments on your posts, once LinkedIn is connected." />}
               <ReplyDrafter />
             </>
           )}
@@ -165,8 +165,8 @@ function QueueEmpty({ connected }: { connected: boolean }) {
       </h2>
       <p className="max-w-[60ch] text-sm leading-[1.55] text-text-2">
         {connected
-          ? "New posts from the people on your lists show up here as they're published."
-          : "Orbit lines up conversations worth joining, starting with the comments on your own posts, with a reply drafted in your voice for each. You open LinkedIn and paste it yourself."}
+          ? "New comments on your posts show up here as they arrive."
+          : "Coming later: once LinkedIn is connected, Orbit will collect the comments on your own posts and draft a reply in your voice for each. You open LinkedIn and paste it yourself."}
       </p>
       {!connected && <ConnectLinkedIn size="sm" className="mt-1" />}
     </section>
@@ -191,8 +191,8 @@ function ListsPanel({ lists, connected }: { lists: EngageSnapshot["lists"]; conn
       {lists.length === 0 ? (
         <>
           <p className="max-w-[60ch] text-sm leading-[1.55] text-text-2">
-            Group the people you want to show up for: your audience plan, founders you follow, customers. Each list becomes a
-            filter on the comment queue.
+            Coming later: group the people who engage with you, such as customers or peers, and use each list as a filter on
+            the comment queue.
           </p>
           {!connected && <ConnectLinkedIn size="sm" className="mt-1" />}
         </>
@@ -230,7 +230,7 @@ export function SessionPanel({ session, active }: { session: SessionStats; activ
             ))}
           </div>
         ) : (
-          <p className="text-[13px] leading-[1.5] text-text-2">No session yet. Sessions start once your queue has posts.</p>
+          <p className="text-[13px] leading-[1.5] text-text-2">No session yet. Sessions start once your queue has comments to answer.</p>
         )}
       </div>
     </section>

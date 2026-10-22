@@ -37,11 +37,16 @@ const chip = cn(pillClass(), "!min-h-8 text-xs");
 function downloadCsv(view: AnalyticsView) {
   const rows = [["date", "impressions", "previous_period"], ...view.chart.dates.map((d, i) => [d, view.chart.current[i], view.chart.previous[i]])];
   const blob = new Blob([rows.map((r) => r.join(",")).join("\n")], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
+  a.href = url;
   a.download = `orbit-analytics-${view.range}d.csv`;
+  a.hidden = true;
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(a.href);
+  a.remove();
+  // Revoke after the download has started; revoking synchronously can cancel it in some browsers.
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 /**
@@ -146,7 +151,7 @@ export function Legend({ showPrevious = true, current = "This period", previous 
       </span>
       {showPrevious && (
         <span className="flex items-center gap-1.5">
-          <span aria-hidden="true" className="block h-0.5 w-3.5 bg-line-hover" />
+          <span aria-hidden="true" className="block h-0.5 w-3.5 bg-line-control" />
           {previous}
         </span>
       )}

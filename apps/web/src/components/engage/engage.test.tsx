@@ -52,7 +52,7 @@ const SNAPSHOT: EngageSnapshot = {
   session: { minutes: 7, commentsPosted: 1, commentGoal: 4, dmsAnswered: 0, dmGoal: 1 },
 };
 
-const ARTBOARD = ["Lena Marsh", "Tomás Ferreira", "Hanna Lindqvist", "Ledgerly", "7 with intent", "3 of 8 comments posted", "Leads inbox · 7"];
+const ARTBOARD = ["Comment on the people in your plan", "visited your profile", "Lena Marsh", "Tomás Ferreira", "Hanna Lindqvist", "Ledgerly", "7 with intent", "3 of 8 comments posted", "Leads inbox · 7"];
 
 describe("EngageScreen (connected)", () => {
   const html = renderToStaticMarkup(<EngageScreen snapshot={SNAPSHOT} connected now={NOW} />);
@@ -92,7 +92,8 @@ describe("EngageScreen (not connected)", () => {
     expect(html).toContain("Your comment queue is empty");
     expect(html).toContain('href="/settings/integrations"');
     expect(html).toContain("Connect LinkedIn");
-    expect(html).toContain("People who comment on your posts");
+    expect(html).toContain("people who comment on your posts more than once");
+    expect(html).toContain("Coming later");
     expect(html).toContain("No session yet.");
     expect(html).toContain("Draft a reply");
     expect(html).toContain("Paste the comment here");
@@ -101,12 +102,12 @@ describe("EngageScreen (not connected)", () => {
 
   it("opens on the leads tab when asked", () => {
     const leads = renderToStaticMarkup(<EngageScreen snapshot={null} connected={false} now={NOW} initialTab="leads" />);
-    expect(leads).toContain("Leads appear after you connect LinkedIn.");
+    expect(leads).toContain("Leads come from comments on your posts, once LinkedIn is connected.");
     expect(leads).not.toContain("Your comment queue is empty");
   });
 
   it("explains lists on the lists tab", () => {
     const lists = renderToStaticMarkup(<EngageScreen snapshot={null} connected={false} now={NOW} initialTab="lists" />);
-    expect(lists).toContain("Each list becomes a filter on the comment queue.");
+    expect(lists).toContain("use each list as a filter on");
   });
 });

@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 import { Button } from "@brandloop/ui";
-import { REPLY_SOURCE_MAX, replyHref } from "@/lib/insights/engage-view";
+import { replyHref } from "@/lib/insights/engage-view";
 
 /**
  * Works today, without LinkedIn: paste a comment someone left and Orbit opens a new chat with a reply prompt in the
@@ -39,7 +39,6 @@ export function ReplyDrafter() {
           id={`${id}-text`}
           value={text}
           onChange={(e) => setText(e.target.value)}
-          maxLength={REPLY_SOURCE_MAX}
           rows={3}
           placeholder="Paste the comment here"
           className="orbit-transition min-h-[88px] w-full resize-y rounded-[14px] border border-line-control bg-ground px-3.5 py-3 text-sm leading-normal text-text placeholder:text-text-3 focus-visible:border-accent-text focus-visible:outline-none"

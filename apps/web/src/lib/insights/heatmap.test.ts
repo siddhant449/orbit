@@ -25,6 +25,12 @@ describe("buildHeatmap", () => {
     expect(h.peak?.label).toBe("Tue · 10 AM");
   });
 
+  it("shows no peak below the minimum count, but still steps the cells", () => {
+    const h = buildHeatmap({ rows, cols, values: [[0, 1, 2], [0, 0, 0]], minPeak: 3 });
+    expect(h.peak).toBeNull();
+    expect(h.cells[0]![2]).toMatchObject({ step: HEAT_STEPS - 1, peak: false });
+  });
+
   it("rejects a values grid that doesn't match the axes", () => {
     expect(() => buildHeatmap({ rows, cols, values: [[1, 2, 3]] })).toThrow();
   });

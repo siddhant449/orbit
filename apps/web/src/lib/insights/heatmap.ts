@@ -17,11 +17,14 @@ export function buildHeatmap({
   cols,
   values,
   colLabel = (c) => c,
+  minPeak = 1,
 }: {
   rows: string[];
   cols: string[];
   values: number[][];
   colLabel?: (col: string) => string;
+  /** The strongest cell is only called out when it reaches this count; below it the grid has no peak. */
+  minPeak?: number;
 }): Heatmap {
   if (values.length !== rows.length || values.some((r) => r.length !== cols.length)) {
     throw new Error("Heatmap values must be rows × cols.");
@@ -38,7 +41,7 @@ export function buildHeatmap({
       }
     }),
   );
-  const at = peakAt as { row: number; col: number } | null;
+  const at = max >= minPeak ? (peakAt as { row: number; col: number } | null) : null;
   const cells = values.map((r, ri) =>
     r.map((value, ci) => ({
       value,

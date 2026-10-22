@@ -100,6 +100,7 @@ describe("localAnalyticsView", () => {
     versions: [
       { createdAt: at("2026-10-22T09:00:00Z"), source: "AI_CREATE" },
       { createdAt: at("2026-10-22T09:30:00Z"), source: "USER_EDIT" },
+      { createdAt: at("2026-10-22T10:00:00Z"), source: "USER_EDIT" },
       { createdAt: at("2026-10-21T20:00:00Z"), source: "USER_EDIT" },
     ],
   };
@@ -109,7 +110,7 @@ describe("localAnalyticsView", () => {
     expect(v.stats.map((s) => [s.label, s.value, s.delta])).toEqual([
       ["Posts drafted", 1, "±0 vs previous 7 days"],
       ["Writing streak", 2, "Best 5 days"],
-      ["Revisions", 2, "+2 vs previous 7 days"],
+      ["Revisions", 3, "+3 vs previous 7 days"],
       ["Active days", 2, "of 7"],
     ]);
   });
@@ -121,10 +122,15 @@ describe("localAnalyticsView", () => {
 
   it("summarises the chart and the writing-time heatmap in words", () => {
     const v = localAnalyticsView(localActivity(7, input), { current: 2, best: 2, wroteToday: true });
-    expect(v.chart.summary).toBe("Versions saved per day over the last 7 days: 3 in total, most on 22 Oct with 2. The previous 7 days had 0.");
+    expect(v.chart.summary).toBe("Versions saved per day over the last 7 days: 4 in total, most on 22 Oct with 3. The previous 7 days had 0.");
     expect(v.chart.ticks.at(-1)?.label).toBe("22 Oct");
-    expect(v.writing.peak?.label).toBe("Thu · 8 AM");
+    expect(v.writing.peak?.label).toBe("Thu · 8 AM–12 PM");
     expect(v.writing.rows).toHaveLength(7);
+  });
+
+  it("shows no writing-time peak until a block has at least three saves", () => {
+    const few = { ...input, versions: input.versions.slice(0, 2) };
+    expect(localAnalyticsView(localActivity(7, few), { current: 1, best: 1, wroteToday: true }).writing.peak).toBeNull();
   });
 
   it("says plainly when nothing was saved", () => {

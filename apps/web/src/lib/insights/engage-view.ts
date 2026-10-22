@@ -26,13 +26,14 @@ export type QueuePost = {
 
 export type EngageList = { id: string; name: string };
 
-export type LeadKind = "comments" | "question" | "dm" | "profile_view";
+/** Only what LinkedIn's Community Management API exposes: comments on the member's own posts. */
+export type LeadKind = "comments" | "question";
 export type Lead = {
   id: string;
   name: string;
   headline: string | null;
   kind: LeadKind;
-  /** The signal in words: "Commented twice, then visited your profile", "DM: “Can we talk…”". */
+  /** The signal in words: "Commented twice on your post", "Asked “what did churn look like after?”". */
   text: string;
   url: string;
   at: string;
@@ -113,10 +114,6 @@ export function focusMeta(p: QueuePost, now: Date): string {
   return parts.filter(Boolean).join(" · ");
 }
 
-export function leadAction(kind: LeadKind): "Reply" | "Open" {
-  return kind === "comments" || kind === "question" ? "Reply" : "Open";
-}
-
 export function leadsWithIntent(leads: Lead[]): number {
   return leads.filter((l) => !l.handled).length;
 }
@@ -133,12 +130,23 @@ export function sessionView(s: SessionStats) {
   };
 }
 
-export const REPLY_SOURCE_MAX = 3000;
+/** The home composer's `?prompt=` cap (orbit/posts-board `promptParam`), in code points. */
+export const PROMPT_MAX = 2000;
+/** Pasted comment budget inside the reply prompt, so the whole prompt fits PROMPT_MAX with its closing quote. */
+export const REPLY_SOURCE_MAX = 1500;
+const EXCERPT_MAX = 900;
+const DRAFT_MAX = 600;
+const NAME_MAX = 120;
+
+/** Trims to `max` code points (never splitting an emoji), adding "…" when it cut. */
+export function clip(text: string, max: number): string {
+  const chars = Array.from(text.trim());
+  return chars.length <= max ? chars.join("") : `${chars.slice(0, max).join("").trimEnd()}…`;
+}
 
 /** The chat prompt for "Draft a reply": Orbit drafts in the user's voice, the user posts it themselves. */
 export function replyPrompt(comment: string): string {
-  const text = comment.trim().slice(0, REPLY_SOURCE_MAX);
-  return `Help me reply to this comment on LinkedIn. Keep it in my voice, short and specific, and end with a question if it fits:\n\n"${text}"`;
+  return `Help me reply to this comment on LinkedIn. Keep it in my voice, short and specific, and end with a question if it fits:\n\n"${clip(comment, REPLY_SOURCE_MAX)}"`;
 }
 
 /** A new chat with the reply prompt in the composer (not sent), or null for blank text. */
@@ -150,12 +158,13 @@ export type RedraftMode = "draft" | "angle" | "shorter";
 
 /** "Another angle", "Shorter" and a first draft go through chat, prefilled (not sent), until in-place drafting lands. */
 export function redraftHref(p: QueuePost, mode: RedraftMode): string {
-  const source = `Post by ${authorLine(p)}:\n\n"${p.excerpt.slice(0, REPLY_SOURCE_MAX)}"`;
+  const source = `Post by ${clip(authorLine(p), NAME_MAX)}:\n\n"${clip(p.excerpt, EXCERPT_MAX)}"`;
+  const draft = p.draft ? clip(p.draft, DRAFT_MAX) : null;
   const ask =
-    mode === "draft" || !p.draft
+    mode === "draft" || !draft
       ? "Draft a comment I can post on this LinkedIn post. Keep it in my voice, add something specific, no flattery."
       : mode === "angle"
-        ? `Give me a different angle for my comment on this LinkedIn post. My current draft:\n\n"${p.draft}"`
-        : `Make my comment on this LinkedIn post shorter without losing the point. My current draft:\n\n"${p.draft}"`;
+        ? `Give me a different angle for my comment on this LinkedIn post. My current draft:\n\n"${draft}"`
+        : `Make my comment on this LinkedIn post shorter without losing the point. My current draft:\n\n"${draft}"`;
   return `/?prompt=${encodeURIComponent(`${ask}\n\n${source}`)}`;
 }

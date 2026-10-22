@@ -5,11 +5,7 @@ import { greetingFor } from "@/lib/greeting";
 import { latestChatOf, summarizeStrategy } from "@/lib/home-summary";
 import { getSelectedVoice, getStrategy, listChats, listVoices } from "@brandloop/db";
 
-/** `?prompt=` prefills the composer (Engage "Draft a reply"); capped like the reply source it carries. */
-const PROMPT_MAX = 4000;
-
-export default async function HomePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  const prompt = (await searchParams).prompt;
+export default async function HomePage() {
   const account = await getAccount();
   const profile = account.currentProfile;
   const timeZone = profile?.timezone ?? "UTC";
@@ -23,7 +19,6 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       cards={<HomeCards strategy={summarizeStrategy(strategy, now, timeZone)} latestChat={latestChatOf(history.chats)} now={now} />}
       voices={voices.map((v) => ({ id: v.id, name: v.name, tagline: v.tagline, own: v.kind === "OWN" }))}
       selectedVoiceId={selected?.id ?? null}
-      initialText={typeof prompt === "string" ? prompt.slice(0, PROMPT_MAX) : ""}
     />
   );
 }

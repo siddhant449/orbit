@@ -11,10 +11,11 @@ export type LocalAnalyticsView = {
   writing: Heatmap;
 };
 
-const blockLabel = (h: string) => {
-  const n = Number(h);
-  return n === 0 ? "12 AM" : n === 12 ? "12 PM" : n > 12 ? `${n - 12} PM` : `${n} AM`;
-};
+const clock = (n: number) => (n % 12 === 0 ? 12 : n % 12) + (n % 24 < 12 ? " AM" : " PM");
+/** "8" → "8 AM–12 PM": the four-hour block a column covers. */
+const blockLabel = (h: string) => `${clock(Number(h))}–${clock(Number(h) + 4)}`;
+/** A writing-time pattern needs at least this many saves in one block before Orbit names it. */
+export const WRITING_PEAK_MIN = 3;
 
 function streakNote(s: Streak): string {
   if (s.current === 0) return s.best > 0 ? `Best ${plural(s.best, "day")}` : "Start one today";
@@ -50,6 +51,6 @@ export function localAnalyticsView(a: LocalActivity, streak: Streak): LocalAnaly
           ? `Nothing saved in the last ${a.range} days.`
           : `Versions saved per day over the last ${a.range} days: ${formatCount(total)} in total, most on ${shortDate(dates[peak]!)} with ${formatCount(current[peak]!)}. The previous ${a.range} days had ${formatCount(prevTotal)}.`,
     },
-    writing: buildHeatmap({ rows: [...WEEKDAY_ROWS], cols: [...WRITING_BLOCKS], values: a.writingTimes, colLabel: blockLabel }),
+    writing: buildHeatmap({ rows: [...WEEKDAY_ROWS], cols: [...WRITING_BLOCKS], values: a.writingTimes, colLabel: blockLabel, minPeak: WRITING_PEAK_MIN }),
   };
 }

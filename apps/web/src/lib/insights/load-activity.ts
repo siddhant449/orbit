@@ -7,12 +7,13 @@ const HISTORY_DAYS = 365;
 export type ActivitySummary = { byRange: Record<Range, LocalActivity>; streak: Streak };
 
 /**
- * Reads the profile's live (not deleted) documents and their saved versions and derives the Analytics screen's
+ * Reads all of the profile's documents (deleted ones included) and their saved versions and derives the Analytics screen's
  * local numbers for every range at once, so the range switch is instant. Server only.
  */
 export async function loadActivitySummary(profileId: string, timeZone: string, now = new Date()): Promise<ActivitySummary> {
   const since = new Date(now.getTime() - HISTORY_DAYS * 86_400_000);
-  const where = { profileId, deletedAt: null };
+  // Deleted drafts still count: the writing happened on that day, so streaks and totals don't drop when a draft is removed.
+  const where = { profileId };
   const [documents, versions] = await Promise.all([
     prisma.document.findMany({ where: { ...where, createdAt: { gte: since } }, select: { createdAt: true } }),
     prisma.documentVersion.findMany({

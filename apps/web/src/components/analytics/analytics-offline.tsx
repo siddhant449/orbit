@@ -14,6 +14,7 @@ import { StatPanel } from "./stat-panel";
 /** What the connected screen adds, named so the empty panel says exactly what will appear (p09 panels). */
 const LINKEDIN_METRICS = ["Impressions", "Reach", "Engagement rate", "New followers", "Top posts", "Best time to post"];
 
+
 /**
  * Analytics before LinkedIn is connected (screens.md B7, ruling A14). Orbit's p09 layout with only real numbers:
  * the stat row, chart and heatmap count what the profile drafted in Orbit; LinkedIn's statistics are named, not
@@ -55,7 +56,7 @@ export function AnalyticsOffline({ byRange, streak }: { byRange: Record<Range, L
           <LineChart current={view.chart.current} previous={view.chart.previous} ticks={view.chart.ticks} summary={view.chart.summary} />
           {!wrote && (
             <p className="text-[13px] text-text-2">
-              Nothing saved yet. Every draft and edit you save shows up here.{" "}
+              Nothing saved yet. Every draft and edit you save shows up here, including drafts you later delete.{" "}
               <Link href="/" className="text-accent-text underline-offset-4 hover:underline">
                 Start a draft
               </Link>
@@ -73,11 +74,12 @@ export function AnalyticsOffline({ byRange, streak }: { byRange: Record<Range, L
                 See how your posts land
               </h2>
               <p className="text-[13px] leading-[1.55] text-text-2">
-                Connect LinkedIn and this page fills with your post and follower statistics, read through LinkedIn&apos;s
-                official API and visible only to you.
+                Coming later: once LinkedIn approves Orbit&apos;s access to member post analytics, connecting your account
+                will fill this page with your post and follower statistics from LinkedIn&apos;s official API, visible only to
+                you.
               </p>
             </div>
-            <ul aria-label="Appears after you connect" className="flex w-full flex-col">
+            <ul aria-label="Appears once LinkedIn access is approved and connected" className="flex w-full flex-col">
               {LINKEDIN_METRICS.map((m) => (
                 <li key={m} className="flex items-center justify-between border-b border-line py-2 text-[13px] text-text-soft last:border-0">
                   {m}
@@ -91,15 +93,19 @@ export function AnalyticsOffline({ byRange, streak }: { byRange: Record<Range, L
           <section aria-labelledby="writing-h" className="orbit-panel flex flex-col gap-3 !rounded-[20px] px-5 py-[18px]">
             <div className="flex items-center justify-between gap-3">
               <h2 id="writing-h" className="text-sm font-medium text-text">
-                When you write
+                Versions saved, by time
               </h2>
-              <span className="text-xs text-text-2">{view.writing.peak ? view.writing.peak.label : "No saves yet"}</span>
+              {view.writing.peak && <span className="text-xs text-text-2">{view.writing.peak.label}</span>}
             </div>
             <HeatmapGrid
               heatmap={view.writing}
-              summary={view.writing.peak ? `You save the most drafts on ${view.writing.peak.label}.` : "No drafts saved in this range."}
+              summary={view.writing.peak ? `Most versions saved: ${view.writing.peak.label}.` : "Not enough versions saved in this range to show a pattern."}
             />
-            <p className="text-[11px] leading-[1.5] text-text-3">Best time to post replaces this once LinkedIn shares when your audience reads.</p>
+            <p className="text-[11px] leading-[1.5] text-text-3">
+              {view.writing.peak
+                ? "Each cell counts versions you saved in that four-hour block. Best time to post replaces this once LinkedIn analytics are connected."
+                : "Not enough saves yet to show a pattern. Each cell counts versions you saved in that four-hour block."}
+            </p>
           </section>
         </div>
       </div>

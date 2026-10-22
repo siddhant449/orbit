@@ -4,7 +4,7 @@ import {
   authorLine,
   focusMeta,
   initialQueue,
-  leadAction,
+  PROMPT_MAX,
   leadsWithIntent,
   queueReducer,
   queueSummary,
@@ -125,15 +125,8 @@ describe("row copy", () => {
 });
 
 describe("leads", () => {
-  it("replies to comments and questions, opens DMs and profile visits", () => {
-    expect(leadAction("comments")).toBe("Reply");
-    expect(leadAction("question")).toBe("Reply");
-    expect(leadAction("dm")).toBe("Open");
-    expect(leadAction("profile_view")).toBe("Open");
-  });
-
   it("counts unhandled leads as intent", () => {
-    const base = { name: "N", headline: null, url: "https://www.linkedin.com/in/n", at: "2026-10-22T10:00:00Z", kind: "dm" as const, text: "t" };
+    const base = { name: "N", headline: null, url: "https://www.linkedin.com/in/n", at: "2026-10-22T10:00:00Z", kind: "question" as const, text: "t" };
     expect(leadsWithIntent([{ ...base, id: "1", handled: false }, { ...base, id: "2", handled: true }])).toBe(1);
   });
 });
@@ -167,9 +160,22 @@ describe("reply drafting", () => {
     expect(replyHref("   ")).toBeNull();
   });
 
-  it("caps very long pasted text", () => {
+  it("caps very long pasted text with an ellipsis inside the closing quote, within the prompt limit", () => {
     const p = replyPrompt("x".repeat(REPLY_SOURCE_MAX + 500));
     expect(p.match(/x+/)![0].length).toBe(REPLY_SOURCE_MAX);
+    expect(p.endsWith('…"')).toBe(true);
+    expect(Array.from(p).length).toBeLessThanOrEqual(PROMPT_MAX);
+  });
+
+  it("counts code points, so emoji are never split", () => {
+    const p = replyPrompt("😀".repeat(REPLY_SOURCE_MAX + 10));
+    expect(Array.from(p).length).toBeLessThanOrEqual(PROMPT_MAX);
+    expect(p).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/);
+    expect(p.endsWith('😀…"')).toBe(true);
+  });
+
+  it("leaves short text untouched", () => {
+    expect(replyPrompt("Short one.").endsWith('"Short one."')).toBe(true);
   });
 });
 
@@ -188,5 +194,14 @@ describe("redraftHref", () => {
     expect(decode(redraftHref(p, "angle"))).toContain("different angle");
     expect(decode(redraftHref(p, "angle"))).toContain("Same here.");
     expect(decode(redraftHref(p, "shorter"))).toContain("shorter");
+  });
+
+  it("fits the prompt limit with huge posts and drafts, closing quote intact", () => {
+    const big = post("a", { excerpt: "e".repeat(5000), draft: "d".repeat(5000) });
+    for (const mode of ["draft", "angle", "shorter"] as const) {
+      const text = decode(redraftHref(big, mode));
+      expect(Array.from(text).length).toBeLessThanOrEqual(PROMPT_MAX);
+      expect(text.endsWith('…"')).toBe(true);
+    }
   });
 });
