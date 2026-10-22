@@ -11,7 +11,10 @@ import { useEffect, useLayoutEffect, useRef } from "react";
  */
 export function RouteFocus() {
   const pathname = usePathname();
-  const first = useRef(true);
+  // The path the document loaded with. Compared by value (not a "first run" flag) so React's dev double-invoke of
+  // effects can't make the initial load look like a navigation and touch server-rendered markup mid-hydration.
+  const initial = useRef(pathname);
+  const navigated = useRef(false);
   const seen = useRef<string | null>(null);
   // Before the new screen paints, so its entrance keyframes never start.
   useLayoutEffect(() => {
@@ -19,10 +22,8 @@ export function RouteFocus() {
     seen.current = pathname;
   }, [pathname]);
   useEffect(() => {
-    if (first.current) {
-      first.current = false;
-      return;
-    }
+    if (!navigated.current && pathname === initial.current) return;
+    navigated.current = true;
     const main = document.querySelector("main");
     if (!main) return;
     const focus = (target: HTMLElement) => {
