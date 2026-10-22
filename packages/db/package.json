@@ -11,6 +11,7 @@
     "./vitest-setup": "./src/vitest-setup.ts"
   },
   "scripts": {
+    "build": "prisma generate",
     "generate": "prisma generate",
     "migrate": "prisma migrate dev",
     "seed": "tsx prisma/seed.ts",
