@@ -17,10 +17,6 @@ const pill = { borderRadius: "999px", height: "44px !important", fontSize: "14px
 export const authAppearance: Appearance = {
   elements: {
     rootBox: { width: "100%" },
-    // Clerk's start step carries a password field for password managers and reveals it when Chrome autofills it; that
-    // value isn't used there, so people were asked for their password twice. The start step is the only form with the
-    // identifier field: keep its password row out of the page so the browser fills the real password step instead.
-    form: { '&:has(input[name="identifier"]) .cl-formFieldRow__password': { display: "none !important" } },
     cardBox: { width: "100%", maxWidth: "none", boxShadow: "none", border: "none", borderRadius: 0, background: "transparent", overflow: "visible" },
     card: { background: "transparent", boxShadow: "none", border: "none", borderRadius: 0, padding: 0, gap: "24px" },
     header: { display: "none" },
