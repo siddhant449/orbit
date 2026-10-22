@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Dialog } from "radix-ui";
+import { SWRConfig, type SWRConfiguration } from "swr";
 import { CloseIcon } from "@brandloop/ui/icons";
 import { Grain, cn, useMediaQuery } from "@brandloop/ui";
 import { SmoothScroll } from "@brandloop/ui/scroll";
@@ -16,6 +17,12 @@ import { RouteFocus } from "./route-focus";
 import { MainSidebar, Rail, SPRINT, SectionPanel } from "./sidebar";
 
 const COLLAPSED_KEY = "brandloop:sidebar-collapsed";
+
+/**
+ * Coming back to the tab revalidates what's on screen at most once a minute, and never blanks it: data stays put while
+ * it refreshes (no loading state on return), and a hidden tab doesn't poll.
+ */
+export const SWR_OPTIONS: SWRConfiguration = { focusThrottleInterval: 60_000, keepPreviousData: true, refreshWhenHidden: false };
 
 const COLLAPSED_EVENT = "brandloop:sidebar";
 
@@ -105,6 +112,7 @@ export function AppShell({ account, children }: { account: ShellAccount; childre
 
   return (
     <AccountProvider account={account}>
+      <SWRConfig value={SWR_OPTIONS}>
       <div className="relative flex h-svh overflow-hidden bg-ground text-text">
         <span aria-hidden="true" className="orbit-ambient" />
         <Grain />
@@ -170,6 +178,7 @@ export function AppShell({ account, children }: { account: ShellAccount; childre
       </Dialog.Root>
 
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
+      </SWRConfig>
     </AccountProvider>
   );
 }
