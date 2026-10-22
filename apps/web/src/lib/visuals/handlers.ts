@@ -3,6 +3,7 @@ import {
   updateAltText, VisualError, ALT_TEXT_MAX, type LibraryItem, type VisualWithCurrent,
 } from "@brandloop/db";
 import { checkVisualRequest } from "@brandloop/visuals";
+import { checkVisualLimits } from "./limits";
 import { z } from "zod";
 import { getAccount } from "@/lib/account";
 import { enqueue } from "@/lib/jobs";
@@ -95,6 +96,9 @@ export async function createVisualHandler(request: Request): Promise<Response> {
   const deps = getVisualDeps();
   const verdict = await checkVisualRequest(deps.ai, [input.prompt, input.customInstructions].filter(Boolean).join("\n"), { log: deps.log });
   if (!verdict.allowed) return fail(422, verdict.message, { code: "refused", category: verdict.category });
+
+  const limit = await checkVisualLimits(profile);
+  if (!limit.ok) return fail(limit.status, limit.message, { code: limit.code });
 
   try {
     const { visual, balance } = await createVisualWithDebit({

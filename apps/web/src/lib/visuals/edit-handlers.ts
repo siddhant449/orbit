@@ -3,6 +3,7 @@ import { LOGO_DEFAULT } from "@brandloop/visuals";
 import { z } from "zod";
 import { enqueue } from "@/lib/jobs";
 import { currentProfile, fail, notFound, visualJson } from "./handlers";
+import { checkVisualLimits } from "./limits";
 import { startVisualEdit } from "./start-edit";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -95,6 +96,8 @@ export async function logoHandler(request: Request, { params }: Ctx): Promise<Re
   const id = (await params).id;
   if (!(await getVisual(profile.id, id))) return notFound();
   if (!(await getTheme(profile.id)).logoObjectId) return fail(409, "Add your logo in the brand theme first.", { code: "no_logo" });
+  const limit = await checkVisualLimits(profile);
+  if (!limit.ok) return fail(limit.status, limit.message, { code: limit.code });
   try {
     await beginEdit(profile.id, id, "logo", parsed.data);
   } catch (err) {
