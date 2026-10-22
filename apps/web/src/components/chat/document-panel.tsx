@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, m } from "motion/react";
 import { Dialog } from "radix-ui";
@@ -304,6 +305,12 @@ export function DocumentPanel({ ctl, busy }: { ctl: DocumentController; busy: bo
                 <PencilIcon />
                 {kept ? "Resume edit" : "Edit"}
               </Button>
+              <Link
+                href={`/posts/carousel/new?document=${encodeURIComponent(doc!.id)}`}
+                className="orbit-transition inline-flex h-8 items-center rounded-pill border border-dashed border-line-control px-3.5 text-[13px] font-medium text-text hover:border-text-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-text"
+              >
+                Make a carousel
+              </Link>
               {kept && (
                 <p data-kept-edit className="text-[13px] text-text-2">
                   {kept.base < version

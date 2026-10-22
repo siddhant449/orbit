@@ -226,6 +226,16 @@ CANNED.push(
   },
 );
 
+/** The mock carousel: slides for the scripted post (the carousel studio's "Generate slides"). */
+export const SCRIPTED_SLIDES = [
+  { title: "Most founders build the *wrong thing* first.", body: "" },
+  { title: "A POC asks: *can this work?*", body: "One question, answered in a week." },
+  { title: "An MVP asks: *will anyone use it?*", body: "A harder question, answered by real users." },
+  { title: "Build the POC in a week.", body: "" },
+  { title: "Ship the MVP to *ten real users.*", body: "Then decide." },
+];
+CANNED.push({ slides: SCRIPTED_SLIDES });
+
 /** A specialist client for mock mode: `text` names chats, `json` returns the first canned output the schema accepts. */
 export function scriptedAi(): AiClient {
   return {
