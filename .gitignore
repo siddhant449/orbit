@@ -4,8 +4,8 @@ node_modules
 dist
 coverage
 .env
-.env.local
-.env*.local
+.env.*
+!.env.example
 *.log
 .DS_Store
 .playwright-mcp
@@ -20,3 +20,15 @@ packages/db/src/generated
 # Parallel feature worktrees
 .worktrees/
 .data/
+
+# Local tooling and machine state
+.claude/settings.local.json
+.vercel
+*.tsbuildinfo
+
+# Database dumps and repo backups
+*.dump
+*.bundle
+
+# User-supplied design source (large; reference only)
+Orbit.html
