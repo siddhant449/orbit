@@ -90,6 +90,9 @@ importers:
       '@clerk/nextjs':
         specifier: ^7.9.17
         version: 7.9.17(next@16.4.2(@babel/core@7.29.7(supports-color@7.2.0))(@opentelemetry/api@1.9.1)(@playwright/test@1.64.1)(@types/node@20.19.43)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@paper-design/shaders-react':
+        specifier: ^0.0.81
+        version: 0.0.81(@types/react@19.3.0)(react@19.3.0)
       ai:
         specifier: 7.0.146
         version: 7.0.146(zod@4.6.7)
@@ -1152,6 +1155,18 @@ packages:
 
   '@oxc-project/types@0.154.0':
     resolution: {integrity: sha512-KYOUGQFlLWR+s4QMV2Q9ko38TZm7EdO87Qm7rvZLqk/webse/cDjtyxKhg/47l0byCbs/k46LT8qc4PKjAikzA==}
+
+  '@paper-design/shaders-react@0.0.81':
+    resolution: {integrity: sha512-3FMkeZqj9sSvK/WkgekGu3crnOQd4R2iH8IT+jVBuQmq1m8p88VFvxh63s9bSt2exBwjBNaRfSo0FSCeNxqh3w==}
+    peerDependencies:
+      '@types/react': ^18 || ^19
+      react: ^18 || ^19
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
+
+  '@paper-design/shaders@0.0.81':
+    resolution: {integrity: sha512-jeGdyjMscZ2bxmQdo8lhwUufHUf4iq3s1ayjh8PXU7Go42Rw8E3I0It1FZdc3HuWt5J82m//DRWaxsRqRfA4Gg==}
 
   '@pdf-lib/standard-fonts@1.0.0':
     resolution: {integrity: sha512-hU30BK9IUN/su0Mn9VdlVKsWBS6GyhVfqjwl1FjZN4TxP6cCw0jP2w7V3Hf5uX7M0AZJ16vey9yE0ny7Sa59ZA==}
@@ -5889,6 +5904,15 @@ snapshots:
     optional: true
 
   '@oxc-project/types@0.154.0': {}
+
+  '@paper-design/shaders-react@0.0.81(@types/react@19.3.0)(react@19.3.0)':
+    dependencies:
+      '@paper-design/shaders': 0.0.81
+      react: 19.3.0
+    optionalDependencies:
+      '@types/react': 19.3.0
+
+  '@paper-design/shaders@0.0.81': {}
 
   '@pdf-lib/standard-fonts@1.0.0':
     dependencies:
