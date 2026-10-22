@@ -2,10 +2,17 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Sparkles } from "lucide-react";
 import { AlertDialog } from "radix-ui";
 import { toast } from "sonner";
 import { Button } from "@brandloop/ui";
+import { IdeasIcon } from "@brandloop/ui/icons";
+import {
+  dialogActionsClass,
+  dialogContentClass,
+  dialogDescriptionClass,
+  dialogOverlayClass,
+  dialogTitleClass,
+} from "@/components/dialog-classes";
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -53,8 +60,8 @@ export function GenerateButton({ label = "Generate my strategy", variant = "prim
   }
 
   const trigger = (onClick?: () => void) => (
-    <Button variant={variant} size="sm" onClick={onClick} disabled={working}>
-      <Sparkles aria-hidden /> {working ? "Generating…" : label}
+    <Button variant={variant} size="md" onClick={onClick} disabled={working}>
+      <IdeasIcon /> {working ? "Generating…" : label}
     </Button>
   );
 
@@ -64,13 +71,13 @@ export function GenerateButton({ label = "Generate my strategy", variant = "prim
     <AlertDialog.Root>
       <AlertDialog.Trigger asChild>{trigger()}</AlertDialog.Trigger>
       <AlertDialog.Portal>
-        <AlertDialog.Overlay className="fixed inset-0 z-50 bg-ink/40 data-[state=closed]:animate-[fade-out_120ms_var(--ease-exit)_both] data-[state=open]:animate-[fade-in_180ms_var(--ease-ink)_both]" />
-        <AlertDialog.Content className="fixed left-1/2 top-1/2 z-50 w-[calc(100%-32px)] max-w-md -translate-x-1/2 -translate-y-1/2 plate plate--overlay p-6 data-[state=closed]:animate-[fade-out_120ms_var(--ease-exit)_both] data-[state=open]:animate-[plate-in_180ms_var(--ease-ink)_both]">
-          <AlertDialog.Title className="type-title-2">Replace your strategy?</AlertDialog.Title>
-          <AlertDialog.Description className="mt-1 text-sm text-ink-muted">
+        <AlertDialog.Overlay className={dialogOverlayClass} />
+        <AlertDialog.Content className={`${dialogContentClass} max-w-md`}>
+          <AlertDialog.Title className={dialogTitleClass}>Replace your strategy?</AlertDialog.Title>
+          <AlertDialog.Description className={dialogDescriptionClass}>
             A new strategy will replace the current one, including your edits.
           </AlertDialog.Description>
-          <div className="mt-5 flex justify-end gap-2">
+          <div className={dialogActionsClass}>
             <AlertDialog.Cancel asChild>
               <Button variant="ghost">Cancel</Button>
             </AlertDialog.Cancel>

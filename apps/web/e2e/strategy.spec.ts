@@ -30,7 +30,7 @@ test("strategy: sections render, mix sums to 100, tagline edit persists", async 
   await chart.scrollIntoViewIfNeeded();
   const svg = (await chart.boundingBox())!;
   await page.mouse.move(svg.x + svg.width / 2 + 12, svg.y + svg.height * 0.15);
-  await expect(page.getByTestId("mix-row").first()).toHaveClass(/bg-surface-sunk/);
+  await expect(page.getByTestId("mix-row").first()).toHaveAttribute("data-selected", "");
 
   if (process.env.SHOTS === "1") {
     const dir = "../../.superpowers/sdd/plan/shots";

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { SearchIcon, SidebarIcon } from "@brandloop/ui/icons";
+import { ThemeSwitch } from "@/components/theme/theme-switch";
 import { cn } from "@brandloop/ui";
 import { isActive, primaryNav, type Section } from "@/lib/nav";
 import { ChatHistory } from "@/components/chat/chat-history";
@@ -140,6 +141,8 @@ export function SectionPanel({ section, onNavigate, className }: { section: Sect
           </div>
         ))}
       </nav>
+      {/* Theme switch at the foot of the Settings sub-nav (system §3, p14). */}
+      {section.id === "settings" && <ThemeSwitch className="mt-auto px-2.5 pt-6" />}
     </div>
   );
 }

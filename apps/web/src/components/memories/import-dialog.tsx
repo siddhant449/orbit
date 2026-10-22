@@ -3,9 +3,17 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Dialog } from "radix-ui";
-import { ChevronDown, Copy, Upload } from "lucide-react";
 import { toast } from "sonner";
-import { Button, Label } from "@brandloop/ui";
+import { Button, Label, cn } from "@brandloop/ui";
+import { ChevronRightIcon, CopyIcon, PlusIcon } from "@brandloop/ui/icons";
+import {
+  dialogActionsClass,
+  dialogContentClass,
+  dialogDescriptionClass,
+  dialogOverlayClass,
+  dialogTitleClass,
+  textareaClass,
+} from "@/components/dialog-classes";
 
 export const IMPORT_PROMPT =
   "I'm moving to a new writing assistant. List everything you know about me — background, work, interests, opinions, audience and how I like to write — as plain-text bullet points.";
@@ -77,43 +85,48 @@ export function ImportDialog({ variant = "secondary" }: { variant?: "secondary" 
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Trigger asChild>
-        <Button variant={variant} size="sm">
-          <Upload aria-hidden /> Import memories
+        <Button variant={variant} size="md">
+          <PlusIcon /> Import memories
         </Button>
       </Dialog.Trigger>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-ink/40 data-[state=closed]:animate-[fade-out_120ms_var(--ease-exit)_both] data-[state=open]:animate-[fade-in_180ms_var(--ease-ink)_both]" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[calc(100dvh-32px)] w-[calc(100%-32px)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto plate plate--overlay p-6 data-[state=closed]:animate-[fade-out_120ms_var(--ease-exit)_both] data-[state=open]:animate-[plate-in_180ms_var(--ease-ink)_both]">
-          <Dialog.Title className="type-title-2">Import memories</Dialog.Title>
-          <Dialog.Description className="mt-1 text-sm text-ink-muted">
+        <Dialog.Overlay className={dialogOverlayClass} />
+        <Dialog.Content className={cn(dialogContentClass, "max-w-lg")}>
+          <Dialog.Title className={dialogTitleClass}>Import memories</Dialog.Title>
+          <Dialog.Description className={dialogDescriptionClass}>
             Bring what another assistant knows about you, so your posts sound like you from the start.
           </Dialog.Description>
 
-          <div className="mt-4 rounded-row border border-line">
+          <div className="mt-5 rounded-card-sm border border-line-2">
             <button
               type="button"
               aria-expanded={help}
               aria-controls="import-help"
               onClick={() => setHelp((v) => !v)}
-              className="flex w-full items-center justify-between rounded-row px-3 py-2.5 text-left text-sm font-medium"
+              className="orbit-transition flex min-h-11 w-full items-center gap-2.5 rounded-card-sm px-3.5 text-left text-[13px] font-medium text-text hover:bg-line-soft"
             >
+              <ChevronRightIcon
+                size={14}
+                className={cn("shrink-0 text-text-2 motion-safe:transition-transform motion-safe:duration-[400ms]", help && "rotate-90")}
+              />
               How to get your memories
-              <ChevronDown aria-hidden className={`size-4 transition-transform ${help ? "rotate-180" : ""}`} />
             </button>
             {help && (
-              <div id="import-help" className="space-y-3 border-t border-line px-3 py-3">
-                <p className="text-sm text-ink-muted">Paste this into ChatGPT, Claude or whichever assistant you use now, then paste its answer below.</p>
-                <p className="rounded-row bg-surface-sunk p-3 text-sm leading-relaxed" data-testid="import-prompt">
+              <div id="import-help" className="flex flex-col items-start gap-3 border-t border-line-2 px-3.5 py-3.5">
+                <p className="text-[13px] leading-[1.55] text-text-2">
+                  Paste this into ChatGPT, Claude or whichever assistant you use now, then paste its answer below.
+                </p>
+                <p className="rounded-[12px] bg-ground p-3.5 text-[13px] leading-relaxed text-text-soft" data-testid="import-prompt">
                   {IMPORT_PROMPT}
                 </p>
                 <Button type="button" variant="secondary" size="sm" onClick={copyPrompt}>
-                  <Copy aria-hidden /> Copy prompt
+                  <CopyIcon /> Copy prompt
                 </Button>
               </div>
             )}
           </div>
 
-          <form onSubmit={submit} className="mt-4 space-y-2">
+          <form onSubmit={submit} className="mt-5 flex flex-col gap-1.5">
             <Label htmlFor="import-text">Paste your memories</Label>
             <textarea
               id="import-text"
@@ -122,10 +135,10 @@ export function ImportDialog({ variant = "secondary" }: { variant?: "secondary" 
               value={text}
               onChange={(e) => setText(e.target.value)}
               placeholder="Paste anything here, in any format. We'll turn it into memories."
-              className="w-full resize-y rounded-row border border-line bg-paper px-3 py-2 text-sm leading-relaxed placeholder:text-ink-faint"
+              className={textareaClass}
             />
-            <p className="text-xs text-ink-muted">Importing runs in the background. You can close this and keep working.</p>
-            <div className="flex justify-end gap-2 pt-3">
+            <p className="text-xs text-text-2">Importing runs in the background. You can close this and keep working.</p>
+            <div className={cn(dialogActionsClass, "mt-4")}>
               <Dialog.Close asChild>
                 <Button type="button" variant="ghost">
                   Cancel

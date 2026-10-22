@@ -2,9 +2,16 @@
 
 import { useRef, useState, useTransition } from "react";
 import { AlertDialog } from "radix-ui";
-import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button, cn } from "@brandloop/ui";
+import { Trash2 } from "lucide-react";
+import {
+  dialogActionsClass,
+  dialogContentClass,
+  dialogDescriptionClass,
+  dialogOverlayClass,
+  dialogTitleClass,
+} from "@/components/dialog-classes";
 import { deleteMemoryLineAction, editMemoryLineAction } from "@/app/(app)/actions";
 import { AddMemory } from "./add-memory";
 
@@ -57,8 +64,8 @@ function LineRow({ line }: { line: MemoryLineView }) {
   }
 
   return (
-    <li className="group flex items-start gap-2 py-1.5" style={{ paddingLeft: `${line.depth * 20}px` }}>
-      <span aria-hidden className="mt-[0.9rem] h-px w-2 shrink-0 bg-line-strong" />
+    <li className="group flex items-start gap-1.5" style={{ paddingLeft: `${line.depth * 20}px` }}>
+      <span aria-hidden className="mt-[17px] size-1.5 shrink-0 rounded-full bg-text-3" />
       {editing ? (
         <textarea
           aria-label="Edit memory"
@@ -77,7 +84,7 @@ function LineRow({ line }: { line: MemoryLineView }) {
               cancel();
             }
           }}
-          className="min-w-0 flex-1 resize-none rounded-row border border-line-control bg-paper px-2.5 py-1.5 text-[15px] leading-relaxed text-ink"
+          className="min-w-0 flex-1 resize-none rounded-[12px] border border-accent-text bg-ground px-3 py-2 text-[15px] leading-[1.55] text-text outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-text"
         />
       ) : (
         <button
@@ -88,7 +95,7 @@ function LineRow({ line }: { line: MemoryLineView }) {
             setEditing(true);
           }}
           aria-label={`Edit: ${line.text}`}
-          className="min-w-0 flex-1 rounded-row px-2.5 py-1.5 text-left text-[15px] leading-relaxed text-ink hover:bg-surface-sunk"
+          className="orbit-transition min-w-0 flex-1 cursor-text rounded-[12px] px-3 py-2 text-left text-[15px] leading-[1.55] text-text-soft hover:bg-line-soft hover:text-text"
         >
           {line.text}
         </button>
@@ -99,19 +106,19 @@ function LineRow({ line }: { line: MemoryLineView }) {
             variant="ghost"
             size="icon"
             aria-label={`Delete: ${line.text}`}
-            className="mt-0.5 text-ink-faint md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100"
+            className="mt-0.5 size-9 text-text-2 md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100"
           >
-            <Trash2 aria-hidden />
+            <Trash2 aria-hidden strokeWidth={1.6} />
           </Button>
         </AlertDialog.Trigger>
         <AlertDialog.Portal>
-          <AlertDialog.Overlay className="fixed inset-0 z-50 bg-ink/40 data-[state=closed]:animate-[fade-out_120ms_var(--ease-exit)_both] data-[state=open]:animate-[fade-in_180ms_var(--ease-ink)_both]" />
-          <AlertDialog.Content className="fixed left-1/2 top-1/2 z-50 w-[calc(100%-32px)] max-w-md -translate-x-1/2 -translate-y-1/2 plate plate--overlay p-6 data-[state=closed]:animate-[fade-out_120ms_var(--ease-exit)_both] data-[state=open]:animate-[plate-in_180ms_var(--ease-ink)_both]">
-            <AlertDialog.Title className="type-title-2">Delete this memory?</AlertDialog.Title>
-            <AlertDialog.Description className="mt-2 text-sm text-ink-muted">
+          <AlertDialog.Overlay className={dialogOverlayClass} />
+          <AlertDialog.Content className={cn(dialogContentClass, "max-w-md")}>
+            <AlertDialog.Title className={dialogTitleClass}>Delete this memory?</AlertDialog.Title>
+            <AlertDialog.Description className={dialogDescriptionClass}>
               “{line.text}” will no longer be used when writing your posts.
             </AlertDialog.Description>
-            <div className="mt-6 flex justify-end gap-2">
+            <div className={dialogActionsClass}>
               <AlertDialog.Cancel asChild>
                 <Button variant="ghost">Cancel</Button>
               </AlertDialog.Cancel>
@@ -128,21 +135,25 @@ function LineRow({ line }: { line: MemoryLineView }) {
 
 function Group({ group, nested }: { group: MemoryGroupView; nested: boolean }) {
   return (
-    <div className={cn(nested && "rounded-row bg-paper px-3 py-3")}>
+    <div className={cn(nested && "rounded-card-sm bg-ground/60 p-3 [.light_&]:bg-ground")}>
       {group.title && (
-        <div className="flex items-baseline justify-between gap-3 px-2.5">
-          <h3 className="type-title-3">{group.title}</h3>
-          <p className="text-xs text-ink-faint">Updated {group.updated}</p>
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-1 pb-1">
+          {/* Memory-tag style label (system §6.14): the data register, a leading accent dot. */}
+          <h3 className="inline-flex items-center gap-2 rounded-pill border border-line-4 py-1 pl-2 pr-3 font-mono text-[12px] tracking-[0.04em] text-text-soft">
+            <span aria-hidden="true" className="size-1.5 rounded-full bg-accent-text" />
+            {group.title}
+          </h3>
+          <p className="text-[12px] text-text-2">Updated {group.updated}</p>
         </div>
       )}
       {group.lines.length > 0 ? (
-        <ul className="mt-1">
+        <ul className="mt-1 flex flex-col gap-0.5">
           {group.lines.map((line) => (
             <LineRow key={`${line.key}:${line.index}:${line.text}`} line={line} />
           ))}
         </ul>
       ) : (
-        <p className="px-2.5 py-2 text-sm text-ink-muted">Nothing here yet.</p>
+        <p className="px-3 py-2 text-[14px] text-text-2">Nothing here yet.</p>
       )}
     </div>
   );
@@ -165,21 +176,21 @@ export function MemoryCard({
 }) {
   const nested = groups.some((g) => g.title);
   return (
-    <section aria-label={title} className="rounded-card border border-line bg-surface p-5 sm:p-6">
+    <section aria-label={title} className="orbit-panel p-5 sm:p-6">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h2 className="type-title-2">{title}</h2>
-        {updated && <p className="text-xs text-ink-faint">Updated {updated}</p>}
+        <h2 className="type-card-title text-text">{title}</h2>
+        {updated && <p className="text-[12px] text-text-2">Updated {updated}</p>}
       </div>
-      <p className="mt-0.5 text-sm text-ink-muted">{description}</p>
-      <div className={cn("mt-3", nested && "space-y-3")}>
+      <p className="mt-1.5 text-[14px] text-text-2">{description}</p>
+      <div className={cn("mt-4", nested && "flex flex-col gap-2.5")}>
         {groups.length === 0 ? (
-          <p className="py-2 text-sm text-ink-muted">Nothing here yet.</p>
+          <p className="px-3 py-2 text-[14px] text-text-2">Nothing here yet.</p>
         ) : (
           groups.map((g) => <Group key={g.key} group={g} nested={nested} />)
         )}
       </div>
       {(addKey || addTopic) && (
-        <div className="mt-3 border-t border-line pt-3">
+        <div className="mt-4 border-t border-line pt-4">
           <AddMemory
             memoryKey={addKey ?? ""}
             askTopic={addTopic}

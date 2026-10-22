@@ -1,6 +1,6 @@
 import { getStrategy, listMemory, memoryLines } from "@brandloop/db";
 import { getAccount } from "@/lib/account";
-import { PageBody, PageHeader } from "@/components/page";
+import { EmptyState, PageBody, PageHeader } from "@/components/page";
 import { AudienceBalance } from "@/components/strategy/audience-balance";
 import { ContentMix } from "@/components/strategy/content-mix";
 import { StrategyProvider } from "@/components/strategy/edit";
@@ -18,12 +18,14 @@ export default async function Page() {
   const docs = profile && !strategy ? await listMemory(profile.id) : [];
   const hasIdentity = docs.some((d) => d.key.startsWith("identity/") && memoryLines(d.content).length > 0);
 
+  const subtitle = "Your goal, positioning and what to post each week, built from your memories and knowledge.";
+
   if (!profile) {
     return (
       <>
-        <PageHeader title="Strategy" />
+        <PageHeader title="Strategy" subtitle={subtitle} />
         <PageBody>
-          <p className="text-sm text-ink-muted">Add a profile to build its content strategy.</p>
+          <EmptyState title="No profile yet" body="Add a profile to build its content strategy." />
         </PageBody>
       </>
     );
@@ -32,20 +34,18 @@ export default async function Page() {
   if (!strategy) {
     return (
       <>
-        <PageHeader title="Strategy" />
+        <PageHeader title="Strategy" subtitle={subtitle} />
         <PageBody>
-          <div className="max-w-xl py-6">
-            <h2 className="type-display-2">No strategy yet</h2>
-            <p className="mt-2 text-[15px] leading-relaxed text-ink-muted">
-              Your strategy sets your goal, positioning and what to post each week. It comes from your memories and knowledge base.
-            </p>
-            <div className="mt-5">
-              <GenerateButton />
-            </div>
-            {!hasIdentity && (
-              <p className="mt-3 text-sm text-ink-muted">Add your identity in Memories first for a sharper strategy.</p>
-            )}
-          </div>
+          <EmptyState
+            title="No strategy yet"
+            body={
+              <>
+                <p>Your strategy sets your goal, positioning and what to post each week. It comes from your memories and knowledge base.</p>
+                {!hasIdentity && <p className="mt-2">Add your identity in Memories first for a sharper strategy.</p>}
+              </>
+            }
+            action={<GenerateButton />}
+          />
         </PageBody>
       </>
     );
@@ -53,8 +53,13 @@ export default async function Page() {
 
   return (
     <>
-      <PageHeader title="Strategy" actions={<GenerateButton label="Regenerate strategy" variant="secondary" confirmReplace />} />
-      <PageBody className="max-w-4xl space-y-4">
+      <PageHeader
+        className="max-w-[960px]"
+        title="Strategy"
+        subtitle={subtitle}
+        actions={<GenerateButton label="Regenerate strategy" variant="secondary" confirmReplace />}
+      />
+      <PageBody className="flex max-w-[960px] flex-col gap-3">
         <StrategyProvider strategy={toInput(strategy)}>
           <Foundation />
           <ContentMix />
@@ -62,7 +67,7 @@ export default async function Page() {
           <FormatsCadence />
           <Series />
         </StrategyProvider>
-        <p className="text-xs text-ink-muted">Select any text to edit it. Regenerating replaces the current strategy, including your edits.</p>
+        <p className="px-1 pt-2 text-[12px] text-text-2">Select any text to edit it. Regenerating replaces the current strategy, including your edits.</p>
       </PageBody>
     </>
   );

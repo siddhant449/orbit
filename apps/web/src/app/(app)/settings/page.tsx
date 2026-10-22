@@ -1,4 +1,4 @@
-import { PageBody, PageHeader } from "@/components/page";
+import { EmptyState, PageBody, PageHeader } from "@/components/page";
 import { AccountSettingsForm } from "@/components/settings/account-settings-form";
 import { getAccount } from "@/lib/account";
 
@@ -9,15 +9,15 @@ export default async function AccountSettingsPage() {
   const profile = account.currentProfile;
   return (
     <>
-      <PageHeader title="Manage account" />
-      <PageBody>
+      <PageHeader className="max-w-[760px]" title="Manage account" />
+      <PageBody className="max-w-[760px]">
         {profile ? (
           <AccountSettingsForm
             email={account.user.email}
             profile={{ id: profile.id, name: profile.name, language: profile.language, timezone: profile.timezone }}
           />
         ) : (
-          <p className="text-sm text-ink-muted">Add a profile to change its settings.</p>
+          <EmptyState title="No profile yet" body="Add a profile to change its settings." />
         )}
       </PageBody>
     </>

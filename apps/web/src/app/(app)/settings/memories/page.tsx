@@ -1,12 +1,10 @@
 import { listMemory, memoryLines, MEMORY_KEYS } from "@brandloop/db";
 import { getAccount } from "@/lib/account";
-import { PageBody, PageHeader } from "@/components/page";
+import { EmptyState, PageBody, PageHeader } from "@/components/page";
 import { AddMemory } from "@/components/memories/add-memory";
 import { ImportDialog } from "@/components/memories/import-dialog";
 import { MemoryCard, type MemoryGroupView } from "@/components/memories/memory-card";
 import { Reveal } from "@brandloop/ui/scroll";
-import { LineArt } from "@brandloop/ui";
-import { Frame } from "@/components/page";
 
 export const metadata = { title: "Memories" };
 
@@ -43,25 +41,25 @@ export default async function Page() {
 
   return (
     <>
-      <PageHeader title="Memories" actions={hasAny ? <ImportDialog /> : undefined} />
-      <PageBody className="space-y-4">
+      <PageHeader
+        title="Memories"
+        subtitle="The facts Orbit uses to make every post sound like you and talk about what you actually know."
+        actions={hasAny ? <ImportDialog /> : undefined}
+      />
+      <PageBody className="flex flex-col gap-3">
         {!profile ? (
-          <p className="text-sm text-ink-muted">Add a profile to start building its memories.</p>
+          <EmptyState title="No profile yet" body="Add a profile to start building its memories." />
         ) : !hasAny ? (
-          <div className="grid gap-10 py-6 md:grid-cols-[1fr_220px] md:items-start">
-            <div className="max-w-xl">
-              <p className="type-title-1">
-                Memories are the facts we use to make every post sound like you and talk about what you actually know.
-              </p>
-              <div className="mt-6 flex flex-wrap items-center gap-2">
+          <EmptyState
+            title="Nothing remembered yet"
+            body="Import what another assistant already knows about you, or add the first fact yourself. Every memory stays editable."
+            action={
+              <>
                 <ImportDialog variant="primary" />
                 <AddMemory memoryKey={MEMORY_KEYS.personal} variant="secondary" />
-              </div>
-            </div>
-            <Frame className="mx-auto hidden w-[220px] text-ink-muted md:block">
-              <LineArt name="stack" />
-            </Frame>
-          </div>
+              </>
+            }
+          />
         ) : (
           <>
             <Reveal index={0}>

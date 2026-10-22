@@ -3,7 +3,14 @@
 import { useState, useTransition } from "react";
 import { Dialog } from "radix-ui";
 import { toast } from "sonner";
-import { Button, Hint, Input, Label } from "@brandloop/ui";
+import { Button, Hint, Input, Label, cn } from "@brandloop/ui";
+import {
+  dialogActionsClass,
+  dialogContentClass,
+  dialogDescriptionClass,
+  dialogOverlayClass,
+  dialogTitleClass,
+} from "@/components/dialog-classes";
 import { createProfileAction } from "@/app/(app)/actions";
 
 export function AddProfileDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
@@ -27,13 +34,13 @@ export function AddProfileDialog({ open, onOpenChange }: { open: boolean; onOpen
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-ink/40 data-[state=closed]:animate-[fade-out_120ms_var(--ease-exit)_both] data-[state=open]:animate-[fade-in_180ms_var(--ease-ink)_both]" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[calc(100%-32px)] max-w-md -translate-x-1/2 -translate-y-1/2 plate plate--overlay p-6 data-[state=closed]:animate-[fade-out_120ms_var(--ease-exit)_both] data-[state=open]:animate-[plate-in_180ms_var(--ease-ink)_both]">
-          <Dialog.Title className="type-title-2">Add a profile</Dialog.Title>
-          <Dialog.Description className="mt-1 text-sm text-ink-muted">
+        <Dialog.Overlay className={dialogOverlayClass} />
+        <Dialog.Content className={cn(dialogContentClass, "max-w-md")}>
+          <Dialog.Title className={dialogTitleClass}>Add a profile</Dialog.Title>
+          <Dialog.Description className={dialogDescriptionClass}>
             Each profile has its own voice, posts and LinkedIn account. Use one per person or brand you write for.
           </Dialog.Description>
-          <form onSubmit={submit} className="mt-5 space-y-2">
+          <form onSubmit={submit} className="mt-5 flex flex-col gap-1.5">
             <Label htmlFor="profile-name">Profile name</Label>
             <Input
               id="profile-name"
@@ -44,7 +51,7 @@ export function AddProfileDialog({ open, onOpenChange }: { open: boolean; onOpen
               placeholder="e.g. Priya Raman"
             />
             <Hint>Usually the name of the person posting.</Hint>
-            <div className="flex justify-end gap-2 pt-4">
+            <div className={cn(dialogActionsClass, "mt-4")}>
               <Dialog.Close asChild>
                 <Button type="button" variant="ghost">
                   Cancel

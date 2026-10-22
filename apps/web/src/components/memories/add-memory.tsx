@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button, Input } from "@brandloop/ui";
+import { PlusIcon } from "@brandloop/ui/icons";
 import { addMemoryAction } from "@/app/(app)/actions";
 
 export const slugify = (name: string) =>
@@ -60,8 +60,8 @@ export function AddMemory({
 
   if (!open) {
     return (
-      <Button type="button" variant={variant} size="sm" onClick={() => setOpen(true)}>
-        <Plus aria-hidden /> {label}
+      <Button type="button" variant={variant} size={variant === "secondary" ? "md" : "sm"} onClick={() => setOpen(true)}>
+        <PlusIcon /> {label}
       </Button>
     );
   }

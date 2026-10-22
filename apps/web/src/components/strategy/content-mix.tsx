@@ -5,13 +5,13 @@ import { CONTENT_TYPES, normalizePercents } from "@brandloop/ai";
 import { CountUp, cn } from "@brandloop/ui";
 import { NumberField, Section, useStrategy } from "./edit";
 
-/** Graphite weights derived from the tokens, heaviest first. Each step also reads in the night theme. */
+/** One accent family (system §1.2), heaviest first, mixed into the panel so every step reads in both themes. */
 const SHADES = [
-  "var(--ink)",
-  "color-mix(in oklab, var(--ink) 72%, var(--surface))",
-  "color-mix(in oklab, var(--ink) 50%, var(--surface))",
-  "color-mix(in oklab, var(--ink) 32%, var(--surface))",
-  "color-mix(in oklab, var(--ink) 18%, var(--surface))",
+  "var(--accent-text)",
+  "color-mix(in oklab, var(--accent-text) 74%, var(--panel))",
+  "color-mix(in oklab, var(--accent-text) 54%, var(--panel))",
+  "color-mix(in oklab, var(--accent-text) 36%, var(--panel))",
+  "color-mix(in oklab, var(--accent-text) 22%, var(--panel))",
 ];
 
 const R = 70;
@@ -41,10 +41,10 @@ export function ContentMix() {
 
   return (
     <Section title="Content mix" description="How often to post each type.">
-      <div className="grid items-center gap-6 sm:grid-cols-[220px_1fr] sm:gap-8">
-        <div className="relative mx-auto size-[200px] sm:size-[220px]">
+      <div className="grid items-center gap-8 md:grid-cols-[240px_1fr] md:gap-10">
+        <div className="relative mx-auto size-[220px] md:size-[240px]">
           <svg viewBox="0 0 200 200" role="group" aria-label="Content mix chart" className="size-full -rotate-90">
-            <circle cx="100" cy="100" r={R} fill="none" stroke="var(--surface-sunk)" strokeWidth="34" />
+            <circle cx="100" cy="100" r={R} fill="none" stroke="var(--line-2)" strokeWidth="34" />
             {arcs.map(({ i, dash, offset: off }) => (
               <circle
                 key={mix[i]!.type}
@@ -67,10 +67,10 @@ export function ContentMix() {
             ))}
           </svg>
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
-            <span className="type-title-1 tabular-nums">
+            <span className="type-stat tabular-nums text-text">
               <CountUp value={active === null ? 100 : mix[active]!.percent} suffix="%" />
             </span>
-            <span className="max-w-[90px] text-xs text-ink-muted">
+            <span className="mt-1.5 max-w-[110px] text-[12px] leading-snug text-text-2">
               {active === null ? "of your posts" : CONTENT_TYPES[mix[active]!.type].label}
             </span>
           </div>
@@ -83,14 +83,18 @@ export function ContentMix() {
               <li
                 key={m.type}
                 data-testid="mix-row"
+                data-selected={active === i ? "" : undefined}
                 {...act(i)}
-                className={cn("-mx-2 flex items-start gap-3 rounded-row px-2 py-3 transition-colors", active === i && "bg-surface-sunk")}
+                className={cn(
+                  "orbit-transition -mx-3 flex items-start gap-3 rounded-[12px] px-3 py-3.5",
+                  active === i && "bg-line-row",
+                )}
               >
-                <span aria-hidden className="mt-1.5 size-3 shrink-0 rounded-control border border-keyline" style={{ background: SHADES[i % SHADES.length] }} />
+                <span aria-hidden className="mt-1.5 size-2.5 shrink-0 rounded-full" style={{ background: SHADES[i % SHADES.length] }} />
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium">{t.label}</p>
-                  <p className="text-sm text-ink-muted">{t.description}</p>
-                  <p className="mt-0.5 text-xs text-ink-faint">{t.examples.join(", ")}</p>
+                  <p className="text-[14px] font-medium text-text">{t.label}</p>
+                  <p className="text-[14px] leading-[1.5] text-text-soft">{t.description}</p>
+                  <p className="mt-1 text-[12px] text-text-2">{t.examples.join(", ")}</p>
                 </div>
                 <NumberField value={m.percent} label={`${t.label} percent`} suffix="%" testId="mix-percent" onSave={(n) => setPercent(i, n)} />
               </li>

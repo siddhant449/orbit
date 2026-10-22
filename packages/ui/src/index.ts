@@ -18,7 +18,6 @@ export {
 } from "./motion/presets";
 export { REDUCED_MOTION, useMediaQuery, useReducedMotionPref } from "./motion/use-media";
 export { CountUp, countUpSeen } from "./motion/count-up";
-export { LineArt, type LineArtName } from "./art/line-art";
 export { Logo, LogoMark } from "./orbit/logo";
 export { Ring, ringGeometry } from "./orbit/ring";
 export { Pill, pillClass } from "./orbit/pill";

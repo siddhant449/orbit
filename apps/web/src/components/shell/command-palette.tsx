@@ -7,7 +7,7 @@ import { Dialog } from "radix-ui";
 import { toast } from "sonner";
 import { UserRound } from "lucide-react";
 import { PencilIcon, SearchIcon } from "@brandloop/ui/icons";
-import { primaryNav, sections } from "@/lib/nav";
+import { paletteValue, primaryNav, sections } from "@/lib/nav";
 import { switchProfileAction } from "@/app/(app)/actions";
 import { useAccount } from "./account-context";
 
@@ -59,7 +59,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
                 {pages.map((item, i) => (
                   <Command.Item
                     key={`${item.href}-${i}`}
-                    value={`${item.label} ${item.href}`}
+                    value={paletteValue(item)}
                     className={itemClass}
                     onSelect={() => go(item.href)}
                   >

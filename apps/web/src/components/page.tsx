@@ -1,57 +1,100 @@
 import type { ReactNode } from "react";
-import { LineArt, cn } from "@brandloop/ui";
+import { StatusPill, cn } from "@brandloop/ui";
 
-/** Sticky page header: opaque surface, title-2 after a short rule; the bottom rule draws in (system.md section 9). */
-export function PageHeader({ title, actions }: { title: string; actions?: ReactNode }) {
+/**
+ * Orbit page header (screens.md B12, p14): `page-title` h1, an optional one-line subtitle in `text-2`, actions on the
+ * right. Not sticky: Orbit's sectioned screens scroll as one sheet. Left-aligned to the main padding (`28px 32px`); pass the same `max-w-*` as the `PageBody` so actions line up with it.
+ */
+export function PageHeader({
+  title,
+  subtitle,
+  actions,
+  className,
+}: {
+  title: string;
+  subtitle?: ReactNode;
+  actions?: ReactNode;
+  className?: string;
+}) {
   return (
-    <header className="relative sticky top-0 z-10 flex h-14 items-center justify-between bg-surface px-6">
-      <h1 className="type-title-2 flex items-center gap-3 focus-visible:outline-none">
-        <span aria-hidden="true" className="rule-draw rule-draw--y h-5 w-px bg-keyline" />
-        {title}
-      </h1>
-      {actions}
-      <span aria-hidden="true" className="rule-draw absolute inset-x-0 bottom-0 h-px bg-line" />
+    <header
+      className={cn(
+        "flex w-full max-w-[880px] flex-wrap items-end justify-between gap-x-6 gap-y-4 px-5 pt-8 md:px-8 md:pt-[28px]",
+        className,
+      )}
+    >
+      <div className="min-w-0">
+        <h1 className="type-page-title text-text focus-visible:outline-none">{title}</h1>
+        {subtitle && <p className="mt-2.5 max-w-[64ch] text-[15px] leading-[1.55] text-text-2">{subtitle}</p>}
+      </div>
+      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </header>
   );
 }
 
-/** Corner marks for a framed figure (system.md section 5.3). */
-export function Frame({ children, className }: { children: ReactNode; className?: string }) {
+/** Main column under a `PageHeader`: same left edge, `max-width` per screen (forms 760, lists 880, grids 1120). */
+export function PageBody({ children, className }: { children: ReactNode; className?: string }) {
+  return <div className={cn("w-full max-w-[880px] px-5 pb-16 pt-7 md:px-8", className)}>{children}</div>;
+}
+
+/** Section heading inside a page (p14 "Social accounts"): 14 / 500 `text-2`, an optional note after a separator. */
+export function SectionHeading({ id, title, note }: { id?: string; title: string; note?: string }) {
   return (
-    <div className={cn("relative", className)}>
-      <span aria-hidden="true" className="crosshair crosshair--local -left-[5px] -top-[5px]" />
-      <span aria-hidden="true" className="crosshair crosshair--local -right-[5px] -top-[5px]" />
-      <span aria-hidden="true" className="crosshair crosshair--local -bottom-[5px] -left-[5px]" />
-      <span aria-hidden="true" className="crosshair crosshair--local -bottom-[5px] -right-[5px]" />
-      {children}
-    </div>
+    <h2 id={id} className="mb-3 text-[14px] font-medium text-text-2">
+      {title}
+      {note && <span className="font-normal text-text-3"> · {note}</span>}
+    </h2>
   );
 }
 
-/** Placeholder for screens that arrive in a later feature. Says what the screen will do. */
+/** Orbit empty state (system §6.6): a panel with a `card-title`, one or two sentences in `text-2`, an optional action. */
+export function EmptyState({
+  title,
+  body,
+  action,
+  className,
+}: {
+  title: string;
+  body: ReactNode;
+  action?: ReactNode;
+  className?: string;
+}) {
+  return (
+    <section className={cn("orbit-panel flex flex-col items-start gap-3 p-6 md:p-8", className)}>
+      <h2 className="type-card-title text-text">{title}</h2>
+      <div className="max-w-[60ch] text-[14px] leading-[1.6] text-text-2">{body}</div>
+      {action && <div className="mt-2 flex flex-wrap items-center gap-2">{action}</div>}
+    </section>
+  );
+}
+
+/**
+ * Placeholder for a screen that arrives later (screens.md B14): the page title, one line on what the screen is for,
+ * and a dashed "coming soon" panel listing what it will do. No sample data.
+ */
 export function Upcoming({ title, description, points }: { title: string; description: string; points: string[] }) {
+  const id = `upcoming-${title.replace(/\W+/g, "-").toLowerCase()}`;
   return (
     <>
-      <PageHeader title={title} />
-      <div className="mx-auto grid max-w-3xl gap-10 px-6 py-16 md:grid-cols-[1fr_240px] md:items-start">
-        <div className="max-w-xl">
-          <p className="type-body text-ink">{description}</p>
-          <ul className="mt-6 space-y-2.5 border-l border-keyline pl-4">
+      <PageHeader title={title} subtitle={description} />
+      <PageBody>
+        <section aria-labelledby={id} className="rounded-card border border-dashed border-line-3 p-6 md:p-8">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 id={id} className="type-card-title text-text">
+              What&apos;s coming
+            </h2>
+            <StatusPill>Coming soon</StatusPill>
+          </div>
+          <ul className="mt-5 flex flex-col gap-3">
             {points.map((point) => (
-              <li key={point} className="type-ui text-ink-muted">
+              <li key={point} className="flex items-baseline gap-3 text-[14px] leading-[1.55] text-text-soft">
+                <span aria-hidden="true" className="size-1.5 shrink-0 translate-y-[-2px] rounded-full bg-text-3" />
                 {point}
               </li>
             ))}
           </ul>
-        </div>
-        <Frame className="mx-auto hidden w-[240px] text-ink-muted md:block">
-          <LineArt name="stack" />
-        </Frame>
-      </div>
+        </section>
+      </PageBody>
     </>
   );
-}
-
-export function PageBody({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn("mx-auto w-full max-w-3xl px-6 py-8", className)}>{children}</div>;
 }

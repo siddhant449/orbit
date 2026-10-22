@@ -9,7 +9,7 @@ import { languages } from "@/lib/locales";
 type ProfileFields = { id: string; name: string; language: string; timezone: string };
 
 function Row({ children }: { children: React.ReactNode }) {
-  return <div className="grid gap-2 border-b border-line py-6 sm:grid-cols-[200px_1fr] sm:gap-8">{children}</div>;
+  return <div className="grid gap-2.5 border-t border-line py-5 first:border-t-0 first:pt-0 sm:grid-cols-[220px_1fr] sm:items-start sm:gap-8">{children}</div>;
 }
 
 export function AccountSettingsForm({ email, profile }: { email: string; profile: ProfileFields }) {
@@ -33,10 +33,11 @@ export function AccountSettingsForm({ email, profile }: { email: string; profile
   }
 
   return (
-    <form onSubmit={save} className="max-w-2xl">
-      <p className="text-sm text-ink-muted">
+    <form onSubmit={save} className="flex max-w-[760px] flex-col gap-3">
+      <p className="text-[14px] leading-[1.55] text-text-2">
         These settings apply to the profile you’re working in now. Signed in as {email}.
       </p>
+      <div className="orbit-panel p-5 sm:p-6">
       <Row>
         <div>
           <Label htmlFor="name">Profile name</Label>
@@ -71,7 +72,8 @@ export function AccountSettingsForm({ email, profile }: { email: string; profile
           ))}
         </NativeSelect>
       </Row>
-      <div className="flex justify-end gap-2 pt-6">
+      </div>
+      <div className="flex justify-end gap-2 pt-3">
         <Button type="button" variant="ghost" disabled={!dirty || pending} onClick={() => setValues(profile)}>
           Discard
         </Button>

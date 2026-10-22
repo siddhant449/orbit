@@ -3,9 +3,17 @@
 import { useId, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Dialog, Popover } from "radix-ui";
-import { Check, Plus, Search } from "lucide-react";
 import { toast } from "sonner";
 import { Button, Label, cn } from "@brandloop/ui";
+import { CheckIcon, PlusIcon, SearchIcon } from "@brandloop/ui/icons";
+import {
+  dialogActionsClass,
+  dialogContentClass,
+  dialogDescriptionClass,
+  dialogOverlayClass,
+  dialogTitleClass,
+  textareaClass,
+} from "@/components/dialog-classes";
 import { selectVoiceAction } from "@/app/(app)/actions";
 
 export type VoiceOption = { id: string; name: string; tagline: string; own: boolean };
@@ -19,7 +27,10 @@ function hash(s: string) {
   return h;
 }
 
-/** Graphite line monogram: a hairline circle with the initials drawn in ink (CSS-generated, so not visible text). */
+/** Hue per name so presets stay distinguishable: a cobalt-to-violet arc of the accent family (system §2.5 voice orb). */
+const ORB_HUES = [232, 244, 256, 220, 268];
+
+/** Voice orb avatar (screens.md B14): a gradient orb with the initials, generated, never a picture of anyone. */
 export function VoiceAvatar({ name, className }: { name: string; className?: string }) {
   const initials = name
     .split(/\s+/)
@@ -27,15 +38,14 @@ export function VoiceAvatar({ name, className }: { name: string; className?: str
     .slice(0, 2)
     .map((w) => w[0]!.toUpperCase())
     .join("");
-  // The ring weight varies per name so the presets stay distinguishable without colour.
-  const weight = 1 + (hash(name) % 2);
+  const hue = ORB_HUES[hash(name) % ORB_HUES.length]!;
   return (
     <span
       aria-hidden
       data-initials={initials}
-      style={{ borderWidth: weight }}
+      style={{ background: `radial-gradient(circle at 30% 28%, hsl(${hue} 100% 92%), hsl(${hue} 88% 46%) 72%)` }}
       className={cn(
-        "grid size-6 shrink-0 place-items-center rounded-full border-keyline bg-surface text-[10px] font-semibold tracking-wide text-ink before:content-[attr(data-initials)]",
+        "grid size-6 shrink-0 place-items-center rounded-full text-[10px] font-semibold tracking-wide text-white [text-shadow:0_1px_2px_rgba(10,10,11,0.45)] before:content-[attr(data-initials)]",
         className,
       )}
     />
@@ -137,6 +147,7 @@ export function VoicePicker({ voices, selectedId }: { voices: VoiceOption[]; sel
           </Popover.Trigger>
           <Popover.Portal>
             <Popover.Content
+              aria-label="Choose a writing style"
               align="start"
               side="top"
               sideOffset={8}
@@ -145,10 +156,10 @@ export function VoicePicker({ voices, selectedId }: { voices: VoiceOption[]; sel
                 e.preventDefault();
                 (e.currentTarget as HTMLElement).querySelector("input")?.focus();
               }}
-              className="plate plate--raised z-50 w-[min(340px,calc(100vw-32px))] overflow-hidden data-[state=open]:animate-[plate-in_120ms_var(--ease-ink)_both]"
+              className="orbit-panel z-50 w-[min(360px,calc(100vw-32px))] overflow-hidden rounded-card p-0 shadow-[var(--panel-highlight),var(--shadow-draft)] data-[state=open]:animate-[orbit-pop_200ms_var(--ease-out)_both]"
             >
-              <div className="flex items-center gap-2 border-b border-line px-3">
-                <Search aria-hidden className="size-4 shrink-0 text-ink-faint" />
+              <div className="flex items-center gap-2.5 border-b border-line px-4">
+                <SearchIcon size={16} className="shrink-0 text-text-2" />
                 <input
                   role="combobox"
                   aria-expanded
@@ -162,11 +173,11 @@ export function VoicePicker({ voices, selectedId }: { voices: VoiceOption[]; sel
                   }}
                   onKeyDown={onKeyDown}
                   placeholder="Search writing styles"
-                  className="h-10 w-full bg-transparent text-sm outline-none placeholder:text-ink-faint"
+                  className="h-12 w-full bg-transparent text-[14px] text-text outline-none placeholder:text-text-3"
                 />
               </div>
-              <div ref={listRef} id={listId} role="listbox" aria-label="Writing styles" className="max-h-[min(320px,50dvh)] overflow-y-auto p-1.5">
-                {rows.length === 0 && <p className="px-3 py-6 text-center text-sm text-ink-muted">No writing styles match that.</p>}
+              <div ref={listRef} id={listId} role="listbox" aria-label="Writing styles" className="max-h-[min(340px,50dvh)] overflow-y-auto p-1.5" data-lenis-prevent>
+                {rows.length === 0 && <p className="px-3 py-6 text-center text-[13px] text-text-2">No writing styles match that.</p>}
                 {rows.map((row, i) => {
                   const isActive = i === active;
                   const common = {
@@ -175,19 +186,19 @@ export function VoicePicker({ voices, selectedId }: { voices: VoiceOption[]; sel
                     onMouseMove: () => setActive(i),
                     onClick: () => choose(row),
                     className: cn(
-                      "flex w-full cursor-pointer items-center gap-3 rounded-row px-2.5 py-2 text-left",
-                      isActive && "bg-surface-sunk",
+                      "flex w-full cursor-pointer items-center gap-3 rounded-[10px] px-2.5 py-2 text-left transition-colors duration-150",
+                      isActive && "bg-line-row",
                     ),
                   };
                   if (row.type === "add") {
                     return (
                       <div key="add" role="option" aria-selected={false} {...common}>
-                        <span aria-hidden className="grid size-7 shrink-0 place-items-center rounded-full border border-dashed border-line-strong text-ink-muted">
-                          <Plus className="size-3.5" />
+                        <span aria-hidden className="grid size-8 shrink-0 place-items-center rounded-full border border-dashed border-line-control text-text-2">
+                          <PlusIcon size={14} />
                         </span>
                         <span className="min-w-0">
-                          <span className="block text-sm font-medium text-ink">Add your style</span>
-                          <span className="block truncate text-xs text-ink-muted">Learn your voice from your own posts</span>
+                          <span className="block text-[14px] font-medium text-text">Add your style</span>
+                          <span className="block truncate text-[12px] text-text-2">Learn your voice from your own posts</span>
                         </span>
                       </div>
                     );
@@ -196,12 +207,12 @@ export function VoicePicker({ voices, selectedId }: { voices: VoiceOption[]; sel
                   const sel = v.id === currentId;
                   return (
                     <div key={v.id} role="option" aria-selected={sel} {...common}>
-                      <VoiceAvatar name={v.name} className="size-7 text-[11px]" />
+                      <VoiceAvatar name={v.name} className="size-8 text-[11px]" />
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium text-ink">{v.own ? `${v.name} (your style)` : v.name}</span>
-                        <span className="block truncate text-xs text-ink-muted">{v.tagline}</span>
+                        <span className="block truncate text-[14px] font-medium text-text">{v.own ? `${v.name} (your style)` : v.name}</span>
+                        <span className="block truncate text-[12px] text-text-2">{v.tagline}</span>
                       </span>
-                      {sel && <Check aria-hidden className="size-4 shrink-0 text-ink" />}
+                      {sel && <CheckIcon size={16} className="shrink-0 text-accent-text" />}
                     </div>
                   );
                 })}
@@ -284,13 +295,13 @@ function AddStyleDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-ink/30 backdrop-blur-[2px]" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[calc(100dvh-32px)] w-[calc(100%-32px)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-card border border-line bg-surface p-6 shadow-xl">
-          <Dialog.Title className="font-display text-lg font-semibold">Add your style</Dialog.Title>
-          <Dialog.Description className="mt-1 text-sm text-ink-muted">
+        <Dialog.Overlay className={dialogOverlayClass} />
+        <Dialog.Content className={cn(dialogContentClass, "max-w-lg")}>
+          <Dialog.Title className={dialogTitleClass}>Add your style</Dialog.Title>
+          <Dialog.Description className={dialogDescriptionClass}>
             Paste 3 to 10 of your own posts, each at least 200 characters. We&apos;ll describe how you write so new drafts sound like you.
           </Dialog.Description>
-          <form onSubmit={submit} className="mt-4 space-y-2" noValidate>
+          <form onSubmit={submit} className="mt-5 flex flex-col gap-1.5" noValidate>
             <Label htmlFor="voice-posts">Your posts</Label>
             <textarea
               id="voice-posts"
@@ -303,17 +314,17 @@ function AddStyleDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
               aria-invalid={error ? true : undefined}
               aria-describedby="voice-posts-hint"
               placeholder={"First post…\n---\nSecond post…\n---\nThird post…"}
-              className="w-full resize-y rounded-row border border-line-control bg-paper px-3 py-2 text-sm leading-relaxed placeholder:text-ink-faint"
+              className={textareaClass}
             />
-            <p id="voice-posts-hint" className="text-xs text-ink-muted">
+            <p id="voice-posts-hint" className="text-xs text-text-2">
               Separate posts with a line containing --- ({count} {count === 1 ? "post" : "posts"} found)
             </p>
             {error && (
-              <p role="alert" className="text-sm text-red-700">
+              <p role="alert" className="text-[13px] text-danger">
                 {error}
               </p>
             )}
-            <div className="flex justify-end gap-2 pt-3">
+            <div className={cn(dialogActionsClass, "mt-4")}>
               <Dialog.Close asChild>
                 <Button type="button" variant="ghost">
                   Cancel

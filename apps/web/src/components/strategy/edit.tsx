@@ -134,11 +134,11 @@ export function EditableText({
           setEditing(true);
         }}
         className={cn(
-          "block w-full -mx-2 rounded-row px-2 py-1 text-left hover:bg-surface-sunk focus-visible:bg-surface-sunk focus-visible:outline-2 focus-visible:outline-accent",
+          "orbit-transition -mx-2 block w-[calc(100%+1rem)] cursor-text rounded-[10px] px-2 py-1 text-left hover:bg-line-soft focus-visible:bg-line-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-text",
           className,
         )}
       >
-        {value || <span className="text-ink-faint">{placeholder}</span>}
+        {value || <span className="text-text-3">{placeholder}</span>}
       </button>
     );
   }
@@ -149,7 +149,7 @@ export function EditableText({
     onChange: (e: { target: { value: string } }) => setDraft(e.target.value),
     onBlur: commit,
     className: cn(
-      "-mx-2 block w-[calc(100%+1rem)] rounded-row border border-accent bg-paper px-2 py-1 text-ink focus:outline-none focus:ring-2 focus:ring-accent/25",
+      "-mx-2 block w-[calc(100%+1rem)] rounded-[10px] border border-accent-text bg-ground px-2 py-1 text-text outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-text",
       className,
     ),
   };
@@ -226,21 +226,21 @@ export function NumberField({
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
         onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-        className="h-8 w-9 rounded-row [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none border border-transparent bg-transparent px-0.5 text-right text-sm tabular-nums hover:border-line focus-visible:border-accent focus-visible:bg-paper focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/25"
+        className="orbit-transition h-9 w-12 rounded-[10px] border border-line-control bg-ground px-2 text-right text-[14px] font-medium tabular-nums text-text [appearance:textfield] hover:border-text-3 focus-visible:border-accent-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-text [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
       />
-      {suffix && <span aria-hidden className={cn("whitespace-nowrap text-sm text-ink-muted", suffix !== "%" && "ml-1.5")}>{suffix}</span>}
+      {suffix && <span aria-hidden className="ml-1.5 whitespace-nowrap text-[13px] text-text-2">{suffix}</span>}
     </span>
   );
 }
 
 export function Section({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
   return (
-    <section aria-labelledby={`s-${title.replace(/\W+/g, "-").toLowerCase()}`} className="rounded-card border border-line bg-surface p-5 sm:p-6">
-      <h2 id={`s-${title.replace(/\W+/g, "-").toLowerCase()}`} className="font-display text-lg font-semibold tracking-[-0.01em]">
+    <section aria-labelledby={`s-${title.replace(/\W+/g, "-").toLowerCase()}`} className="orbit-panel p-5 sm:p-7">
+      <h2 id={`s-${title.replace(/\W+/g, "-").toLowerCase()}`} className="type-card-title text-text">
         {title}
       </h2>
-      {description && <p className="mt-0.5 text-sm text-ink-muted">{description}</p>}
-      <div className="mt-5">{children}</div>
+      {description && <p className="mt-1.5 text-[14px] text-text-2">{description}</p>}
+      <div className="mt-6">{children}</div>
     </section>
   );
 }

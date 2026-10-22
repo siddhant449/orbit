@@ -26,6 +26,7 @@ import {
   Sparkles,
   UserPlus,
   Telescope,
+  Library,
 } from "lucide-react";
 
 /** Orbit icons and the few lucide icons Orbit does not draw both fit (className, size, aria-hidden). */
@@ -39,6 +40,8 @@ export type NavItem = {
   shortcut?: string;
   /** Rendered only when a real number exists (posts total, tasks left, queue size). None are built yet. */
   count?: number;
+  /** Extra words the command palette matches (old labels kept as aliases, e.g. "templates" for Hooks). */
+  keywords?: string[];
 };
 export type NavGroup = { label?: string; items: NavItem[] };
 export type Section = { id: "ideas" | "settings"; title: string; groups: NavGroup[]; matches: string[] };
@@ -65,20 +68,26 @@ export const sections: Section[] = [
   {
     id: "ideas",
     title: "Ideas",
-    matches: ["/ideas", "/strategy", "/inspiration", "/following", "/templates", "/images", "/saves"],
+    matches: ["/ideas", "/strategy", "/inspiration", "/following", "/templates", "/images", "/saves", "/knowledge-base"],
     groups: [
       {
         label: "Discover",
         items: [
           { label: "Strategy", href: "/strategy", icon: Compass },
           { label: "For you", href: "/ideas", icon: Sparkles },
-          { label: "Inspiration", href: "/inspiration", icon: Telescope },
+          { label: "Swipe file", href: "/inspiration", icon: Telescope, keywords: ["inspiration"] },
           { label: "Following", href: "/following", icon: UserPlus },
-          { label: "Templates", href: "/templates", icon: LayoutTemplate },
+          { label: "Hooks", href: "/templates", icon: LayoutTemplate, keywords: ["templates"] },
         ],
       },
-      { label: "Images", items: [{ label: "Created by you", href: "/images", icon: Image }] },
-      { label: "My library", items: [{ label: "All saves", href: "/saves", icon: Bookmark }] },
+      { label: "Carousels", items: [{ label: "Created by you", href: "/images", icon: Image, keywords: ["images"] }] },
+      {
+        label: "My library",
+        items: [
+          { label: "All saves", href: "/saves", icon: Bookmark },
+          { label: "Knowledge", href: "/knowledge-base", icon: Library, keywords: ["knowledge base"] },
+        ],
+      },
     ],
   },
   {
@@ -89,18 +98,18 @@ export const sections: Section[] = [
       {
         label: "Account",
         items: [
-          { label: "Manage account", href: "/settings", icon: UserRound },
           { label: "Integrations", href: "/settings/integrations", icon: Plug },
+          { label: "Manage account", href: "/settings", icon: UserRound },
           { label: "Memories", href: "/settings/memories", icon: Brain },
           { label: "Manage team", href: "/settings/team", icon: Users },
-          { label: "Billing", href: "/settings/billing", icon: CreditCard },
+          { label: "Billing and subscription", href: "/settings/billing", icon: CreditCard, keywords: ["billing"] },
         ],
       },
       {
         label: "Support",
         items: [
           { label: "Community", href: "/settings/community", icon: MessagesSquare },
-          { label: "Talk to a person", href: "/settings/help", icon: LifeBuoy },
+          { label: "Talk to us", href: "/settings/help", icon: LifeBuoy, keywords: ["help", "support"] },
         ],
       },
     ],
@@ -118,4 +127,9 @@ export function isActive(pathname: string, href: string) {
   if (href === "/") return pathname === "/";
   if (href === "/settings") return pathname === "/settings";
   return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+/** The string the command palette matches an item against: label first, then its path and any alias keywords. */
+export function paletteValue(item: NavItem) {
+  return [item.label, item.href, ...(item.keywords ?? [])].join(" ");
 }
