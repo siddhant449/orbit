@@ -29,7 +29,7 @@ const fetchJson = (url: string) => fetch(url).then((r) => (r.ok ? r.json() : Pro
  * What a screen reader hears: state changes only, never every token. Errors are left to their own alert, and a
  * reply loaded with the page isn't announced as new.
  */
-function liveStatus(messages: ChatUIMessage[], status: string, initialIds: ReadonlySet<string>) {
+export function liveStatus(messages: ChatUIMessage[], status: string, initialIds: ReadonlySet<string>) {
   const last = messages.at(-1);
   // A chat opened while its reply is still being written isn't announced as a fresh send.
   if (status === "submitted") return last && initialIds.has(last.id) ? "" : "Sent. Waiting for the reply.";

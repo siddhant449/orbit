@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { proposalStatus, type Proposal } from "@brandloop/agent/client";
 import { Button, cn } from "@brandloop/ui";
 import { useDocumentPanel } from "./document-panel";
+import { useThreadPlace } from "./thread-context";
 
 /** The chat the thread belongs to. A proposal only exists after the first reply, when the address is `/chat/:id`. */
 function currentChatId(): string | null {
@@ -27,6 +28,7 @@ type Local =
  */
 export function ProposalCard({ proposal, toolCallId }: { proposal: Proposal; toolCallId: string }) {
   const ctl = useDocumentPanel();
+  const place = useThreadPlace();
   const [local, setLocal] = useState<Local>({ kind: "idle" });
   const [dismissed, setDismissed] = useState(false);
 
@@ -43,7 +45,7 @@ export function ProposalCard({ proposal, toolCallId }: { proposal: Proposal; too
   const busy = local.kind === "applying" || streaming || Boolean(ctl?.saving);
 
   async function apply() {
-    const chatId = currentChatId();
+    const chatId = place?.chatId ?? currentChatId();
     if (!chatId) {
       toast("Open this chat to apply the suggestion.");
       return;

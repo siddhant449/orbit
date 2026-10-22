@@ -4,6 +4,7 @@ import {
   DocumentError,
   DocumentVersionConflict,
   getDocument,
+  linkChatToDocument,
   listDocumentVersions,
   restoreDocumentVersion,
   saveDocumentVersion,
@@ -123,6 +124,30 @@ export async function applyProposalHandler(request: Request, { params }: Ctx): P
   try {
     return Response.json(await applyProposal(profileId, (await params).id, parsed.data));
   } catch (err) {
+    return fromError(err);
+  }
+}
+
+const LinkChatSchema = z.object({ chatId: z.string().regex(/^[A-Za-z0-9_-]{8,100}$/) });
+
+/**
+ * POST /api/documents/:id/chat: `{chatId}` gives the post editor its chat. The post's live chat comes back as is;
+ * a post without one gets `chatId` as a new chat linked to it. 200 `{chatId}`; 404 for another profile's post;
+ * 409 `existing_post` when `chatId` already belongs to another post.
+ */
+export async function linkChatHandler(request: Request, { params }: Ctx): Promise<Response> {
+  const account = await getAccount();
+  const profileId = account?.currentProfile?.id;
+  if (!profileId) return fail(400, "Create a profile first.");
+  const parsed = LinkChatSchema.safeParse(await readJson(request));
+  if (!parsed.success) return fail(400, "Send chatId.");
+  try {
+    const { chatId } = await linkChatToDocument(profileId, account.user.id, parsed.data.chatId, (await params).id);
+    return Response.json({ chatId });
+  } catch (err) {
+    if (err instanceof DocumentError && err.code === "EXISTING_POST") {
+      return fail(409, "That chat already has a post.", { code: "existing_post" });
+    }
     return fromError(err);
   }
 }

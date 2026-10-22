@@ -252,4 +252,61 @@ export async function restoreDocumentVersion(
   });
 }
 
+export type DocumentListRow = Omit<DocumentSnapshot, "hook" | "kind">;
+
+/** The profile's posts, most recently changed first, each with its current text. */
+export async function listDocuments(profileId: string, opts: { limit?: number } = {}): Promise<DocumentListRow[]> {
+  const take = Math.min(Math.max(opts.limit ?? 50, 1), 200);
+  const docs = await prisma.document.findMany({
+    where: { profileId, deletedAt: null },
+    orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+    take,
+    include: { chat: { select: { id: true, deletedAt: true } } },
+  });
+  if (!docs.length) return [];
+  const current = await prisma.documentVersion.findMany({
+    where: { OR: docs.map((d) => ({ documentId: d.id, version: d.version })) },
+    select: { documentId: true, text: true },
+  });
+  const textOf = new Map(current.map((v) => [v.documentId, v.text]));
+  return docs.map((d) => ({
+    id: d.id,
+    title: d.title,
+    status: d.status,
+    version: d.version,
+    text: textOf.get(d.id) ?? "",
+    chatId: d.chat && !d.chat.deletedAt ? d.chat.id : null,
+    updatedAt: d.updatedAt,
+  }));
+}
+
+/**
+ * The chat beside a post in the editor. A post keeps its live chat; a post whose chat was deleted gets the
+ * client-chosen `chatId` as a new chat, titled after the post and linked to it (the deleted chat lets go of the
+ * one-to-one link). Idempotent for the same id. A chat that already has another post is `EXISTING_POST`.
+ */
+export async function linkChatToDocument(
+  profileId: string,
+  userId: string,
+  chatId: string,
+  documentId: string,
+): Promise<{ chatId: string; created: boolean }> {
+  return prisma.$transaction(async (tx) => {
+    // Locks the post's row, so two first sends serialise and the second sees the first one's chat.
+    const locked = await tx.$queryRaw<{ id: string }[]>`
+      SELECT id FROM "Document" WHERE id = ${documentId} AND "profileId" = ${profileId} AND "deletedAt" IS NULL FOR UPDATE`;
+    if (!locked.length) throw new DocumentError("not_found");
+    const holder = await tx.chat.findFirst({ where: { documentId }, select: { id: true, deletedAt: true } });
+    if (holder && !holder.deletedAt) return { chatId: holder.id, created: false };
+    const doc = await tx.document.findUniqueOrThrow({ where: { id: documentId }, select: { title: true } });
+    await tx.chat.createMany({ data: [{ id: chatId, profileId, userId, title: doc.title }], skipDuplicates: true });
+    const chat = await tx.chat.findFirst({ where: { id: chatId, profileId, deletedAt: null }, select: { documentId: true } });
+    if (!chat) throw new DocumentError("not_found", "Chat not found.");
+    if (chat.documentId) throw new DocumentError("EXISTING_POST");
+    if (holder) await tx.chat.update({ where: { id: holder.id }, data: { documentId: null } });
+    await tx.chat.update({ where: { id: chatId }, data: { documentId, title: doc.title } });
+    return { chatId, created: true };
+  });
+}
+
 export type { VersionSource };

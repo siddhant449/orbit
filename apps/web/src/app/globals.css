@@ -420,11 +420,70 @@ h1[tabindex="-1"]:focus-visible {
     }
   }
 
+  /*
+   * Post editor (screens.md B3): the sheet morphs between preview widths; the editable text keeps LinkedIn's type;
+   * the fold line is a dashed hairline with its label centred on paper.
+   */
+  .post-editor__sheet {
+    transition: max-width var(--dur-hover) var(--ease-out);
+  }
+  .post-editor__text {
+    min-height: 12rem;
+    font-size: 15px;
+    line-height: 1.5;
+    color: var(--text);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    outline: none;
+    caret-color: var(--accent-text);
+  }
+  .post-editor__text p {
+    min-height: 1.5em;
+  }
+  .post-editor__text p + p {
+    margin-top: 1.5em;
+  }
+  .post-editor__text[contenteditable="false"] {
+    color: var(--text-2);
+  }
+  .post-editor :focus-visible.post-editor__text {
+    outline: none;
+  }
+  .post-editor__sheet:has(.post-editor__text:focus-visible) .post-sheet {
+    box-shadow: 0 0 0 2px var(--accent-text), var(--shadow-draft);
+  }
+  .post-fold {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 10px 0;
+    pointer-events: none;
+    user-select: none;
+  }
+  .post-fold::before,
+  .post-fold::after {
+    content: "";
+    flex: 1;
+    border-top: 1px dashed var(--line-control);
+  }
+  .post-fold__label {
+    font-size: 11px;
+    line-height: 1;
+    color: var(--accent-text);
+    white-space: nowrap;
+  }
+  .post-chat__thread .user-bubble {
+    max-width: 88%;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .msg-arrive,
     .md--streaming > *,
     .jump-latest {
       animation: none;
+    }
+    .post-editor__sheet {
+      transition: none;
     }
     .steps__chevron,
     .steps__body {

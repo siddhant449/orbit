@@ -2,13 +2,15 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "../client";
 import { ensureAccount } from "./account";
-import { getChat, getOrCreateChat } from "./chat";
+import { deleteChat, getChat, getOrCreateChat } from "./chat";
 import {
   createDocumentForChat,
   DocumentError,
   DocumentVersionConflict,
   getChatDocument,
   getDocument,
+  linkChatToDocument,
+  listDocuments,
   listDocumentVersions,
   restoreDocumentVersion,
   saveDocumentVersion,
@@ -135,5 +137,54 @@ describe("documents", () => {
     // Another profile can't attach a post to this chat either.
     await expect(createDocumentForChat(q, chat, { title: "t", text: "y" })).rejects.toMatchObject({ code: "not_found" });
     expect((await getDocument(p, d.id))!.version).toBe(1);
+  });
+
+  it("lists the profile's posts newest first with their current text", async () => {
+    const a = await createDocumentForChat(p, chat, { title: "First", text: "one" });
+    const s = await ensureAccount(clerk(1));
+    const chat2 = randomUUID();
+    await getOrCreateChat(p, s.user.id, chat2);
+    const b = await createDocumentForChat(p, chat2, { title: "Second", text: "two" });
+    await saveDocumentVersion(p, a.id, { text: "one, edited", source: "USER_EDIT", expectedVersion: 1 });
+    const rows = await listDocuments(p);
+    expect(rows.map((r) => r.id)).toEqual([a.id, b.id]);
+    expect(rows[0]).toMatchObject({ title: "First", version: 2, text: "one, edited", status: "DRAFT", chatId: chat });
+    const other = await ensureAccount(clerk(2));
+    expect(await listDocuments(other.currentProfile!.id)).toEqual([]);
+  });
+
+  describe("linkChatToDocument", () => {
+    it("returns the post's live chat when it has one", async () => {
+      const d = await createDocumentForChat(p, chat, { title: "T", text: "x" });
+      const s = await ensureAccount(clerk(1));
+      expect(await linkChatToDocument(p, s.user.id, randomUUID(), d.id)).toEqual({ chatId: chat, created: false });
+    });
+
+    it("gives a post whose chat was deleted a new chat, titled after the post", async () => {
+      const d = await createDocumentForChat(p, chat, { title: "Free tier", text: "x" });
+      await deleteChat(p, chat);
+      expect((await getDocument(p, d.id))!.chatId).toBeNull();
+      const s = await ensureAccount(clerk(1));
+      const fresh = randomUUID();
+      expect(await linkChatToDocument(p, s.user.id, fresh, d.id)).toEqual({ chatId: fresh, created: true });
+      expect(await getChatDocument(p, fresh)).toMatchObject({ id: d.id });
+      expect((await getChat(p, fresh))!.title).toBe("Free tier");
+      expect((await getDocument(p, d.id))!.chatId).toBe(fresh);
+      // Idempotent for the same id.
+      expect(await linkChatToDocument(p, s.user.id, fresh, d.id)).toEqual({ chatId: fresh, created: false });
+    });
+
+    it("refuses another profile's post and a chat that already has a post", async () => {
+      const d = await createDocumentForChat(p, chat, { title: "T", text: "x" });
+      await deleteChat(p, chat);
+      const other = await ensureAccount(clerk(2));
+      await expect(linkChatToDocument(other.currentProfile!.id, other.user.id, randomUUID(), d.id)).rejects.toMatchObject({ code: "not_found" });
+
+      const s = await ensureAccount(clerk(1));
+      const busy = randomUUID();
+      await getOrCreateChat(p, s.user.id, busy);
+      await createDocumentForChat(p, busy, { title: "Other", text: "y" });
+      await expect(linkChatToDocument(p, s.user.id, busy, d.id)).rejects.toMatchObject({ code: "EXISTING_POST" });
+    });
   });
 });

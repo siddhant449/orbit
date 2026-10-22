@@ -1,15 +1,17 @@
 "use client";
 
+import Link from "next/link";
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, m } from "motion/react";
 import { Dialog } from "radix-ui";
 import { toast } from "sonner";
 import type { PanelDoc } from "@brandloop/agent/client";
 import { Button, cn, CountUp, durations, easeOut, Segmented, useMediaQuery, useReducedMotionPref } from "@brandloop/ui";
-import { CloseIcon, CopyIcon, PencilIcon } from "@brandloop/ui/icons";
+import { CloseIcon, CopyIcon, ExpandIcon, PencilIcon } from "@brandloop/ui/icons";
 import { useCurrentProfile } from "@/components/shell/account-context";
 import { CharMeter, DocumentEditor } from "./document-editor";
 import type { DocumentController } from "./use-document";
+import { useThreadPlace } from "./thread-context";
 import { VersionList } from "./version-list";
 
 export const DESKTOP_PANEL = "(min-width: 1024px)";
@@ -226,6 +228,13 @@ export function DocumentPanel({ ctl, busy }: { ctl: DocumentController; busy: bo
           <Button variant="ghost" size="icon" className="size-9 border border-line-3" onClick={() => void copy()} disabled={!version} aria-label="Copy post">
             <CopyIcon />
           </Button>
+          {version && doc && (
+            <Button asChild variant="ghost" size="icon" className="size-9 border border-line-3">
+              <Link href={`/posts/${encodeURIComponent(doc.id)}`} aria-label="Open in editor" title="Open in editor">
+                <ExpandIcon />
+              </Link>
+            </Button>
+          )}
           <Dialog.Close asChild>
             <Button variant="ghost" size="icon" className="size-9 border border-line-3" aria-label="Close post">
               <CloseIcon />
@@ -415,6 +424,7 @@ export function DocumentPanel({ ctl, busy }: { ctl: DocumentController; busy: bo
  */
 export function DraftCard({ fallback }: { fallback: PanelDoc }) {
   const ctl = useDocumentPanel();
+  const place = useThreadPlace();
   const profile = useCurrentProfile();
   const doc = ctl?.state.doc && ctl.state.doc.id === fallback.id && ctl.state.doc.version > 0 ? ctl.state.doc : fallback;
   const paras = doc.text.split(/\n\s*\n/).filter((p) => p.trim());
@@ -446,10 +456,13 @@ export function DraftCard({ fallback }: { fallback: PanelDoc }) {
           ))}
           {folded && <p className="text-text-3">…more</p>}
         </div>
-        {ctl && (
-          <div>
+        {ctl && !place?.inPostEditor && (
+          <div className="flex flex-wrap gap-2">
             <Button variant="inverse" size="sm" onClick={ctl.open}>
               Open post
+            </Button>
+            <Button asChild variant="secondary" size="sm">
+              <Link href={`/posts/${encodeURIComponent(doc.id)}`}>Open in editor</Link>
             </Button>
           </div>
         )}

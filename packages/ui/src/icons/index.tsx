@@ -126,6 +126,29 @@ export const SettingsIcon = make(
   </>,
 );
 export const SignOutIcon = make("sign-out", <path d="M8 4H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3M12 6.5 15.5 10 12 13.5M15.5 10H8" />);
+export const UndoIcon = make("undo", <path d="M7.5 5.5L4 9l3.5 3.5M4 9h8a4 4 0 0 1 0 8H9" />);
+export const RedoIcon = make("redo", <path d="M12.5 5.5L16 9l-3.5 3.5M16 9H8a4 4 0 0 0 0 8h3" />);
+export const ListBulletIcon = make(
+  "list-bullet",
+  <>
+    <path d="M8 6h8M8 10h8M8 14h8" />
+    <circle cx="4.5" cy="6" r=".6" fill="currentColor" />
+    <circle cx="4.5" cy="10" r=".6" fill="currentColor" />
+    <circle cx="4.5" cy="14" r=".6" fill="currentColor" />
+  </>,
+);
+export const ListNumberIcon = make("list-number", <path d="M8.5 6h7.5M8.5 10h7.5M8.5 14h7.5M4 5l1-.6V8M3.8 12.4a1 1 0 0 1 1.9.4L3.8 15h2" />);
+export const EmojiIcon = make(
+  "emoji",
+  <>
+    <circle cx="10" cy="10" r="7" />
+    <path d="M7 11.8a3.6 3.6 0 0 0 6 0" />
+    <circle cx="7.6" cy="8.2" r=".5" fill="currentColor" />
+    <circle cx="12.4" cy="8.2" r=".5" fill="currentColor" />
+  </>,
+);
+export const ExpandIcon = make("expand", <path d="M11.5 3.5H16.5V8.5M16.5 3.5l-5 5M8.5 16.5H3.5V11.5M3.5 16.5l5-5" />);
+export const ChatIcon = make("chat", <path d="M4 4.5h12a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H9l-4 3v-3H4a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1z" />);
 
 /** Every icon, by name, for catalogues (the /design page). */
 export const icons = {
@@ -154,6 +177,13 @@ export const icons = {
   sidebar: SidebarIcon,
   settings: SettingsIcon,
   "sign-out": SignOutIcon,
+  undo: UndoIcon,
+  redo: RedoIcon,
+  "list-bullet": ListBulletIcon,
+  "list-number": ListNumberIcon,
+  emoji: EmojiIcon,
+  expand: ExpandIcon,
+  chat: ChatIcon,
 } as const;
 
 export type IconName = keyof typeof icons;

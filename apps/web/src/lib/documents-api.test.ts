@@ -11,9 +11,9 @@ const env = vi.hoisted(() => {
 });
 vi.mock("@/lib/account", () => ({ getAccount: async () => env.account }));
 
-import { createDocumentForChat, ensureAccount, getOrCreateChat, prisma, saveAssistantMessage, saveDocumentVersion } from "@brandloop/db";
+import { createDocumentForChat, deleteChat, ensureAccount, getOrCreateChat, prisma, saveAssistantMessage, saveDocumentVersion } from "@brandloop/db";
 import { randomUUID } from "node:crypto";
-import { applyProposalHandler, getDocumentHandler, listVersionsHandler, patchDocumentHandler, restoreDocumentHandler } from "./documents-api";
+import { applyProposalHandler, getDocumentHandler, linkChatHandler, listVersionsHandler, patchDocumentHandler, restoreDocumentHandler } from "./documents-api";
 
 const CLERK = "user_test_webdocs";
 let mine: { userId: string; profileId: string };
@@ -167,5 +167,27 @@ describe("POST /api/documents/:id/apply-proposal", () => {
     expect((await applyProposalHandler(send("POST", "{"), params(d.id))).status).toBe(400);
     env.account = { user: { id: theirs.userId }, currentProfile: { id: theirs.profileId } };
     expect((await applyProposalHandler(send("POST", { chatId, toolCallId: "call_p", expectedVersion: 1 }), params(d.id))).status).toBe(404);
+  });
+
+  it("POST chat returns the post's chat, or links a new one when it was deleted", async () => {
+    const d = await newDoc();
+    const fresh = randomUUID();
+    let res = await linkChatHandler(send("POST", { chatId: fresh }), params(d.id));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ chatId: d.chatId });
+
+    await deleteChat(mine.profileId, d.chatId!);
+    res = await linkChatHandler(send("POST", { chatId: fresh }), params(d.id));
+    expect(await res.json()).toEqual({ chatId: fresh });
+
+    expect((await linkChatHandler(send("POST", { chatId: "../x" }), params(d.id))).status).toBe(400);
+    const orphan = await newDoc();
+    await deleteChat(mine.profileId, orphan.chatId!);
+    const other = await newDoc();
+    res = await linkChatHandler(send("POST", { chatId: other.chatId }), params(orphan.id));
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: "existing_post" });
+    env.account = { user: { id: theirs.userId }, currentProfile: { id: theirs.profileId } };
+    expect((await linkChatHandler(send("POST", { chatId: randomUUID() }), params(d.id))).status).toBe(404);
   });
 });
