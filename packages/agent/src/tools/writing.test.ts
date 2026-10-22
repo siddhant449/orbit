@@ -116,7 +116,7 @@ describe("delegateWriting (writer v2)", () => {
       { kind: "prose", lines: ["words ".repeat(12).trim()] },
       { kind: "close", lines: ["Write the role first."] },
     ];
-    const ai = fakeAi((call) => (call.system.includes("You repair one LinkedIn post") ? { blocks: split } : model({}, dirty)));
+    const ai = fakeAi((call: { system: string }) => (call.system.includes("You repair one LinkedIn post") ? { blocks: split } : model({}, dirty)));
     ctx.ai = ai;
     const out = await run();
     expect(out.payload.draft).not.toMatch(/\u{1F680}/u);
