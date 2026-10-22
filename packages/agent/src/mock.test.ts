@@ -2,7 +2,7 @@ import { z } from "zod";
 import { describe, expect, it } from "vitest";
 import { EditResultSchema } from "./specialists/editing";
 import { FinalReviewPayload, PostWritingPayload, specialistOutputSchema } from "./specialists/envelope";
-import { createScriptedChatModel, SCRIPTED_DRAFT, SCRIPTED_SLIDES, scriptedAi, scriptedModel } from "./mock";
+import { createScriptedChatModel, SCRIPTED_DRAFT, SCRIPTED_IDEAS, SCRIPTED_SLIDES, scriptedAi, scriptedModel } from "./mock";
 
 type Prompt = { role: string; content: unknown }[];
 
@@ -152,5 +152,17 @@ describe("scriptedAi", () => {
     const schema = z.object({ slides: z.array(z.object({ title: z.string().min(1), body: z.string() })).min(3).max(10) });
     const out = await scriptedAi().json({ model: "generate", system: "s", prompt: "p", schema });
     expect(out.slides).toEqual(SCRIPTED_SLIDES);
+  });
+
+  it("returns the canned weekly ideas for an ideas-shaped schema", async () => {
+    const ai = scriptedAi();
+    const schema = z.object({
+      ideas: z.array(
+        z.object({ title: z.string(), angle: z.string(), hook: z.string(), format: z.string(), contentType: z.string(), why: z.string() }),
+      ),
+    });
+    const out = await ai.json({ model: "generate", system: "s", prompt: "p", schema });
+    expect(out.ideas).toHaveLength(SCRIPTED_IDEAS.length);
+    expect(out.ideas[0]!.hook).toBeTruthy();
   });
 });

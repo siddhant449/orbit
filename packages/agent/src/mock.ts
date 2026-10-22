@@ -236,6 +236,20 @@ export const SCRIPTED_SLIDES = [
 ];
 CANNED.push({ slides: SCRIPTED_SLIDES });
 
+/** The mock "Ideas for this week" (apps/web/src/lib/ideas.ts): generic, clearly sample ideas; the route takes the first N. */
+export const SCRIPTED_IDEAS = [
+  { title: "MVP versus POC", angle: "Most teams build the wrong one first.", hook: "Most founders build a proof of concept when they need a minimum viable product.", format: "text", contentType: "educational", why: "Teaches a decision your audience faces this quarter." },
+  { title: "The week I nearly quit", angle: "A hard week, and the one habit that got you through it.", hook: "Last Tuesday I wrote my resignation email to myself.", format: "text", contentType: "personal", why: "Personal posts build the trust your strategy relies on." },
+  { title: "Three questions before any build", angle: "A short checklist people can save.", hook: "Before we write a line of code, we ask three questions.", format: "carousel", contentType: "authority", why: "A saveable framework shows expertise without bragging." },
+  { title: "What I'd cut first", angle: "Opinion on scope: cut features, not quality.", hook: "If your roadmap has 40 items, 34 of them are wishes.", format: "text", contentType: "educational", why: "A clear opinion invites comments from your niche." },
+  { title: "Ask me your stuck project", angle: "Offer a short review in exchange for a comment.", hook: "Comment \"review\" and I'll look at your stuck project this week.", format: "text", contentType: "lead_magnet", why: "Turns attention into conversations, which fits your goal." },
+  { title: "Before and after", angle: "One project, two versions, what changed.", hook: "Same product. Two launch pages. One converted three times better.", format: "image", contentType: "sales", why: "Shows results through the work instead of claims." },
+  { title: "Poll: build or buy", angle: "Let your audience pick a side, then share your take.", hook: "Build or buy your first internal tool?", format: "poll", contentType: "educational", why: "Polls lift reach and tell you what to write next." },
+  { title: "My Monday planning ritual", angle: "The 20 minutes that shape the week.", hook: "Every Monday I plan the week on one index card.", format: "video", contentType: "personal", why: "A recurring ritual makes a natural weekly series." },
+];
+
+CANNED.push({ ideas: SCRIPTED_IDEAS });
+
 /** A specialist client for mock mode: `text` names chats, `json` returns the first canned output the schema accepts. */
 export function scriptedAi(): AiClient {
   return {

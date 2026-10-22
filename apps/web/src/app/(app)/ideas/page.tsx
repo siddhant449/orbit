@@ -1,13 +1,23 @@
-import { Upcoming } from "@/components/page";
+import { getAccount } from "@/lib/account";
+import { EmptyState, PageBody, PageHeader } from "@/components/page";
+import { IdeasBoard } from "@/components/ideas/ideas-board";
+import { loadIdeasContext } from "@/lib/ideas-api";
 
 export const metadata = { title: "For you" };
 
-export default function Page() {
-  return (
-    <Upcoming
-      title={"For you"}
-      description={"A fresh set of post ideas each week, written from your strategy, knowledge base and recent posts."}
-      points={["Pick the day new ideas arrive.", "Turn any idea into a draft in one click.", "Ideas pause while you're doing the 30-day challenge."]}
-    />
-  );
+/** For you (screens.md B11): this week's ideas, generated on demand from the profile's strategy, memory and posts. */
+export default async function Page() {
+  const profile = (await getAccount()).currentProfile;
+  if (!profile) {
+    return (
+      <>
+        <PageHeader title="For you" />
+        <PageBody>
+          <EmptyState title="No profile yet" body="Add a profile to get post ideas for the week." />
+        </PageBody>
+      </>
+    );
+  }
+  const { ctx, basis } = await loadIdeasContext(profile.id, profile.timezone ?? "UTC", new Date());
+  return <IdeasBoard profileId={profile.id} weekOf={ctx.weekOf} basis={basis} />;
 }

@@ -1,13 +1,18 @@
-import { Upcoming } from "@/components/page";
+import { LibraryEmpty } from "@/components/ideas/library-empty";
 
 export const metadata = { title: "Swipe file" };
 
 export default function Page() {
   return (
-    <Upcoming
-      title={"Swipe file"}
-      description={"Real LinkedIn posts that performed well, filtered by topic, format and audience size."}
-      points={["Find outliers and hidden gems from creators your size.", "Save posts to your library.", "Use a post as the starting point for your own."]}
+    <LibraryEmpty
+      title="Swipe file"
+      description="LinkedIn posts that performed well, to learn from and build on."
+      heading="Posts worth learning from will appear here"
+      points={[
+        "Filter by topic, and find outliers and hidden gems from creators your size.",
+        "Save a post to your library, or use it as the starting point for a draft of your own.",
+      ]}
+      needs="The swipe file needs a source of public LinkedIn posts Orbit is allowed to show. It isn't connected yet, so nothing here is sample data."
     />
   );
 }
