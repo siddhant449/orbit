@@ -9,7 +9,13 @@ import { languages } from "@/lib/locales";
 type ProfileFields = { id: string; name: string; language: string; timezone: string };
 
 function Row({ children }: { children: React.ReactNode }) {
-  return <div className="grid gap-2.5 border-t border-line py-5 first:border-t-0 first:pt-0 sm:grid-cols-[220px_1fr] sm:items-start sm:gap-8">{children}</div>;
+  // Two columns only when the panel itself is wide enough (a container query: beside the settings sub-nav on a tablet
+  // the panel is narrow even though the viewport is not). The label block's first line is centred on the 40 px field.
+  return (
+    <div className="grid gap-2.5 border-t border-line py-5 first:border-t-0 first:pt-0 last:pb-0 @xl:grid-cols-[240px_minmax(0,1fr)] @xl:items-start @xl:gap-8 @xl:[&>div:first-child]:pt-2.5">
+      {children}
+    </div>
+  );
 }
 
 export function AccountSettingsForm({ email, profile }: { email: string; profile: ProfileFields }) {
@@ -37,7 +43,7 @@ export function AccountSettingsForm({ email, profile }: { email: string; profile
       <p className="text-[14px] leading-[1.55] text-text-2">
         These settings apply to the profile you’re working in now. Signed in as {email}.
       </p>
-      <div className="orbit-panel p-5 sm:p-6">
+      <div className="orbit-panel @container p-5 sm:p-6">
       <Row>
         <div>
           <Label htmlFor="name">Profile name</Label>
@@ -73,7 +79,7 @@ export function AccountSettingsForm({ email, profile }: { email: string; profile
         </NativeSelect>
       </Row>
       </div>
-      <div className="flex justify-end gap-2 pt-3">
+      <div className="flex justify-end gap-2 pt-5">
         <Button type="button" variant="ghost" disabled={!dirty || pending} onClick={() => setValues(profile)}>
           Discard
         </Button>

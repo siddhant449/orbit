@@ -20,9 +20,12 @@ const starters = [
 
 const rise = (ms: number) => ({ "--rise-delay": `${ms}ms` }) as CSSProperties;
 
-/** Composer icon button (system §6.3 `icon`): 40 px circle, control outline, inverts on hover. */
+/**
+ * Composer icon button (system §6.3 `icon`): a circle the height of the footer row (`--composer-control`, 44 px on
+ * home so every control in the row, the voice pill and Send included, shares one height and a 44 px touch target).
+ */
 const iconButton =
-  "orbit-transition grid size-10 shrink-0 place-items-center rounded-full border border-line-control text-text enabled:hover:border-inverse enabled:hover:bg-inverse enabled:hover:text-on-inverse disabled:cursor-not-allowed disabled:opacity-40 max-sm:h-9 max-sm:w-[38px]";
+  "orbit-transition grid size-[var(--composer-control)] shrink-0 place-items-center rounded-full border border-line-control text-text enabled:hover:border-inverse enabled:hover:bg-inverse enabled:hover:text-on-inverse disabled:cursor-not-allowed disabled:opacity-40";
 
 /**
  * Home (screens.md B1, p01 / p17 / p16): top bar, the greeting, the composer (system §6.5) with its focus aura, the
@@ -82,7 +85,7 @@ export function Composer({
   return (
     <div className="relative flex min-h-full flex-col">
       <TopBar crumb="Home" actions={<Notifications />} className="max-md:hidden" />
-      <div className="flex flex-1 flex-col items-center justify-center gap-[18px] px-5 pb-6 pt-4 md:gap-[26px] md:px-8 md:pb-16 md:pt-6">
+      <div className="flex flex-1 flex-col items-center justify-center gap-5 px-(--gutter) pb-6 pt-4 md:gap-6 md:pb-16 md:pt-6">
         <div className="w-full max-w-[760px]">
           <Greeting greeting={greeting} />
         </div>
@@ -105,23 +108,23 @@ export function Composer({
               placeholder="Give Orbit a thought, a link or a voice note…"
               className="block w-full resize-none bg-transparent px-[18px] pt-[18px] text-[16px] leading-[1.5] text-text outline-none placeholder:text-text-3 md:px-6 md:pt-[22px] md:text-[17px]"
             />
-            <div className="flex items-center justify-between gap-3 px-3 pb-3 pt-2.5 md:px-4 md:pb-4 md:pt-3.5">
-              <div className="flex min-w-0 items-center gap-1.5 md:gap-2">
+            <div className="flex items-center justify-between gap-3 px-3 pb-3 pt-3 [--composer-control:44px] md:px-4 md:pb-4 md:pt-4">
+              <div className="flex min-w-0 items-center gap-2">
                 <button type="button" aria-label="Attach a file" disabled className={iconButton}>
-                  <PlusIcon size={16} />
+                  <PlusIcon size={18} />
                 </button>
                 <VoicePicker voices={voices} selectedId={selectedVoiceId} />
                 <button type="button" aria-label="Dictate" disabled className={iconButton}>
-                  <MicIcon size={15} />
+                  <MicIcon size={18} />
                 </button>
               </div>
               <button
                 type="submit"
                 aria-label="Send"
                 disabled={!text.trim()}
-                className="orbit-transition grid h-11 w-[46px] shrink-0 place-items-center rounded-pill bg-accent text-on-accent enabled:hover:bg-accent-hover enabled:hover:shadow-glow motion-safe:enabled:hover:-translate-y-px motion-safe:enabled:active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 max-sm:w-[42px]"
+                className="orbit-transition grid size-[var(--composer-control)] shrink-0 place-items-center rounded-full bg-accent text-on-accent enabled:hover:bg-accent-hover enabled:hover:shadow-glow motion-safe:enabled:hover:-translate-y-px motion-safe:enabled:active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
               >
-                <SendIcon size={19} />
+                <SendIcon size={18} />
               </button>
             </div>
           </ComposerShell>
@@ -130,7 +133,7 @@ export function Composer({
         <ul className="orbit-rise flex w-full max-w-[760px] flex-wrap gap-2" style={rise(230)} aria-label="Ways to start">
           {starters.map(({ label, prompt }) => (
             <li key={label}>
-              <button type="button" onClick={() => applyStarter(prompt)} className={cn(pillClass(), "min-h-8")}>
+              <button type="button" onClick={() => applyStarter(prompt)} className={pillClass()}>
                 {label}
               </button>
             </li>

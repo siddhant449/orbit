@@ -153,7 +153,7 @@ function Group({ group, nested }: { group: MemoryGroupView; nested: boolean }) {
           ))}
         </ul>
       ) : (
-        <p className="px-3 py-2 text-[14px] text-text-2">Nothing here yet.</p>
+        <p className="py-2 text-[14px] text-text-2">Nothing here yet.</p>
       )}
     </div>
   );
@@ -184,7 +184,7 @@ export function MemoryCard({
       <p className="mt-1.5 text-[14px] text-text-2">{description}</p>
       <div className={cn("mt-4", nested && "flex flex-col gap-2.5")}>
         {groups.length === 0 ? (
-          <p className="px-3 py-2 text-[14px] text-text-2">Nothing here yet.</p>
+          <p className="py-2 text-[14px] text-text-2">Nothing here yet.</p>
         ) : (
           groups.map((g) => <Group key={g.key} group={g} nested={nested} />)
         )}

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import useSWR from "swr";
 import { ArrowDown, SquarePen } from "lucide-react";
 import { toast } from "sonner";
@@ -143,6 +143,18 @@ export function ChatView({
 
   // The thread follows the newest words unless the reader has scrolled up; then a "Jump to latest" pill shows.
   const scrollerRef = useRef<HTMLDivElement>(null);
+  // The thread keeps a stable scrollbar gutter; the header and the composer dock add the same width on the right so
+  // the bubbles, the header actions and the composer share one right edge (0 with overlay scrollbars).
+  const [scrollbar, setScrollbar] = useState(0);
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const measure = () => setScrollbar(el.offsetWidth - el.clientWidth);
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    measure();
+    return () => ro.disconnect();
+  }, []);
   const contentRef = useRef<HTMLDivElement>(null);
   // The ref is the truth for scroll handlers and the resize observer; the state renders the pill.
   const followRef = useRef(initialFollow);
@@ -215,9 +227,9 @@ export function ChatView({
 
   return (
     <DocumentPanelContext.Provider value={post}>
-    <div className="flex h-full min-h-0" data-document-host="">
+    <div className="flex h-full min-h-0" data-document-host="" style={{ "--thread-scrollbar": `${scrollbar}px` } as CSSProperties}>
     <div className="relative flex min-w-0 flex-1 flex-col">
-      <header className="relative z-10 flex shrink-0 items-center justify-between gap-3 px-4 py-3 sm:px-8 md:py-[18px]">
+      <header className="relative z-10 flex min-h-14 shrink-0 items-center justify-between gap-3 py-3 pl-(--gutter) pr-[calc(var(--gutter)+var(--thread-scrollbar,0px))] md:min-h-(--header-row) md:py-[18px]">
         <div className="flex min-w-0 items-baseline gap-3">
           <h1 className="min-w-0 truncate text-[15px] font-medium text-text focus-visible:outline-none">{liveTitle}</h1>
           {when && <span className="hidden shrink-0 text-xs text-text-3 sm:inline">{when}</span>}
@@ -230,12 +242,12 @@ export function ChatView({
             </span>
           )}
           {hasPost && !panelShown && (
-            <Button variant="secondary" size="sm" onClick={post.open} aria-haspopup="dialog" className="h-8 border-line-2 px-3 text-[13px]">
+            <Button variant="secondary" size="sm" onClick={post.open} aria-haspopup="dialog" className="h-8 border-line-2 px-3 text-[13px] max-md:h-11 max-md:min-w-11">
               <PostsIcon />
               Open post
             </Button>
           )}
-          <Button asChild variant="secondary" size="sm" className="h-8 border-line-2 px-3 text-[13px]">
+          <Button asChild variant="secondary" size="sm" className="h-8 border-line-2 px-3 text-[13px] max-md:h-11 max-md:min-w-11">
             <Link href="/" aria-label="New chat">
               <SquarePen aria-hidden="true" />
               <span className="hidden sm:inline">New chat</span>
@@ -252,7 +264,7 @@ export function ChatView({
           data-thread-scroller=""
           className="thread-scroller absolute inset-0 overflow-y-auto"
         >
-          <div ref={contentRef} className="px-4 pb-8 pt-3 sm:px-8 sm:pb-10">
+          <div ref={contentRef} className="px-(--gutter) pb-8 pt-3 sm:pb-10">
             <div className="mx-auto w-full max-w-[780px]">
             <MessageList
               messages={messages}
@@ -281,7 +293,7 @@ export function ChatView({
       </div>
 
       <div
-        className="relative z-10 shrink-0 px-4 pt-2 sm:px-8 md:pb-[max(24px,env(safe-area-inset-bottom))]"
+        className="relative z-10 shrink-0 pl-(--gutter) pr-[calc(var(--gutter)+var(--thread-scrollbar,0px))] pt-2 md:pb-[max(24px,env(safe-area-inset-bottom))]"
         style={{ paddingBottom: keyboard ? keyboard + 12 : undefined }}
         data-composer-dock=""
       >

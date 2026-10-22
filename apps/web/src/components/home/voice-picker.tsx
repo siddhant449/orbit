@@ -135,14 +135,14 @@ export function VoicePicker({ voices, selectedId }: { voices: VoiceOption[]; sel
               aria-label={`Change writing style, ${current ? current.name : "Your voice"}`}
               aria-busy={pending}
               title={current?.tagline || "Choose how your posts sound"}
-              className="orbit-transition flex h-10 max-w-[210px] items-center gap-2 rounded-pill border border-line-control pl-2 pr-3.5 text-[13px] font-medium text-text hover:border-inverse hover:bg-inverse hover:text-on-inverse data-[state=open]:border-inverse data-[state=open]:bg-inverse data-[state=open]:text-on-inverse max-sm:h-9 max-sm:w-[38px] max-sm:justify-center max-sm:px-0"
+              className="orbit-transition flex h-[var(--composer-control,40px)] max-w-[210px] items-center gap-2 rounded-pill border border-line-control pl-2 pr-3.5 text-[13px] font-medium text-text hover:border-inverse hover:bg-inverse hover:text-on-inverse data-[state=open]:border-inverse data-[state=open]:bg-inverse data-[state=open]:text-on-inverse @max-md:w-[var(--composer-control,40px)] @max-md:justify-center @max-md:px-0"
             >
               {/* Orbit's voice orb (system §2.5): a gradient, not a picture of anyone. */}
               <span
                 aria-hidden
-                className="block size-6 shrink-0 rounded-full bg-[radial-gradient(circle_at_30%_30%,#E8EBFF,#2A3BFF)] max-sm:size-5"
+                className="block size-6 shrink-0 rounded-full bg-[radial-gradient(circle_at_30%_30%,#E8EBFF,#2A3BFF)]"
               />
-              <span className="truncate max-sm:sr-only">{current ? current.name : "Your voice"}</span>
+              <span className="truncate @max-md:sr-only">{current ? current.name : "Your voice"}</span>
             </button>
           </Popover.Trigger>
           <Popover.Portal>

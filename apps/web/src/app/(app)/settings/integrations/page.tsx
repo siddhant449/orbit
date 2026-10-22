@@ -92,7 +92,7 @@ export default function IntegrationsPage() {
                   <div className="flex items-center gap-3">
                     <span aria-hidden="true">{s.mark}</span>
                     <div className="min-w-0">
-                      <h3 className="text-[15px] font-medium text-text">{s.name}</h3>
+                      <h3 className="text-[15px] font-medium leading-6 text-text">{s.name}</h3>
                       <p className="text-[12px] text-text-2">Not connected</p>
                     </div>
                   </div>
@@ -117,7 +117,7 @@ export default function IntegrationsPage() {
             {ASSISTANTS.map((a) => (
               <li key={a.name} className="flex">
                 <Card className="w-full">
-                  <h3 className="text-[15px] font-medium text-text">{a.name}</h3>
+                  <h3 className="text-[15px] font-medium leading-6 text-text">{a.name}</h3>
                   <p className="flex-1 text-[13px] leading-[1.55] text-text-soft">{a.body}</p>
                   <NotYetButton service={a.name} variant="paper" aria-label={`Set up ${a.name}`} className="w-full">
                     Set up
@@ -128,7 +128,7 @@ export default function IntegrationsPage() {
             <li className="flex">
               <div className="flex w-full flex-col gap-4 rounded-card border border-dashed border-line-3 p-5">
                 <div className="flex items-center justify-between gap-3">
-                  <h3 className="text-[15px] font-medium text-text">WhatsApp</h3>
+                  <h3 className="text-[15px] font-medium leading-6 text-text">WhatsApp</h3>
                   <StatusPill>Coming soon</StatusPill>
                 </div>
                 <p className="text-[13px] leading-[1.55] text-text-2">
@@ -144,7 +144,7 @@ export default function IntegrationsPage() {
           <ul className={grid(260)}>
             <li className="flex">
               <Card className="w-full">
-                <h3 className="text-[15px] font-medium text-text">API key</h3>
+                <h3 className="text-[15px] font-medium leading-6 text-text">API key</h3>
                 <p className="flex-1 text-[13px] leading-[1.55] text-text-soft">
                   No key yet. Keys let your own scripts read and write drafts in this profile.
                 </p>
@@ -157,7 +157,7 @@ export default function IntegrationsPage() {
             </li>
             <li className="flex">
               <Card className="w-full">
-                <h3 className="text-[15px] font-medium text-text">MCP server</h3>
+                <h3 className="text-[15px] font-medium leading-6 text-text">MCP server</h3>
                 <p className="flex-1 text-[13px] leading-[1.55] text-text-soft">
                   Draft, schedule and read analytics from Claude, Cursor, Codex or ChatGPT.
                 </p>
@@ -170,7 +170,7 @@ export default function IntegrationsPage() {
             </li>
             <li className="flex">
               <Card className="w-full">
-                <h3 className="text-[15px] font-medium text-text">Zapier and webhooks</h3>
+                <h3 className="text-[15px] font-medium leading-6 text-text">Zapier and webhooks</h3>
                 <p className="flex-1 text-[13px] leading-[1.55] text-text-soft">
                   Post published, lead detected, approval requested. Send them anywhere.
                 </p>

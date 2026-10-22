@@ -394,8 +394,8 @@ export function PostEditorView({
               data-lenis-prevent
               className="post-editor__main min-w-0 flex-1 overflow-y-auto overscroll-contain"
             >
-              <header className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4 px-4 pb-6 pt-5 sm:px-8 lg:pt-6">
-                <div className="min-w-0 flex-1">
+              <header className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4 px-(--gutter) pb-6 pt-5 lg:pt-[14px]">
+                <div className="min-w-0 flex-1 lg:pt-1.5">
                   <div className="mb-2 flex items-center gap-2 lg:hidden">
                     <Button asChild variant="ghost" size="sm" className="-ml-2 px-2">
                       <Link href="/posts">
@@ -423,7 +423,7 @@ export function PostEditorView({
                         ref={renameRef}
                         variant="ghost"
                         size="icon"
-                        className="size-8 shrink-0 text-text-3"
+                        className="size-8 shrink-0 text-text-3 max-sm:size-11"
                         onClick={() => setRenaming(true)}
                         aria-label="Rename post"
                         title="Rename post"
@@ -480,7 +480,7 @@ export function PostEditorView({
                   </div>
                 </div>
 
-                <div className="flex shrink-0 flex-wrap items-center gap-2">
+                <div className="flex shrink-0 flex-wrap items-center gap-2 max-sm:[&_button]:min-h-11 max-sm:[&_button]:min-w-11">
                   {/* Shown by CSS below 1024 px, so it never flashes in or out on hydration. */}
                   <Button
                     ref={chatToggleRef}
@@ -502,7 +502,7 @@ export function PostEditorView({
                 </div>
               </header>
 
-              <div className="flex flex-col items-center gap-5 px-4 pb-16 sm:px-8">
+              <div className="flex flex-col items-center gap-5 px-(--gutter) pb-16">
                 <EditorToolbar
                   controls={editorId}
                   canUndo={history?.canUndo ?? false}

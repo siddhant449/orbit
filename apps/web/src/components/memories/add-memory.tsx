@@ -60,7 +60,14 @@ export function AddMemory({
 
   if (!open) {
     return (
-      <Button type="button" variant={variant} size={variant === "secondary" ? "md" : "sm"} onClick={() => setOpen(true)}>
+      <Button
+        type="button"
+        variant={variant}
+        size={variant === "secondary" ? "md" : "sm"}
+        // A ghost trigger hangs its padding outside the text edge so the plus lines up with the card's copy.
+        className={variant === "ghost" ? "-ml-3.5" : undefined}
+        onClick={() => setOpen(true)}
+      >
         <PlusIcon /> {label}
       </Button>
     );
