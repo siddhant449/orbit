@@ -17,6 +17,7 @@
     "@brandloop/agent": "workspace:*",
     "@brandloop/ai": "workspace:*",
     "@brandloop/db": "workspace:*",
+    "@brandloop/jobs": "workspace:*",
     "@brandloop/knowledge": "workspace:*",
     "@brandloop/storage": "workspace:*",
     "@brandloop/ui": "workspace:*",

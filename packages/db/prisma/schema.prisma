@@ -440,6 +440,8 @@ model Visual {
   /// "generate" | "edit" | "logo" while a job runs: one operation at a time.
   activeOp           String?
   activeOpStartedAt  DateTime?
+  /// Input of the operation in flight: `{instruction}` for an edit, `{x, y, sizePercent}` for a logo. Cleared when it ends.
+  opInput            Json?
   /// User-safe.
   error              String?
   altText            String?

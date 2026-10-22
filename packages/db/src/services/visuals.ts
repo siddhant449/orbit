@@ -1,4 +1,5 @@
 import { prisma } from "../client";
+import { Prisma } from "../generated/prisma/client";
 import type { Document, StorageObject, Visual, VisualAspect, VisualType, VisualVersion, VisualVersionKind } from "../generated/prisma/client";
 import { lockAccount, OutOfCreditsError, toState, type Tx } from "./credits";
 
@@ -115,7 +116,7 @@ export async function completeGenerate(visualId: string, r: GenerateResult): Pro
   return prisma.$transaction(async (tx) => {
     const { count } = await tx.visual.updateMany({
       where: { id: visualId, status: "PROCESSING", activeOp: "generate" },
-      data: { status: "COMPLETED", currentVersion: 0, activeOp: null, activeOpStartedAt: null, error: null, provider: r.provider, builtPrompt: r.builtPrompt },
+      data: { status: "COMPLETED", currentVersion: 0, activeOp: null, activeOpStartedAt: null, opInput: Prisma.JsonNull, error: null, provider: r.provider, builtPrompt: r.builtPrompt },
     });
     if (count === 0) return null;
     await tx.visualVersion.create({
@@ -135,7 +136,7 @@ export async function failVisual(visualId: string, error: string, opts: { refund
     if (!visual) return false;
     const { count } = await tx.visual.updateMany({
       where: { id: visualId, status: { in: ["PENDING", "PROCESSING"] } },
-      data: { status: "FAILED", error, activeOp: null, activeOpStartedAt: null },
+      data: { status: "FAILED", error, activeOp: null, activeOpStartedAt: null, opInput: Prisma.JsonNull },
     });
     if (count === 0) return false;
     if (opts.refund) await refundTx(tx, visual);
@@ -159,16 +160,22 @@ async function refundTx(tx: Tx, visual: Visual): Promise<void> {
  * Claims the visual's single operation slot for an edit or a logo: the visual must be COMPLETED, idle, in the editor's
  * profile and under the edit cap. Throws not_found, invalid (not completed), in_progress or edit_limit.
  */
-export async function beginEdit(profileId: string, visualId: string, op: "edit" | "logo" = "edit", now: Date = new Date()): Promise<Visual> {
+export async function beginEdit(
+  profileId: string,
+  visualId: string,
+  op: "edit" | "logo" = "edit",
+  input?: Prisma.InputJsonValue,
+  now: Date = new Date(),
+): Promise<Visual> {
   const claimed = await prisma.visual.updateMany({
     where: { id: visualId, profileId, deletedAt: null, status: "COMPLETED", activeOp: null, editCount: { lt: 5 } },
-    data: { activeOp: op, activeOpStartedAt: now, error: null },
+    data: { activeOp: op, activeOpStartedAt: now, opInput: input ?? Prisma.JsonNull, error: null },
   });
   if (claimed.count === 1) {
     // maxEdits is per row; re-check in case it was lowered below the count (cheap guard against the fixed 5 above).
     const v = (await prisma.visual.findUnique({ where: { id: visualId } }))!;
     if (v.editCount >= v.maxEdits) {
-      await prisma.visual.update({ where: { id: visualId }, data: { activeOp: null, activeOpStartedAt: null } });
+      await prisma.visual.update({ where: { id: visualId }, data: { activeOp: null, activeOpStartedAt: null, opInput: Prisma.JsonNull } });
       throw new VisualError("edit_limit", "This image has used all of its edits");
     }
     return v;
@@ -197,7 +204,7 @@ export async function completeEdit(visualId: string, r: EditResult): Promise<num
     const next = (await tx.visualVersion.aggregate({ where: { visualId }, _max: { version: true } }))._max.version! + 1;
     const { count } = await tx.visual.updateMany({
       where: { id: visualId, status: "PROCESSING", activeOp: { in: ["edit", "logo"] } },
-      data: { status: "COMPLETED", currentVersion: next, editCount: { increment: 1 }, activeOp: null, activeOpStartedAt: null, error: null },
+      data: { status: "COMPLETED", currentVersion: next, editCount: { increment: 1 }, activeOp: null, activeOpStartedAt: null, opInput: Prisma.JsonNull, error: null },
     });
     if (count === 0) return null;
     await tx.visualVersion.create({
@@ -207,11 +214,25 @@ export async function completeEdit(visualId: string, r: EditResult): Promise<num
   });
 }
 
+/**
+ * A transient failure: hand the operation back (PROCESSING -> PENDING for a generate, -> COMPLETED for an edit/logo,
+ * `activeOp` kept) so the retried job can `startOp` it again. False when it wasn't being processed.
+ */
+export async function requeueOp(visualId: string): Promise<boolean> {
+  const v = await prisma.visual.findUnique({ where: { id: visualId }, select: { activeOp: true, status: true } });
+  if (!v || v.status !== "PROCESSING" || !v.activeOp) return false;
+  const { count } = await prisma.visual.updateMany({
+    where: { id: visualId, status: "PROCESSING", activeOp: v.activeOp },
+    data: { status: v.activeOp === "generate" ? "PENDING" : "COMPLETED" },
+  });
+  return count === 1;
+}
+
 /** An edit/logo failed: clear the op, keep the current version and the edit count, record the user-safe error. */
 export async function failEdit(visualId: string, error: string): Promise<boolean> {
   const { count } = await prisma.visual.updateMany({
     where: { id: visualId, activeOp: { in: ["edit", "logo"] }, status: { in: ["COMPLETED", "PROCESSING"] } },
-    data: { status: "COMPLETED", activeOp: null, activeOpStartedAt: null, error },
+    data: { status: "COMPLETED", activeOp: null, activeOpStartedAt: null, opInput: Prisma.JsonNull, error },
   });
   return count === 1;
 }
@@ -289,4 +310,20 @@ export async function listVersions(profileId: string, id: string): Promise<Versi
   const visual = await prisma.visual.findFirst({ where: { id, profileId, deletedAt: null }, select: { id: true } });
   if (!visual) return [];
   return prisma.visualVersion.findMany({ where: { visualId: id }, orderBy: { version: "asc" }, include: { storageObject: true } });
+}
+
+export const ALT_TEXT_MAX = 1_000;
+
+/** Sets (or clears, with null/blank) the alt text. Returns false when the visual isn't this profile's. */
+export async function updateAltText(profileId: string, id: string, altText: string | null): Promise<boolean> {
+  const text = altText?.trim() || null;
+  if (text && text.length > ALT_TEXT_MAX) throw new VisualError("invalid", `Alt text can be at most ${ALT_TEXT_MAX} characters`);
+  const { count } = await prisma.visual.updateMany({ where: { id, profileId, deletedAt: null }, data: { altText: text } });
+  return count === 1;
+}
+
+/** Soft delete. An operation in flight is left to finish into a deleted visual and then be ignored. False when not found. */
+export async function deleteVisual(profileId: string, id: string): Promise<boolean> {
+  const { count } = await prisma.visual.updateMany({ where: { id, profileId, deletedAt: null }, data: { deletedAt: new Date() } });
+  return count === 1;
 }

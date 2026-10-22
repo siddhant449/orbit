@@ -2,8 +2,8 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "../client";
 import { getCredits, OutOfCreditsError } from "./credits";
 import {
-  beginEdit, completeEdit, completeGenerate, createVisualWithDebit, failEdit, failVisual, getActiveForDocument, getVisual,
-  listVersions, listVisuals, revertVisual, startOp, VisualError,
+  beginEdit, completeEdit, completeGenerate, createVisualWithDebit, deleteVisual, failEdit, failVisual, getActiveForDocument, getVisual,
+  listVersions, listVisuals, requeueOp, revertVisual, startOp, updateAltText, VisualError,
 } from "./visuals";
 import { account, cleanupVisualTests, newDocument, object, secondProfile, setBalance, visualInput, type TestAccount } from "./visual-test-helpers";
 
@@ -298,5 +298,67 @@ describe("reads", () => {
     const b = await account("q4");
     await createVisualWithDebit(visualInput(a, "t"), now);
     expect((await getCredits(b.teamId, now)).balance).toBe(30);
+  });
+});
+
+describe("retries, input, alt text and delete", () => {
+  it("requeueOp hands a PROCESSING generate back to PENDING so the retry can start it", async () => {
+    const a = await account("x1");
+    const { visual } = await createVisualWithDebit(visualInput(a, "x1"), now);
+    expect(await requeueOp(visual.id)).toBe(false); // not processing yet
+    await startOp(visual.id, "generate");
+    expect(await requeueOp(visual.id)).toBe(true);
+    expect((await getVisual(a.profileId, visual.id))!.visual).toMatchObject({ status: "PENDING", activeOp: "generate" });
+    expect(await startOp(visual.id, "generate")).not.toBeNull();
+  });
+
+  it("requeueOp for an edit goes back to COMPLETED with the op kept", async () => {
+    const a = await account("x2");
+    const { id } = await completed(a, "x2");
+    await beginEdit(a.profileId, id, "edit", { instruction: "make it green" });
+    await startOp(id, "edit");
+    expect(await requeueOp(id)).toBe(true);
+    const v = (await getVisual(a.profileId, id))!.visual;
+    expect(v).toMatchObject({ status: "COMPLETED", activeOp: "edit", opInput: { instruction: "make it green" } });
+    expect(await startOp(id, "edit")).not.toBeNull();
+  });
+
+  it("opInput is stored by beginEdit and cleared when the op ends either way", async () => {
+    const a = await account("x3");
+    const { id } = await completed(a, "x3");
+    await beginEdit(a.profileId, id, "edit", { instruction: "bigger" });
+    expect((await getVisual(a.profileId, id))!.visual.opInput).toEqual({ instruction: "bigger" });
+    await startOp(id, "edit");
+    await failEdit(id, "no");
+    expect((await getVisual(a.profileId, id))!.visual.opInput).toBeNull();
+    await beginEdit(a.profileId, id, "edit", { instruction: "again" });
+    await startOp(id, "edit");
+    await completeEdit(id, { storageObjectId: (await object(a)).id, editPrompt: "again", kind: "EDIT", width: 1, height: 1 });
+    expect((await getVisual(a.profileId, id))!.visual.opInput).toBeNull();
+  });
+
+  it("alt text is capped at 1,000, can be cleared, and is profile-scoped", async () => {
+    const a = await account("x4");
+    const p2 = await secondProfile(a);
+    const { id } = await completed(a, "x4");
+    expect(await updateAltText(a.profileId, id, "  A bar chart  ")).toBe(true);
+    expect((await getVisual(a.profileId, id))!.visual.altText).toBe("A bar chart");
+    await expect(updateAltText(a.profileId, id, "x".repeat(1001))).rejects.toMatchObject({ code: "invalid" });
+    expect(await updateAltText(a.profileId, id, "x".repeat(1000))).toBe(true);
+    expect(await updateAltText(p2.profileId, id, "nope")).toBe(false);
+    expect(await updateAltText(a.profileId, id, null)).toBe(true);
+    expect((await getVisual(a.profileId, id))!.visual.altText).toBeNull();
+  });
+
+  it("delete is a soft delete that hides it from reads and the library, profile-scoped", async () => {
+    const a = await account("x5");
+    const p2 = await secondProfile(a);
+    const { id } = await completed(a, "x5");
+    expect(await deleteVisual(p2.profileId, id)).toBe(false);
+    expect(await deleteVisual(a.profileId, id)).toBe(true);
+    expect(await deleteVisual(a.profileId, id)).toBe(false);
+    expect(await getVisual(a.profileId, id)).toBeNull();
+    expect((await listVisuals(a.profileId, {})).items).toEqual([]);
+    await expect(beginEdit(a.profileId, id)).rejects.toMatchObject({ code: "not_found" });
   });
 });
