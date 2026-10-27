@@ -46,3 +46,10 @@ describe("research briefs", () => {
     expect(await searchesToday(a.profileId, new Date(Date.now() + BRIEF_REUSE_MS + 60_000))).toBe(0);
   });
 });
+
+describe("stripNul", () => {
+  it("removes NUL and stray control characters from nested strings but keeps tabs and newlines", async () => {
+    const { stripNul } = await import("./research");
+    expect(stripNul({ a: "x\u0000y", b: ["p\u0007q", "line\nnext\tcol"], c: 3, d: null })).toEqual({ a: "xy", b: ["pq", "line\nnext\tcol"], c: 3, d: null });
+  });
+});

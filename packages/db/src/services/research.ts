@@ -19,13 +19,28 @@ export type StoredBrief = {
   createdAt: Date;
 };
 
+/** Postgres rejects the NUL character in text and jsonb; web content sometimes carries it. Strip it (and other C0 controls except tab/newline) everywhere. */
+export function stripNul<T>(value: T): T {
+  if (typeof value === "string") return value.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "") as T;
+  if (Array.isArray(value)) return value.map(stripNul) as T;
+  if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, stripNul(v)])) as T;
+  return value;
+}
+
 export async function saveResearchBrief(
   profileId: string,
   chatId: string,
   input: { topic: string; windowStart: string; windowEnd: string; provider: string; items: unknown; exclusions: unknown; searchCount: number },
 ): Promise<StoredBrief> {
   return prisma.researchBrief.create({
-    data: { profileId, chatId, ...input, items: input.items as Prisma.InputJsonValue, exclusions: input.exclusions as Prisma.InputJsonValue },
+    data: {
+      profileId,
+      chatId,
+      ...input,
+      topic: stripNul(input.topic),
+      items: stripNul(input.items) as Prisma.InputJsonValue,
+      exclusions: stripNul(input.exclusions) as Prisma.InputJsonValue,
+    },
   });
 }
 
