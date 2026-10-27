@@ -17,7 +17,7 @@ describe("editDocumentText", () => {
     const out = await editDocumentText(ai, input);
     expect(out).toEqual({ ok: true, text: "Hook.\n\nBody stays.", changeSummary: "Shortened the hook" });
     expect(ai.calls).toHaveLength(1);
-    expect(ai.calls[0]!.model).toBe("generate");
+    expect(ai.calls[0]!.model).toBe("write");
     expect(ai.calls[0]!.prompt).toContain('<open_document id="doc_1" version="3"');
     expect(ai.calls[0]!.prompt).toContain("Shorten the first line");
     expect(ai.calls[0]!.prompt).toContain("<voice>");
