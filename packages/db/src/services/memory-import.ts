@@ -16,6 +16,7 @@ export async function importMemories(
   text: string,
 ): Promise<{ saved: number }> {
   const result = await ai.json({
+    feature: "memory-learning",
     model: "extract",
     system: SYSTEM,
     prompt:

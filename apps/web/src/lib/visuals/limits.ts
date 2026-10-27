@@ -1,9 +1,9 @@
-import { createUsageLimiter, defaultCounterStore, type UsageLimiter } from "@brandloop/ai";
-import { prisma } from "@brandloop/db";
+import { AI_PAUSED_MESSAGE, createUsageLimiter, defaultCounterStore, type UsageLimiter } from "@brandloop/ai";
+import { isAiBlocked, prisma } from "@brandloop/db";
 
 export type VisualLimit =
   | { ok: true }
-  | { ok: false; status: 429 | 503; code: "daily_limit" | "too_many_active" | "visuals_paused"; message: string };
+  | { ok: false; status: 403 | 429 | 503; code: "daily_limit" | "too_many_active" | "visuals_paused" | "ai_paused"; message: string };
 
 const MAX_ACTIVE_PER_TEAM = 2;
 /** An operation older than this is treated as stuck and no longer counts as active. */
@@ -31,7 +31,10 @@ export const visualsPaused = (env: Record<string, string | undefined> = process.
  * active operations per team, then a daily operation count per team (VISUALS_TEAM_DAILY_LIMIT, 40) and across the app
  * (VISUALS_GLOBAL_DAILY_LIMIT, 500). Counters share the chat's Redis helper and reset at UTC midnight.
  */
-export async function checkVisualLimits(profile: { id: string; teamId: string }): Promise<VisualLimit> {
+export async function checkVisualLimits(profile: { id: string; teamId: string; ownerUserId?: string }, userId?: string): Promise<VisualLimit> {
+  // An admin paused AI for this account: refused before any debit, enqueue or model call.
+  const who = userId ?? profile.ownerUserId;
+  if (who && (await isAiBlocked(who))) return { ok: false, status: 403, code: "ai_paused", message: AI_PAUSED_MESSAGE };
   if (visualsPaused()) return { ok: false, status: 503, code: "visuals_paused", message: "Image generation is paused right now. Try again later." };
   const active = await prisma.visual.count({
     where: { teamId: profile.teamId, deletedAt: null, activeOp: { not: null }, activeOpStartedAt: { gt: new Date(now().getTime() - ACTIVE_WINDOW_MS) } },

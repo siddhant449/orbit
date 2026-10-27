@@ -80,7 +80,7 @@ async function describe(ai: AiClient, posts: string[], count: number, names: str
   let last = "the model's answer was unusable";
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const out = await ai.json({ model: "extract", system: SYSTEM, prompt, schema: ExtractedStyleSchema });
+      const out = await ai.json({ feature: "style-extract", model: "extract", system: SYSTEM, prompt, schema: ExtractedStyleSchema });
       const problem = problemWith(out, count, names);
       if (!problem) return out;
       last = problem;

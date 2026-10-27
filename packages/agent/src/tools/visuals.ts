@@ -54,7 +54,7 @@ export async function suggestVisualsRun(ctx: TurnContext, input: { focusHint: st
       `<post title="${defuseTags(doc.title).replace(/["<>\n]/g, " ")}">\n${defuseTags(doc.text.slice(0, 3_000))}\n</post>`,
       input.focusHint?.trim() ? `<focus>\n${defuseTags(input.focusHint.trim().slice(0, 300))}\n</focus>` : "",
     ].filter(Boolean).join("\n\n");
-    const out = ConceptsSchema.parse(await ctx.ai.json({ model: "extract", system: SUGGEST_SYSTEM, prompt, schema: ConceptsSchema, abortSignal }));
+    const out = ConceptsSchema.parse(await ctx.ai.json({ feature: "images", model: "extract", system: SUGGEST_SYSTEM, prompt, schema: ConceptsSchema, abortSignal }));
     const concepts = tidy(out.concepts);
     if (concepts.length === 0) return "Failed: no image ideas came back. Try again in a moment.";
     return { documentId: doc.id, concepts };

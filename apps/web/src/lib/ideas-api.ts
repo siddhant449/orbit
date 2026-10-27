@@ -1,6 +1,6 @@
-import { AiUnavailableError, createAiClient, StrategySchema, type AiClient } from "@brandloop/ai";
+import { AI_PAUSED_MESSAGE, AiUnavailableError, bindUsage, createAiClient, StrategySchema, type AiClient } from "@brandloop/ai";
 import { assignSources, loadIdeaMaterial, scriptedAi, sourceBadge } from "@brandloop/agent";
-import { getStrategy, listMemory, prisma, renderCoreSections, renderMemoryIndex } from "@brandloop/db";
+import { getStrategy, isAiBlocked, listMemory, prisma, renderCoreSections, renderMemoryIndex } from "@brandloop/db";
 import { z } from "zod";
 import { getAccount } from "@/lib/account";
 import { isMockMode } from "@/lib/chat-deps";
@@ -74,8 +74,11 @@ async function readBody(request: Request): Promise<{ ok: true; value: unknown } 
 
 /** POST /api/ideas `{count?, previous?}`: generates this week's ideas on demand. Nothing is stored. */
 export async function postIdeasHandler(request: Request, deps: IdeasDeps = {}): Promise<Response> {
-  const profile = (await getAccount())?.currentProfile;
+  const account = await getAccount();
+  const profile = account?.currentProfile;
   if (!profile) return fail(400, "Create a profile first.");
+  // An admin paused AI for this account: refused before anything is read or any model is called.
+  if (account.user?.id && (await isAiBlocked(account.user.id))) return fail(403, AI_PAUSED_MESSAGE);
 
   const raw = await readBody(request);
   if (!raw.ok) return fail(413, "That request is too large.");
@@ -102,7 +105,7 @@ export async function postIdeasHandler(request: Request, deps: IdeasDeps = {}): 
 
   try {
     // The real client throws AiUnavailableError on first use when no key is set; mock mode never needs one.
-    const ai = deps.ai ?? (isMockMode() ? scriptedAi() : createAiClient());
+    const ai = bindUsage(deps.ai ?? (isMockMode() ? scriptedAi() : createAiClient()), { userId: account.user?.id, profileId: profile.id, feature: "ideas" });
     const ideas = await generateIdeas(ai, ctx, count, request.signal);
     const response: IdeasResponse = {
       weekOf: ctx.weekOf,

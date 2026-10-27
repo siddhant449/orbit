@@ -1,4 +1,4 @@
-import { AiUnavailableError, type AiClient } from "@brandloop/ai";
+import { AI_PAUSED_MESSAGE, AiUnavailableError, bindUsage, type AiClient } from "@brandloop/ai";
 import { readCappedJson } from "@/lib/chat-request";
 import { AI_UNAVAILABLE_MESSAGE } from "@/lib/run-job";
 import { generateSlides, GenerateRequestSchema, type VoiceGuide } from "./ai";
@@ -10,6 +10,8 @@ export type GenerateDeps = {
   session: () => Promise<Session>;
   ai: () => AiClient;
   aiAvailable: () => boolean;
+  /** True when an admin paused AI for the profile's owner. Absent: never paused. */
+  aiPaused?: (profileId: string) => Promise<boolean>;
   voice: (profileId: string) => Promise<VoiceGuide>;
   throttle: Throttle;
 };
@@ -32,6 +34,7 @@ export function makeGenerateHandler(deps: GenerateDeps) {
     if (!session.signedIn) return fail(401, "Sign in to generate slides.");
     if (!session.profileId) return fail(400, "Create a profile first.");
     if (!deps.aiAvailable()) return fail(503, AI_UNAVAILABLE_MESSAGE);
+    if (await deps.aiPaused?.(session.profileId)) return fail(403, AI_PAUSED_MESSAGE);
     const body = await readCappedJson(request, GENERATE_BODY_MAX);
     if (!body.ok) return body.tooLarge ? fail(413, "That post is too long to turn into slides.") : fail(400, "That request isn't valid.");
     const parsed = GenerateRequestSchema.safeParse(body.value);
@@ -45,7 +48,7 @@ export function makeGenerateHandler(deps: GenerateDeps) {
     }
     try {
       const voice = await deps.voice(session.profileId).catch(() => null);
-      const slides = await generateSlides(deps.ai(), parsed.data, voice, request.signal);
+      const slides = await generateSlides(bindUsage(deps.ai(), { profileId: session.profileId, feature: "writing" }), parsed.data, voice, request.signal);
       return Response.json({ slides });
     } catch (err) {
       if (err instanceof AiUnavailableError) return fail(503, AI_UNAVAILABLE_MESSAGE);

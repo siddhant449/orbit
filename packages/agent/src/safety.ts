@@ -92,7 +92,9 @@ export const SAFETY_RULES = `
 export type ChatSafety = {
   moderate: Moderate;
   /** Per-profile rate limit plus the daily cost cap; counts the turn. */
-  check(profileId: string): Promise<LimitResult>;
+  check(profileId: string, userId?: string): Promise<LimitResult>;
+  /** True when an admin paused AI for this user; the turn is refused with the paused message before anything runs. */
+  isBlocked?(userId: string): Promise<boolean>;
   /** Adds a finished turn's estimated cost to today's total. */
   recordUsage(profileId: string, modelId: string, usage: { inputTokens?: number | undefined; outputTokens?: number | undefined }): Promise<void>;
 };

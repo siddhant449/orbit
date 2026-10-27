@@ -45,7 +45,7 @@ export async function normalizeResearch(
     .map((r, i) => `Search ${i + 1}:\n${defuseTags(r.answer)}\nCitations:\n${r.citations.map((c) => `- ${c.url} | ${defuseTags(c.title)}${c.snippet ? ` | ${defuseTags(c.snippet)}` : ""}`).join("\n")}`)
     .join("\n\n");
   const prompt = `<window start="${window.start}" end="${window.end}">${windowWords(window)}</window>\n\n<results>\n${results}\n</results>`;
-  const out = NormalizedSchema.parse(await ai.json({ model: "extract", system: SYSTEM, prompt, schema: NormalizedSchema, abortSignal: signal }));
+  const out = NormalizedSchema.parse(await ai.json({ feature: "research", model: "extract", system: SYSTEM, prompt, schema: NormalizedSchema, abortSignal: signal }));
 
   const items: ResearchItem[] = [];
   const exclusions: Exclusion[] = [];

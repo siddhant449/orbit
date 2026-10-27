@@ -3,7 +3,7 @@ import { createKnowledge, failIngest } from "@brandloop/db";
 import { IMAGE_TYPES, KNOWLEDGE_LIMITS, resolveUploadMime, verifyUpload } from "@brandloop/knowledge";
 import { getAccount } from "@/lib/account";
 import { knowledgeErrorResponse, startIngest, uploadStore, publicItem } from "@/lib/knowledge";
-import { requireAi } from "@/lib/run-job";
+import { requireAiFor } from "@/lib/run-job";
 
 const SLACK_BYTES = 1024 * 1024;
 
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
   }
   // Reading an image needs the model; documents still ingest without a key.
   if (isImage) {
-    const unavailable = requireAi();
+    const unavailable = await requireAiFor(currentProfile.id);
     if (unavailable) return unavailable;
   }
 

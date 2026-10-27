@@ -92,7 +92,7 @@ export async function generateSlides(ai: AiClient, input: GenerateRequest, voice
   const { system, prompt } = buildCarouselPrompt(input, voice);
   let ask = prompt;
   for (let attempt = 0; ; attempt++) {
-    const raw = await ai.json({ model: "generate", system, prompt: ask, schema: ModelSlidesSchema, abortSignal });
+    const raw = await ai.json({ feature: "writing", model: "generate", system, prompt: ask, schema: ModelSlidesSchema, abortSignal });
     const checked = GeneratedSlidesSchema.safeParse(raw);
     if (checked.success) return checked.data.slides.map((s) => ({ title: s.title.trim(), body: s.body.trim() }));
     if (attempt >= 1 || !lengthOnly(checked.error)) throw new Error(`Slides failed the schema: ${checked.error.issues[0]?.message}`);

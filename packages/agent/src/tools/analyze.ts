@@ -102,7 +102,7 @@ export async function analyzePostRun(ctx: TurnContext, input: { postContent: str
       `Deterministic findings already computed by the server (do not repeat them as issues): ${violations.map((v) => v.detail).join(" | ") || "none"}`,
       renderGrounding(grounding),
     ].join("\n\n");
-    const model = AnalysisModelSchema.parse(await ctx.ai.json({ model: "generate", system: SYSTEM, prompt, schema: AnalysisModelSchema, abortSignal }));
+    const model = AnalysisModelSchema.parse(await ctx.ai.json({ feature: "review", model: "generate", system: SYSTEM, prompt, schema: AnalysisModelSchema, abortSignal }));
 
     const code = codeRatings(text, violations);
     const byId = new Map(model.criteria.map((c) => [c.id, c]));

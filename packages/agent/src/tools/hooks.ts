@@ -126,7 +126,7 @@ export async function generateHooksRun(
         taken.length ? `Do not repeat or reword these hooks: ${taken.map((t) => JSON.stringify(t)).join(", ")}` : "",
         renderGrounding(grounding),
       ].filter(Boolean).join("\n\n");
-      const raw = await ctx.ai.json({ model: "generate", system: HOOKS_SYSTEM, prompt, schema: HooksModelSchema, abortSignal });
+      const raw = await ctx.ai.json({ feature: "hooks", model: "generate", system: HOOKS_SYSTEM, prompt, schema: HooksModelSchema, abortSignal });
       const allowed = new Set(purposes);
       for (const h of HooksModelSchema.parse(raw).hooks) accept(h, allowed);
     };

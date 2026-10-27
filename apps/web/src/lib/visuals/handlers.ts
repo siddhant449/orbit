@@ -1,7 +1,8 @@
 import {
-  createVisualWithDebit, getReference, deleteVisual, getActiveForDocument, getCredits, getTheme, getVisual, listVisuals, OutOfCreditsError, prisma,
+  createVisualWithDebit, getReference, isAiBlocked, deleteVisual, getActiveForDocument, getCredits, getTheme, getVisual, listVisuals, OutOfCreditsError, prisma,
   updateAltText, VisualError, ALT_TEXT_MAX, type LibraryItem, type VisualWithCurrent,
 } from "@brandloop/db";
+import { AI_PAUSED_MESSAGE, bindUsage } from "@brandloop/ai";
 import { checkVisualRequest } from "@brandloop/visuals";
 import { checkVisualLimits } from "./limits";
 import { z } from "zod";
@@ -94,10 +95,12 @@ export async function createVisualHandler(request: Request): Promise<Response> {
   }
 
   const deps = getVisualDeps();
-  const verdict = await checkVisualRequest(deps.ai, [input.prompt, input.customInstructions].filter(Boolean).join("\n"), { log: deps.log });
+  // Paused accounts are refused before the safety classifier (a model call) runs.
+  if (await isAiBlocked(account.user.id)) return fail(403, AI_PAUSED_MESSAGE, { code: "ai_paused" });
+  const verdict = await checkVisualRequest(deps.ai && bindUsage(deps.ai, { userId: account.user.id, profileId: profile.id, feature: "moderation" }), [input.prompt, input.customInstructions].filter(Boolean).join("\n"), { log: deps.log });
   if (!verdict.allowed) return fail(422, verdict.message, { code: "refused", category: verdict.category });
 
-  const limit = await checkVisualLimits(profile);
+  const limit = await checkVisualLimits(profile, account.user.id);
   if (!limit.ok) return fail(limit.status, limit.message, { code: limit.code });
 
   try {
