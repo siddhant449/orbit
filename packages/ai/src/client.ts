@@ -1,5 +1,6 @@
 import { APICallError, generateText, NoObjectGeneratedError, Output } from "ai";
 import type { FinishReason, LanguageModel, ModelMessage } from "ai";
+import { createHash } from "node:crypto";
 import { z } from "zod";
 import { getModel, type ModelAlias } from "./provider";
 import type { AiFeature } from "./usage";
@@ -36,6 +37,14 @@ export type AiClient = {
 export type AiClientDeps = { model?: (alias: ModelAlias) => LanguageModel };
 
 const MAX_OUTPUT_TOKENS = 16000;
+
+/**
+ * OpenAI routes requests that share a prefix to the same cache when they share a `promptCacheKey`. One key per feature
+ * (the system prompt) keeps each specialist's large stable prefix together. Absent for a non-OpenAI test model: ignored.
+ */
+function cacheOptions(system: string) {
+  return { openai: { promptCacheKey: `orbit:${createHash("sha1").update(system).digest("hex").slice(0, 16)}` } };
+}
 
 function buildMessages(prompt: string, images?: AiImage[]): ModelMessage[] {
   return [
@@ -110,6 +119,7 @@ export function createAiClient(
           instructions: system,
           messages: buildMessages(prompt, images),
           maxOutputTokens: MAX_OUTPUT_TOKENS,
+          providerOptions: cacheOptions(system),
           abortSignal,
         });
       } catch (err) {
@@ -128,6 +138,7 @@ export function createAiClient(
           messages: buildMessages(prompt, images),
           output: Output.object({ schema }),
           maxOutputTokens: MAX_OUTPUT_TOKENS,
+          providerOptions: cacheOptions(system),
           abortSignal,
         });
       } catch (err) {

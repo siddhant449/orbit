@@ -113,7 +113,8 @@ export async function runSpecialist<K extends SpecialistKind>(
   const signal = input.abortSignal;
   const strict = specialistOutputSchema(PAYLOADS[kind]);
   const asked = specialistOutputSchema(MODEL_PAYLOADS[kind]);
-  const prompt = [`<request>\n${defuseTags(input.request)}\n</request>`, input.format ? `<format>\n${defuseTags(input.format)}\n</format>` : "", input.grounding, documentBlock(input.document)].filter(Boolean).join("\n\n");
+  // The large, stable grounding first (the provider caches a shared prefix); the per-request parts last.
+  const prompt = [input.grounding, input.format ? `<format>\n${defuseTags(input.format)}\n</format>` : "", documentBlock(input.document), `<request>\n${defuseTags(input.request)}\n</request>`].filter(Boolean).join("\n\n");
 
   let reason = "the AI request failed";
   for (let attempt = 0; attempt < 2; attempt++) {

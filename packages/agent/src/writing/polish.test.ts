@@ -8,7 +8,7 @@ import { resolveRules } from "./rules";
 const rules = (md = "") => resolveRules({ userRulesMarkdown: md, style: null, turn: {} });
 const lintCtx = { postType: null, groundingText: null, researchDates: null, personalDetails: "allowed" as const };
 const far = () => new Date(Date.now() + 120_000);
-const base = { request: "r", grounding: "g", lintCtx, deadline: far(), render: { bullet: "-" as const, numbered: true } };
+const base = { request: "r", writingRules: "- No emojis", lintCtx, deadline: far(), render: { bullet: "-" as const, numbered: true } };
 
 const wall = Array.from({ length: 26 }, () => "words").join(" ") + " and a few more words to make this block long on a phone screen";
 const CLEAN: WriterBlock[] = [
@@ -113,6 +113,45 @@ describe("polishDraft", () => {
     expect(ai.calls).toHaveLength(0);
     expect(out.text).toBe(renderBlocks(CLEAN, base.render));
     expect(out.log).toMatchObject({ mechanical: [], lastResort: [] });
+  });
+});
+
+describe("model repair gating", () => {
+  const withTell = (extra: string): WriterBlock[] => [
+    { kind: "hook", lines: ["Stop building the wrong thing."] },
+    { kind: "prose", lines: ["It is not just a tool. It is a mindset.", extra] },
+    { kind: "close", lines: ["Pick the harder one first."] },
+  ];
+
+  it("a single soft hit is reported, not repaired", async () => {
+    const ai = fakeAi({ blocks: CLEAN });
+    const out = await polishDraft(ai, { ...base, blocks: withTell("A proof of concept answers one question."), rules: rules() });
+    expect(ai.calls).toHaveLength(0);
+    expect(out.log.modelRepair.attempted).toBe(false);
+    expect(out.log.remaining.map((v) => v.id)).toContain("not-just");
+  });
+
+  it("two soft hits are repaired", async () => {
+    const ai = fakeAi({ blocks: CLEAN });
+    const out = await polishDraft(ai, { ...base, blocks: withTell("Let's dive in."), rules: rules() });
+    expect(ai.calls).toHaveLength(1);
+    expect(out.log.modelRepair.attempted).toBe(true);
+  });
+
+  it("a hard violation is repaired, and the call carries only the hard rules, writing rules, blocks and problems", async () => {
+    const ai = fakeAi({ blocks: CLEAN });
+    const rs = rules("- No walls of text (>3 lines)");
+    await polishDraft(ai, { ...base, writingRules: "- No walls of text (>3 lines)", blocks: [CLEAN[0]!, { kind: "prose", lines: [wall] }, CLEAN[2]!], rules: rs });
+    expect(ai.calls).toHaveLength(1);
+    const prompt = ai.calls[0]!.prompt;
+    expect(prompt).toContain("<style>");
+    expect(prompt).toContain("Hard rules");
+    expect(prompt).toContain("<writing_rules>");
+    expect(prompt).toContain("<post_blocks>");
+    expect(prompt).toContain("<problems>");
+    for (const gone of ["<identity>", "<strategy>", "<knowledge>", "<examples>"]) expect(prompt).not.toContain(gone);
+    // The stable context comes first, the per-post blocks last.
+    expect(prompt.indexOf("<style>")).toBeLessThan(prompt.indexOf("<post_blocks>"));
   });
 });
 

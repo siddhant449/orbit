@@ -48,46 +48,48 @@ How good Orbit's chat agent is on the six benchmark prompts, judged by a rubric 
 
 Average judge score (1–5) per dimension, over the prompts where it applies.
 
-| Dimension | Run 1 | Run 2 | Run 3 | Run 4 | Run 5 |
-|---|---|---|---|---|---|
-| Memory/strategy use | 3.33 | 3.33 | 5.00 | 4.67 | 5.00 |
-| Voice match | 4.50 | 4.25 | 4.80 | 4.60 | 5.00 |
-| LinkedIn craft | 3.80 | 3.80 | 4.20 | 4.20 | 3.67 |
-| Follows instruction | 4.83 | 4.83 | 4.83 | 5.00 | 3.67 |
-| Tool use | 3.33 | 3.50 | 5.00 | 5.00 | 4.33 |
-| No hallucinated facts | 5.00 | 5.00 | 4.83 | 5.00 | 5.00 |
-| **Overall** | **4.12** | **4.12** | **4.79** | **4.76** | **4.43** |
+| Dimension | Run 1 | Run 2 | Run 3 | Run 4 | Run 5 | Run 6 |
+|---|---|---|---|---|---|---|
+| Memory/strategy use | 3.33 | 3.33 | 5.00 | 4.67 | 5.00 | 3.33 |
+| Voice match | 4.50 | 4.25 | 4.80 | 4.60 | 5.00 | 3.33 |
+| LinkedIn craft | 3.80 | 3.80 | 4.20 | 4.20 | 3.67 | 3.50 |
+| Follows instruction | 4.83 | 4.83 | 4.83 | 5.00 | 3.67 | 3.17 |
+| Tool use | 3.33 | 3.50 | 5.00 | 5.00 | 4.33 | 3.67 |
+| No hallucinated facts | 5.00 | 5.00 | 4.83 | 5.00 | 5.00 | 5.00 |
+| **Overall** | **4.12** | **4.12** | **4.79** | **4.76** | **4.43** | **3.71** |
 
 ## Per prompt
 
-| Prompt | Run 1 | Run 2 | Run 3 | Run 4 | Run 5 |
-|---|---|---|---|---|---|
-| (a) What do you remember about me? | 4.75 | 4.75 | 5.00 | 4.75 | 5.00 |
-| (b) Give me 5 post ideas for this week based on my strategy. | 4.33 | 3.83 | 4.50 | 4.50 | 4.83 |
-| (c) Draft a LinkedIn post about the difference between an MVP and a POC. | 4.00 | 3.83 | 5.00 | 4.83 | 3.20 |
-| (d) Make the hook punchier and cut it to under 120 words. | 4.67 | 4.83 | 5.00 | 5.00 | 4.67 |
-| (e) Write 3 hook variations for a post about hiring your first engineer. | 3.67 | 3.67 | 4.67 | 4.67 | 4.00 |
-| (f) Analyze this draft and tell me what to fix: | 3.40 | 4.00 | 4.67 | 4.83 | 5.00 |
+| Prompt | Run 1 | Run 2 | Run 3 | Run 4 | Run 5 | Run 6 |
+|---|---|---|---|---|---|---|
+| (a) What do you remember about me? | 4.75 | 4.75 | 5.00 | 4.75 | 5.00 | 4.75 |
+| (b) Give me 5 post ideas for this week based on my strategy. | 4.33 | 3.83 | 4.50 | 4.50 | 4.83 | 3.00 |
+| (c) Draft a LinkedIn post about the difference between an MVP and a POC. | 4.00 | 3.83 | 5.00 | 4.83 | 3.20 | 4.67 |
+| (d) Make the hook punchier and cut it to under 120 words. | 4.67 | 4.83 | 5.00 | 5.00 | 4.67 | 3.67 |
+| (e) Write 3 hook variations for a post about hiring your first engineer. | 3.67 | 3.67 | 4.67 | 4.67 | 4.00 | 2.50 |
+| (f) Analyze this draft and tell me what to fix: | 3.40 | 4.00 | 4.67 | 4.83 | 5.00 | 3.60 |
 
-## Latest run (5): tools, latency, tokens
+## Latest run (6): tools, latency, tokens
 
 | Prompt | Tools in order | Doc | Latency | Tokens in/out |
 |---|---|---|---|---|
-| (a) | viewMemory | none | 10.1 s | 10276 / 342 |
-| (b) | getContentStrategy → searchKB → readMemory | none | 21.1 s | 12829 / 492 |
-| (c) | searchKB → presentOptions | none | 19.5 s | 10372 / 527 |
-| (d) | delegateWriting → createDocument | created | 166.4 s | 27870 / 2134 |
-| (e) | searchKB → generateHooks | none | 33.0 s | 18615 / 812 |
-| (f) | – | none | 5.0 s | 4865 / 23 |
+| (a) | viewMemory | none | 22.2 s | 10508 / 379 |
+| (b) | generateIdeas | none | 20.5 s | 6764 / 1330 |
+| (c) | delegateWriting → createDocument | created | 68.4 s | 20944 / 3277 |
+| (d) | updateDocument | updated | 24.5 s | 8895 / 879 |
+| (e) | generateHooks | none | 20.8 s | 12345 / 861 |
+| (f) | searchKB → analyzePost | none | 35.9 s | 19915 / 2114 |
 
-## Latest run (5): failures the judge found
+## Latest run (6): failures the judge found
 
-- (b) [craft] "Monday and Wednesday use the same case from different angles. If you want more variety, run Tuesday instead of Wednesday." — The plan recognises repetition but leaves the user to resolve it. Thursday also revisits the same technical-risk-versus-demand-risk distinction, so three of the five ideas substantially overlap rather than offering a varied week.
-- (c) [instruction] "No post was created or changed in this turn." — The requested LinkedIn draft was not delivered.
-- (c) [tools] "presentOptions" — The assistant substituted an unnecessary choice of angles for drafting, rather than proceeding through delegateWriting and createDocument.
-- (d) [craft] "More polish won't tell them whether customers will pay." — Repeats the opening claim immediately before another concluding takeaway, making the ending less economical than the rest of the post.
-- (d) [tools] "1. delegateWriting [ok]" — The visible workflow proceeds directly to drafting and document creation without checking the knowledge base, although the request has a directly relevant workshop example.
-- (e) [instruction] "Your three hooks are ready: a scoping-first opener, a range-over-specialism claim, and an interview clue." — This announces and summarises the hooks instead of providing the three requested hook variations, leaving the user without usable copy.
+- (b) [voice] "Opening line to start from: What should be settled before you interview engineer number one?" — This is a rhetorical-question opening, which Maya’s writing rules explicitly prohibit.
+- (b) [tools] "1. generateIdeas [ok] input={"count":5}" — The trace shows idea generation without first reading the strategy, despite the request being explicitly based on it.
+- (d) [instruction] "Post updated by this turn (v2, 127 words):" — The requested limit was under 120 words, but the updated post is 127 words.
+- (d) [tools] "Server checks on the post: length ok" — The length check is inconsistent with the supplied post, which is identified as 127 words and therefore exceeds the under-120-word request.
+- (e) [instruction] "The three hook variations are ready: a bold claim, a prediction, and a how-to." — This describes the requested deliverable instead of giving the three hook variations.
+- (e) [memory] "The three hook variations are ready: a bold claim, a prediction, and a how-to." — The reply misses the chance to use Maya’s specific first-hire guidance, especially scoping the first 90 days and hiring for range.
+- (f) [craft] "spell out “proof of concept” and “minimum viable product” in the opening for readers unfamiliar with the acronyms." — This is a reasonable edit, but the reply misses a more substantive fix: “meaningful next step” is vague, while the example and source notes make the MVP test specifically about whether customers will use and pay.
+- (f) [instruction] "The analysis card is ready." — The reply says an analysis card is ready but does not provide one; it only gives two short recommendations.
 
 Raw transcripts: local benchmark transcripts (`orbit-run-<n>.md` with `orbit-run-<n>.json`).
 <!-- eval:generated:end -->

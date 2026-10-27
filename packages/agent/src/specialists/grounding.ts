@@ -99,6 +99,28 @@ async function styleRow(profileId: string, writingStyleId: string | null): Promi
   return saved && (saved.guide.trim() || saved.styleProfile) ? saved : null;
 }
 
+/**
+ * Words that say an edit or hook request wants material the post does not already hold: the user's notes, a story,
+ * an example, a number, a source. Deliberately broad: a false positive only costs the knowledge search we would have run
+ * anyway; a false negative would starve the edit of the fact the user asked for.
+ */
+const NEW_MATERIAL =
+  /\b(?:add|include|insert|mention|bring in|work in|weave in|use|pull|draw|cite|back (?:it|this) up)\b[^.\n]{0,60}\b(?:numbers?|stats?|statistics?|data|metrics?|figures?|results?|examples?|stor(?:y|ies)|anecdotes?|cases?|case stud(?:y|ies)|clients?|customers?|facts?|details?|quotes?|evidence|proof|sources?|links?|experience|lessons?|notes?|knowledge|kb|research)\b|\b(?:my|our) (?:notes?|knowledge|kb|stor(?:y|ies)|examples?|clients?|data|numbers|results|experience|projects?|research)\b|\bfrom (?:my|our|the) (?:notes?|knowledge|kb|docs?|files?|library)\b|\b(?:real|specific|concrete|personal|actual) (?:example|story|number|stat|case|detail)s?\b|\b(?:knowledge base|kb|according to|based on|source|sources|cite|citation|research|statistic|stat)\b/i;
+
+/** Whether an edit or hook request needs a fresh look at the user's material (see {@link NEW_MATERIAL}). */
+export function asksForNewMaterial(text: string): boolean {
+  return NEW_MATERIAL.test(text);
+}
+
+/**
+ * How much grounding an edit or hook call needs. "light" reuses the post or brief in hand: the voice, style and writing
+ * rules, but no fresh knowledge search and no identity or strategy. Anything that asks for new material, a selected
+ * knowledge item, or a research brief keeps the full grounding.
+ */
+export function groundingScopeFor(input: { text: string; knowledgeIds: readonly string[]; research?: string | null }): "full" | "light" {
+  return asksForNewMaterial(input.text) || input.knowledgeIds.length > 0 || Boolean(input.research) ? "full" : "light";
+}
+
 export async function buildGrounding(input: {
   profileId: string;
   request: string;
@@ -109,15 +131,20 @@ export async function buildGrounding(input: {
   turn?: Partial<TurnOverrides>;
   /** The brief text for the writer's `<research>` block. */
   research?: string | null;
+  /** "light": voice, style and writing rules only (no knowledge search, identity or strategy). Default "full". */
+  scope?: "full" | "light";
 }): Promise<Grounding> {
   const { profileId } = input;
+  const light = input.scope === "light";
   const docs = await listMemory(profileId);
   const memory = (key: string) => docs.find((d) => d.key === key)?.content.trim() ?? "";
   const [row, knowledge] = await Promise.all([
     styleRow(profileId, input.writingStyleId),
-    input.knowledgeIds.length > 0
-      ? selectedKnowledge(profileId, input.knowledgeIds)
-      : searchedKnowledge(profileId, input.request, input.embedder),
+    light
+      ? Promise.resolve([] as Grounding["knowledge"])
+      : input.knowledgeIds.length > 0
+        ? selectedKnowledge(profileId, input.knowledgeIds)
+        : searchedKnowledge(profileId, input.request, input.embedder),
   ]);
   const parsed = row ? StyleProfileSchema.safeParse(row.styleProfile) : null;
   const profile = parsed?.success ? parsed.data : null;
@@ -137,8 +164,8 @@ export async function buildGrounding(input: {
     research: input.research ?? null,
     styleProfile: profile,
     writingRules: memory("writing/rules"),
-    identity: IDENTITY_KEYS.map(memory).filter(Boolean).join("\n\n"),
-    strategy: memory("strategy/themes"),
+    identity: light ? "" : IDENTITY_KEYS.map(memory).filter(Boolean).join("\n\n"),
+    strategy: light ? "" : memory("strategy/themes"),
     knowledge,
   };
 }

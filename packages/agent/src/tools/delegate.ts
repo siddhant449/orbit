@@ -167,7 +167,7 @@ export async function delegateWritingRun(
         personalDetails: personal,
         expectList: format.source === "picked" && planHasList(format.plan) && !forbidLists,
       };
-      const common = { rules: grounding.rules, lintCtx, request: input.request, grounding: renderGrounding(grounding), deadline: ctx.deadline, abortSignal, render: { bullet: grounding.style.bullet, numbered: true } };
+      const common = { rules: grounding.rules, lintCtx, request: input.request, writingRules: grounding.writingRules, deadline: ctx.deadline, abortSignal, render: { bullet: grounding.style.bullet, numbered: true } };
       const started = Date.now();
       const polished = payload.blocks?.length
         ? await polishDraft(ctx.ai, { ...common, blocks: payload.blocks })
@@ -255,17 +255,44 @@ export async function delegateEditingRun(
   }
 }
 
+/**
+ * What the orchestrator sees of a post-writing handoff: just what it needs to route (readiness, title, what is
+ * missing, the handoff id for createDocument and any rule findings). The draft, blocks, facts and digest stay on the
+ * server: createDocument reads the stored handoff, and the orchestrator never retypes a draft.
+ */
+export function slimWritingHandoff(env: HandoffEnvelope): Record<string, unknown> {
+  const p = (env.payload ?? {}) as Partial<PostWriting>;
+  const missing = (p.missingFacts?.length ? p.missingFacts : env.missingInput) ?? [];
+  return {
+    handoffId: env.handoffId,
+    readiness: p.readiness,
+    title: p.title,
+    parentAction: env.parentAction,
+    ...(missing.length ? { missingFacts: missing } : {}),
+    ...(p.clarifyingQuestion ? { clarifyingQuestion: p.clarifyingQuestion } : {}),
+    ...(env.findings.length ? { findings: env.findings } : {}),
+  };
+}
+
 /** What the orchestrator sees: status strings as they are, envelopes framed as the specialist's data. */
 export function specialistModelOutput(output: unknown, source: DataSource = "writing specialist"): { type: "text"; value: string } {
   if (typeof output === "string") return { type: "text", value: output };
-  return { type: "text", value: capOutput(frameData(source, JSON.stringify(output, null, 2))) };
+  const env = output as Partial<HandoffEnvelope> | null;
+  let shown: unknown = output;
+  if (env?.specialist === "post-writing") shown = slimWritingHandoff(env as HandoffEnvelope);
+  else if (env?.specialist === "final-review") {
+    // The review is read in full (issues are quoted back to the user); only the server's stamps are dropped.
+    const { authority: _a, taskId: _t, createdAt: _c, requestDigest: _d, sourceRevisions: _s, ...rest } = env as HandoffEnvelope;
+    shown = rest;
+  }
+  return { type: "text", value: capOutput(frameData(source, JSON.stringify(shown))) };
 }
 
 export function delegateTools(ctx: TurnContext) {
   return {
     delegateWriting: tool({
       description:
-        "Ask the writing specialist, who already has the user's voice, writing style, rules, identity and strategy, to draft a new LinkedIn post, or a set of short options (hook variations, openings, angles). Write a clear brief in `request`: the topic, the angle, the audience, the format if the user named one, how many options if they asked for options, and the specific facts, stories and numbers from memory or the knowledge base the post should use. Returns a handoff. For a post, then call createDocument with this call's id and never retype the draft. For options, show them to the user in your reply instead of creating a document.",
+        "Ask the writing specialist, who already has the user's voice, writing style, rules, identity and strategy, to draft a new LinkedIn post. Write a clear brief in `request`: the topic, the angle, the audience, the format if the user named one, and the specific facts, stories and numbers from memory or the knowledge base the post should use. Returns a handoff (readiness, title, missing facts). Then call createDocument with this call's id; never retype the draft. For hook variations or openings use generateHooks instead.",
       inputSchema: z.object({
         request: z.string().min(REQUEST_MIN).max(REQUEST_MAX),
         specialty: z.enum(["post"]),

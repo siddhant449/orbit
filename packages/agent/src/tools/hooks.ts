@@ -3,7 +3,7 @@ import { z } from "zod";
 import { listMessages } from "@brandloop/db";
 import type { TurnContext } from "../context";
 import { defuseTags } from "../data";
-import { buildGrounding, provenanceText, renderGrounding } from "../specialists/grounding";
+import { buildGrounding, groundingScopeFor, provenanceText, renderGrounding } from "../specialists/grounding";
 import { gatePurposes, HOOK_PURPOSES, HOOK_PURPOSE_IDS, pickPurposes, type HookPurpose } from "../library";
 import { lintPost } from "../writing/lint";
 import { gatherEvidence } from "../writing/evidence";
@@ -91,6 +91,8 @@ export async function generateHooksRun(
       knowledgeIds: ctx.selections.knowledgeIds,
       writingStyleId: ctx.selections.writingStyleId,
       embedder: ctx.embedder,
+      // Hooks for a post in hand reuse that post; hooks for a bare topic need the user's material to find a real story.
+      scope: input.draftBody?.trim() ? groundingScopeFor({ text: `${ctx.userText}\n${input.topic}`, knowledgeIds: ctx.selections.knowledgeIds }) : "full",
     });
     const rules = grounding.rules;
     const facts = provenanceText(grounding, `${input.topic}\n${input.draftBody ?? ""}`);
@@ -119,12 +121,13 @@ export async function generateHooksRun(
     };
 
     const ask = async (purposes: HookPurpose[]) => {
+      // The large, stable grounding first (the provider caches a shared prefix); this request's parts last.
       const prompt = [
-        `<request>\n${defuseTags(input.topic)}\n</request>`,
-        `<assignments>\n${purposes.map((p, i) => assignmentLine(p, i + 1)).join("\n")}\n</assignments>`,
-        input.draftBody ? `<draft>\n${defuseTags(input.draftBody)}\n</draft>` : "",
-        taken.length ? `Do not repeat or reword these hooks: ${taken.map((t) => JSON.stringify(t)).join(", ")}` : "",
         renderGrounding(grounding),
+        `<request>\n${defuseTags(input.topic)}\n</request>`,
+        input.draftBody ? `<draft>\n${defuseTags(input.draftBody)}\n</draft>` : "",
+        `<assignments>\n${purposes.map((p, i) => assignmentLine(p, i + 1)).join("\n")}\n</assignments>`,
+        taken.length ? `Do not repeat or reword these hooks: ${taken.map((t) => JSON.stringify(t)).join(", ")}` : "",
       ].filter(Boolean).join("\n\n");
       const raw = await ctx.ai.json({ feature: "hooks", model: "generate", system: HOOKS_SYSTEM, prompt, schema: HooksModelSchema, abortSignal });
       const allowed = new Set(purposes);

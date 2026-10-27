@@ -31,6 +31,7 @@ import type { ResearchProvider } from "./research/provider";
 import { isTimely } from "./research/timely";
 import { randomUUID } from "node:crypto";
 import type { TurnContext, VisualsToolDeps } from "./context";
+import { closingLine } from "./closing";
 import { windowHistory } from "./history";
 import { nextActiveTask, type TurnOutcome } from "./ledger";
 import { LIMITS } from "./limits";
@@ -42,6 +43,7 @@ import type { RunRegistry } from "./registry";
 import { titleChat } from "./title";
 import { isAbort } from "./tools/run";
 import { buildTools, type ChatUIMessage } from "./tools";
+import { gatedToolNames } from "./tools/gate";
 import { resolveOptionPick, resolveTypedPick } from "./tools/options";
 import { ActiveTaskSchema, type ActiveTask, type ChatRequestBody, type MessageMetadata } from "./types";
 
@@ -153,6 +155,22 @@ export function tagToolErrors<T extends Record<string, unknown>>(tools: T): T {
     };
   }
   return out as T;
+}
+
+/** Inserts the server's closing line as a text part just before the stream's final `finish` chunk. */
+function appendClosing<T extends { type: string }>(source: ReadableStream<T>, line: () => string | null, id: string): ReadableStream<T> {
+  return source.pipeThrough(
+    new TransformStream<T, T>({
+      transform(chunk, controller) {
+        const text = chunk.type === "finish" ? line() : null;
+        if (text) {
+          const textId = `${id}-closing`;
+          for (const c of [{ type: "text-start", id: textId }, { type: "text-delta", id: textId, delta: text }, { type: "text-end", id: textId }]) controller.enqueue(c as unknown as T);
+        }
+        controller.enqueue(chunk);
+      },
+    }),
+  );
 }
 
 /** Maps a db `ChatError` to its response. `activeTurn` may be missing on a contended 409. */
@@ -341,6 +359,13 @@ export async function runChatTurn(
   const ideasShown: StopCondition<typeof tools> = ({ steps }) =>
     (steps.at(-1)?.toolResults ?? []).some((r) => r.toolName === "generateIdeas" && typeof r.output === "object" && r.output !== null);
 
+  // A finished draft on a picked angle, or a finished edit, ends the turn: the server writes the fixed closing line.
+  let closing: string | null = null;
+  const closeAfter: StopCondition<typeof tools> = ({ steps }) => {
+    closing = closingLine({ steps, pickedAngle: Boolean(ctx.pickedAngle), userText });
+    return closing !== null;
+  };
+
   const stream = createUIMessageStream<ChatUIMessage>({
     originalMessages: window,
     generateId: () => assistantId,
@@ -351,9 +376,13 @@ export async function runChatTurn(
         instructions: verdict.ok ? instructions : "Reply with the fixed message only.",
         messages: modelMessages,
         tools,
+        // Fixed for the whole turn from server facts, so the tool list stays a stable cached prefix.
+        activeTools: gatedToolNames(ctx, Object.keys(tools)) as never,
         // A picker ends the turn: the user answers it, then the next turn writes.
-        stopWhen: [stepCountIs(LIMITS.steps), hasToolCall("presentOptions"), ideasShown],
+        stopWhen: [stepCountIs(LIMITS.steps), hasToolCall("presentOptions"), ideasShown, closeAfter],
         maxOutputTokens: LIMITS.maxOutputTokens,
+        // One cache key per profile: its turns share the static prompt and tool list prefix.
+        providerOptions: { openai: { promptCacheKey: `orbit-chat:${profileId}` } },
         abortSignal: AbortSignal.any([controller.signal, AbortSignal.timeout(deps.turnTimeoutMs ?? TURN_TIMEOUT_MS)]),
         // Another instance may have asked this run to stop (POST /api/chat/stop landed elsewhere).
         prepareStep: async ({ stepNumber }) => {
@@ -380,7 +409,7 @@ export async function runChatTurn(
       // Keep the model stream flowing to the end no matter who reads the UI stream.
       void Promise.resolve(result.consumeStream({ onError: () => {} })).catch(() => {});
       writer.merge(
-        toUIMessageStream<typeof tools, ChatUIMessage>({
+        appendClosing(toUIMessageStream<typeof tools, ChatUIMessage>({
           stream: result.stream,
           tools,
           originalMessages: window,
@@ -389,7 +418,7 @@ export async function runChatTurn(
           sendSources: true,
           messageMetadata: ({ part }) => (part.type === "start" || part.type === "finish" ? metadata : undefined),
           onError: uiErrorText,
-        }),
+        }), () => closing, assistantId),
       );
     },
     onError: streamErrorText,

@@ -59,11 +59,12 @@ ${SKILL_NOTES.proofreading}${again}`;
 function prompt(input: { document: EditDocument; description: string; editRequirements: string[]; grounding: string }): string {
   const attr = (t: string) => defuseTags(t).replace(/[\s"<>]+/g, " ").trim();
   const reqs = input.editRequirements.map((r) => `- ${oneLine(defuseTags(r))}`).join("\n");
+  // The large, stable grounding first (the provider caches a shared prefix); this edit's own parts last.
   return [
-    `<request>\n${defuseTags(input.description)}\n</request>`,
-    `<edit_requirements>\n${reqs}\n</edit_requirements>`,
     input.grounding,
     `<open_document id="${attr(input.document.id)}" version="${input.document.version}" title="${attr(input.document.title)}">\n${defuseTags(input.document.text)}\n</open_document>`,
+    `<request>\n${defuseTags(input.description)}\n</request>`,
+    `<edit_requirements>\n${reqs}\n</edit_requirements>`,
   ].join("\n\n");
 }
 

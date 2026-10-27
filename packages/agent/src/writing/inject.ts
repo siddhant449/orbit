@@ -54,6 +54,15 @@ function referenceCandidates(profile: StyleProfile, postType: PostType | null) {
   return [...profile.referencePosts].sort((a, b) => Number(b.postType === postType) - Number(a.postType === postType) || a.text.length - b.text.length);
 }
 
+/** Only the user's hard rules, as the style block opens with them (the model repair needs nothing else of the style). */
+export function renderHardRules(rules: EffectiveRules): string {
+  const overridden = Object.keys(rules.overrides).map((k) => OVERRIDE_WORDS[k]).filter(Boolean);
+  return section("Hard rules (the user's; they outrank everything else here):", [
+    ...hardLines(rules.hard),
+    ...(overridden.length ? [`This turn the user asked to allow: ${overridden.join(", ")}.`] : []),
+  ]);
+}
+
 export function renderStyleBlock(
   profile: StyleProfile | null,
   rules: EffectiveRules,
