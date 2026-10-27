@@ -1,5 +1,6 @@
-import { createDocumentForChat, getChatDocument, getDocument, getOrCreateChat, listDocumentVersions, saveDocumentVersion, upsertMemory } from "@brandloop/db";
+import { createKnowledge, prisma, replaceChunks, createDocumentForChat, getChatDocument, getDocument, getOrCreateChat, listDocumentVersions, saveDocumentVersion, upsertMemory } from "@brandloop/db";
 import type { UIMessageStreamWriter } from "ai";
+import { fakeEmbedder } from "@brandloop/ai/testing";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { stampEnvelope, type HandoffEnvelope, type PostWriting } from "../specialists/envelope";
@@ -203,6 +204,44 @@ async function openPost(text = POST) {
 }
 
 const edit = { description: "Make the hook shorter", editRequirements: ["Shorten the first line"], editScope: "local-change", restoreVersion: null };
+
+describe("updateDocument grounding", () => {
+  const KB = "ZEBRAFACT: churn fell from nine to four percent after the onboarding rewrite " + "padding words about the topic ".repeat(25);
+  async function seed() {
+    await upsertMemory(ctx.profileId, "identity/about", "IDENTITYMARK founder of a tiny studio", "USER");
+    const item = await createKnowledge(ctx.profileId, { type: "TEXT", title: "Churn notes", content: KB });
+    const [v] = await fakeEmbedder().embed([`Churn notes\n\n${KB}`]);
+    await replaceChunks(ctx.profileId, "KNOWLEDGE", item.id, [{ ordinal: 0, title: "Churn notes", text: KB, embedding: v! }]);
+    await prisma.knowledgeItem.update({ where: { id: item.id }, data: { status: "READY" } });
+  }
+  const answer = { text: "Short hook.\n\nThe body stays the same.", changeSummary: "Shortened the hook", unmetRequirements: [] };
+
+  it("a plain edit reuses the post: no knowledge search, identity or strategy", async () => {
+    await seed();
+    await openPost();
+    const ai = fakeAi(answer);
+    const embedder = fakeEmbedder();
+    ctx.ai = ai;
+    ctx.embedder = embedder;
+    ctx.userText = "make the hook shorter";
+    await run(ctx, "updateDocument", edit);
+    expect(embedder.calls).toBe(0);
+    expect(ai.calls[0]!.prompt).not.toContain("ZEBRAFACT");
+    expect(ai.calls[0]!.prompt).not.toContain("IDENTITYMARK");
+    expect(ai.calls[0]!.prompt).toContain("<open_document");
+  });
+
+  it("an edit that asks for new facts keeps the knowledge search and identity", async () => {
+    await seed();
+    await openPost();
+    const ai = fakeAi(answer);
+    ctx.ai = ai;
+    ctx.userText = "add a number from my notes about churn";
+    await run(ctx, "updateDocument", { ...edit, description: "Add a number from the user's notes about churn", editRequirements: ["Include a churn number from the notes"] });
+    expect(ai.calls[0]!.prompt).toContain("ZEBRAFACT");
+    expect(ai.calls[0]!.prompt).toContain("IDENTITYMARK");
+  });
+});
 
 describe("updateDocument", () => {
   it("saves an AI_EDIT version and writes a document snapshot", async () => {

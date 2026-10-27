@@ -1,5 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { upsertMemory } from "@brandloop/db";
+import { fakeEmbedder } from "@brandloop/ai/testing";
+import { createKnowledge, prisma, replaceChunks, upsertMemory } from "@brandloop/db";
 import type { TurnContext } from "../context";
 import { scriptedAi } from "../mock";
 import { cleanup, fakeAi, testContext } from "../test/fixtures";
@@ -77,5 +78,38 @@ describe("generateHooks", () => {
   it("fails cleanly when no hook survives", async () => {
     ctx.ai = fakeAi({ hooks: [] });
     expect(await generateHooksRun(ctx, input)).toMatch(/^Failed: /);
+  });
+});
+
+describe("generateHooks grounding", () => {
+  const KB = "ZEBRAFACT: hiring the first engineer took us eleven interviews " + "padding words about the topic ".repeat(25);
+  async function seed() {
+    const item = await createKnowledge(ctx.profileId, { type: "TEXT", title: "Hiring notes", content: KB });
+    const [v] = await fakeEmbedder().embed([`Hiring notes\n\n${KB}`]);
+    await replaceChunks(ctx.profileId, "KNOWLEDGE", item.id, [{ ordinal: 0, title: "Hiring notes", text: KB, embedding: v! }]);
+    await prisma.knowledgeItem.update({ where: { id: item.id }, data: { status: "READY" } });
+  }
+
+  it("hooks for a post in hand reuse it: no knowledge search", async () => {
+    await seed();
+    const ai = fakeAi({ hooks: [] });
+    ctx.ai = ai;
+    ctx.userText = "give me hook options";
+    await generateHooksRun(ctx, { ...input, draftBody: "The post body about hiring your first engineer." });
+    expect(ai.calls.length).toBeGreaterThan(0);
+    expect(ai.calls[0]!.prompt).not.toContain("ZEBRAFACT");
+  });
+
+  it("hooks for a bare topic, or that ask for new material, keep the knowledge", async () => {
+    await seed();
+    const bare = fakeAi({ hooks: [] });
+    ctx.ai = bare;
+    await generateHooksRun(ctx, input);
+    expect(bare.calls[0]!.prompt).toContain("ZEBRAFACT");
+    const asks = fakeAi({ hooks: [] });
+    ctx.ai = asks;
+    ctx.userText = "hooks that use a story from my notes";
+    await generateHooksRun(ctx, { ...input, draftBody: "The post body about hiring your first engineer." });
+    expect(asks.calls[0]!.prompt).toContain("ZEBRAFACT");
   });
 });

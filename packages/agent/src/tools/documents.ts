@@ -19,7 +19,7 @@ import { defuseTags, frameData, oneLine } from "../data";
 import { LIMITS } from "../limits";
 import { editDocumentText } from "../specialists/editing";
 import { findHandoff, PostWritingPayload } from "../specialists/envelope";
-import { buildGrounding, renderGrounding } from "../specialists/grounding";
+import { buildGrounding, groundingScopeFor, renderGrounding } from "../specialists/grounding";
 import { lintPost } from "../writing/lint";
 import { lastResort, mechanicalFix, polishText } from "../writing/polish";
 import { capOutput } from "./cap";
@@ -219,12 +219,15 @@ export async function updateDocumentRun(ctx: TurnContext, input: UpdateDocumentI
       publish(ctx, saved);
       return { id: saved.id, title: saved.title, version: saved.version, success: true, contentChanged: saved.text !== doc.text, changeSummary: `Restored version ${restore}` };
     }
+    // An edit works on the post in hand: voice, style and rules, not a fresh look at the knowledge base, unless the request wants new material.
+    const request = [input.description, ...input.editRequirements].join("\n");
     const grounding = await buildGrounding({
       profileId: ctx.profileId,
-      request: [input.description, ...input.editRequirements].join("\n"),
+      request,
       knowledgeIds: ctx.selections.knowledgeIds,
       writingStyleId: ctx.selections.writingStyleId,
       embedder: ctx.embedder,
+      scope: groundingScopeFor({ text: `${ctx.userText}\n${request}`, knowledgeIds: ctx.selections.knowledgeIds, research: ctx.research.brief ? "research" : null }),
     });
     // A template picked for this message (the draft card's Swap) restructures the whole post around its skeleton.
     const swapTo = await ownTemplate(ctx);
@@ -347,12 +350,13 @@ export async function proposeDocumentEditsRun(
       knowledgeIds: ctx.selections.knowledgeIds,
       writingStyleId: ctx.selections.writingStyleId,
       embedder: ctx.embedder,
+      scope: groundingScopeFor({ text: `${ctx.userText}\n${input.instruction}`, knowledgeIds: ctx.selections.knowledgeIds }),
     });
     const attr = (t: string) => defuseTags(t).replace(/[\s"<>]+/g, " ").trim();
     const prompt = [
-      `<request>\n${defuseTags(input.instruction)}\n</request>`,
       renderGrounding(grounding),
       `<open_document id="${attr(doc.id)}" version="${doc.version}" title="${attr(doc.title)}">\n${defuseTags(doc.text)}\n</open_document>`,
+      `<request>\n${defuseTags(input.instruction)}\n</request>`,
       `<passage>\n${defuseTags(input.targetText)}\n</passage>`,
     ].join("\n\n");
     const raw = await ctx.ai.json({ model: "generate", system: PROPOSE_SYSTEM, prompt, schema: z.object({ replacement: z.string() }), abortSignal });
