@@ -251,7 +251,7 @@ export async function updateDocumentRun(ctx: TurnContext, input: UpdateDocumentI
       rules: grounding.rules,
       lintCtx,
       request: input.description,
-      grounding: renderGrounding(grounding),
+      writingRules: grounding.writingRules,
       deadline: ctx.deadline,
       abortSignal,
       render: { bullet: grounding.style.bullet, numbered: true },

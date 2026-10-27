@@ -167,7 +167,7 @@ export async function delegateWritingRun(
         personalDetails: personal,
         expectList: format.source === "picked" && planHasList(format.plan) && !forbidLists,
       };
-      const common = { rules: grounding.rules, lintCtx, request: input.request, grounding: renderGrounding(grounding), deadline: ctx.deadline, abortSignal, render: { bullet: grounding.style.bullet, numbered: true } };
+      const common = { rules: grounding.rules, lintCtx, request: input.request, writingRules: grounding.writingRules, deadline: ctx.deadline, abortSignal, render: { bullet: grounding.style.bullet, numbered: true } };
       const started = Date.now();
       const polished = payload.blocks?.length
         ? await polishDraft(ctx.ai, { ...common, blocks: payload.blocks })
