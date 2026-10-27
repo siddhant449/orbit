@@ -370,6 +370,8 @@ export async function runChatTurn(
         // A picker ends the turn: the user answers it, then the next turn writes.
         stopWhen: [stepCountIs(LIMITS.steps), hasToolCall("presentOptions"), ideasShown, closeAfter],
         maxOutputTokens: LIMITS.maxOutputTokens,
+        // One cache key per profile: its turns share the static prompt and tool list prefix.
+        providerOptions: { openai: { promptCacheKey: `orbit-chat:${profileId}` } },
         abortSignal: AbortSignal.any([controller.signal, AbortSignal.timeout(deps.turnTimeoutMs ?? TURN_TIMEOUT_MS)]),
         // Another instance may have asked this run to stop (POST /api/chat/stop landed elsewhere).
         prepareStep: async ({ stepNumber }) => {
