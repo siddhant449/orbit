@@ -319,3 +319,19 @@ describe("resolveModel", () => {
     expect(resolveModel("extract")).toBe("custom-extract");
   });
 });
+
+describe("prompt cache key", () => {
+  const keyOf = (model: MockLanguageModelV4) => (model.doGenerateCalls[0]!.providerOptions as { openai?: { promptCacheKey?: string } } | undefined)?.openai?.promptCacheKey;
+
+  it("is set per feature: the same system prompt gets the same key, a different one another", async () => {
+    const a = make("hi");
+    await a.client.text({ model: "generate", system: "writer system", prompt: "x" });
+    const b = make("hi");
+    await b.client.text({ model: "generate", system: "writer system", prompt: "other request" });
+    const c = make("hi");
+    await c.client.text({ model: "generate", system: "editor system", prompt: "x" });
+    expect(keyOf(a.model)).toMatch(/^orbit:[0-9a-f]{16}$/);
+    expect(keyOf(b.model)).toBe(keyOf(a.model));
+    expect(keyOf(c.model)).not.toBe(keyOf(a.model));
+  });
+});
