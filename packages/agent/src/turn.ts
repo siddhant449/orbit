@@ -43,6 +43,7 @@ import type { RunRegistry } from "./registry";
 import { titleChat } from "./title";
 import { isAbort } from "./tools/run";
 import { buildTools, type ChatUIMessage } from "./tools";
+import { gatedToolNames } from "./tools/gate";
 import { resolveOptionPick, resolveTypedPick } from "./tools/options";
 import { ActiveTaskSchema, type ActiveTask, type ChatRequestBody, type MessageMetadata } from "./types";
 
@@ -364,6 +365,8 @@ export async function runChatTurn(
         instructions: verdict.ok ? instructions : "Reply with the fixed message only.",
         messages: modelMessages,
         tools,
+        // Fixed for the whole turn from server facts, so the tool list stays a stable cached prefix.
+        activeTools: gatedToolNames(ctx, Object.keys(tools)) as never,
         // A picker ends the turn: the user answers it, then the next turn writes.
         stopWhen: [stepCountIs(LIMITS.steps), hasToolCall("presentOptions"), ideasShown, closeAfter],
         maxOutputTokens: LIMITS.maxOutputTokens,
