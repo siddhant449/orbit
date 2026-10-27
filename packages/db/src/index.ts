@@ -26,3 +26,4 @@ export * from "./services/linkedin-export";
 export * from "./services/research";
 export * from "./services/templates";
 export * from "./services/onboarding";
+export * from "./services/ai-usage";
