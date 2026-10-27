@@ -29,6 +29,8 @@ const env = {
   STORAGE_DRIVER: "local",
   JOBS_DRIVER: "local",
   LINKEDIN_PUBLISH_ENABLED: "",
+  // Nobody is an admin by default, whatever .env says: e2e/admin.spec.ts opts in with the mock-only cookie (see lib/admin.ts).
+  ADMIN_EMAILS: "",
 };
 console.log(`dev:e2e: next dev on :${port}, database ${databaseNameFromUrl(url)}, AI_MOCK_MODEL=1`);
 
