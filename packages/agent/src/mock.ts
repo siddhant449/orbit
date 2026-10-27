@@ -117,6 +117,16 @@ function scriptedAngles(topic: string, forOpenPost: boolean) {
   };
 }
 
+/** The previous turn ended on a picker (angles or ideas) that the newest user message answers. */
+function pickerOpenBefore(prompt: Prompt): boolean {
+  const i = lastUserIndex(prompt);
+  for (const m of prompt.slice(0, i).reverse()) {
+    if (m.role === "user") break;
+    if ((m.role === "assistant" || m.role === "tool") && m.content.some((p) => (p.type === "tool-call" || p.type === "tool-result") && (p.toolName === "presentOptions" || p.toolName === "generateIdeas"))) return true;
+  }
+  return false;
+}
+
 /** The first line of the `<open_document>` in the system prompt, or null when no post is open. */
 function openDocumentFirstLine(prompt: Prompt): string | null {
   const system = prompt.find((m) => m.role === "system");
@@ -212,6 +222,10 @@ function route(opts: CallOptions): ScriptStep {
   }
   if (!angle && has.has("presentOptions") && /\b(different|other|some|more)\s+angles?\b|\bangles\b/i.test(text)) {
     return call("presentOptions", scriptedAngles(openLine ? "post" : "this idea", Boolean(openLine)));
+  }
+  // A typed answer to an open picker (no <picked_angle>: the server read it as the user's own words) is the angle to write.
+  if (!angle && !openLine && has.has("delegateWriting") && pickerOpenBefore(opts.prompt)) {
+    return call("delegateWriting", { request: `Write a short LinkedIn post for the user. Use this angle: ${text.slice(0, 1_000)}`, specialty: "post", personalDetails: "none", overrides: null, chosenHook: null, templateSlug: null });
   }
   // Angles only for a bare topic: a comparison, question or stance already carries direction and is written directly.
   const topic = !openLine && /\b(create|write|make)\b[^.]*\bpost on\s+(.+?)[.!?]*$/i.exec(text)?.[2];
@@ -448,12 +462,15 @@ export const FAKE_CITATIONS = [
   { url: "https://harbor.example/pricing", title: "Harbor Cloud pricing change", snippet: null },
   { url: "https://quill.example/old", title: "Quill Software roundup", snippet: null },
 ];
+let failUntil = 0;
 export function fakeResearchProvider(): ResearchProvider {
   return {
     id: "fake",
     async search(q) {
       // The e2e marker simulates a provider that never answers.
-      if (q.query.includes("[e2e:research-fails]")) throw new Error("Simulated provider failure");
+      // The facet queries don't all carry the topic, so the first marked query fails its sibling queries too.
+      if (q.query.includes("[e2e:research-fails]")) failUntil = Date.now() + 1_500;
+      if (Date.now() < failUntil) throw new Error("Simulated provider failure");
       return { answer: `Results for: ${q.query.slice(0, 80)}`, citations: FAKE_CITATIONS };
     },
   };

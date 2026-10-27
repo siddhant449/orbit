@@ -63,6 +63,8 @@ test("a this-week request shows a dated research step, an exclusion, and a post 
   const panel = page.getByRole("dialog", { name: "MVP versus POC" });
   const text = panel.locator("[data-post-text]");
   await expect(text).toContainText(`${day} ${month}`, { timeout: 40_000 });
+  // The post streams in: read it once the Sources line is complete.
+  await expect(text).toContainText("https://northwind.example/models");
   const raw = (await text.textContent()) ?? "";
   expect(raw).toMatch(/\n\nSources: Northwind Labs \(\d{1,2} [A-Z][a-z]{2}\) https:\/\/northwind\.example\/models$/);
   expect(raw).not.toContain("quill.example");
