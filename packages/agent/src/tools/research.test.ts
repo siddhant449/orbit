@@ -1,5 +1,5 @@
 import { getOrCreateChat, saveResearchBrief } from "@brandloop/db";
-import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TurnContext } from "../context";
 import { fakeResearchProvider } from "../mock";
 import { cleanup, fakeAi, testContext } from "../test/fixtures";
@@ -63,3 +63,29 @@ describe("researchTopic", () => {
   });
 });
 
+
+describe("research that cannot complete", () => {
+  it("a provider that errors is skipped, not failed, and logs the real cause", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    ctx.research.provider = { id: "fake", search: async () => { throw Object.assign(new Error("upstream 503"), { statusCode: 503 }); } };
+    const out = await researchTopicRun(ctx, { query: "AI news", window: null, site: null });
+    expect(typeof out).toBe("string");
+    expect(out as string).toMatch(/^Skipped:/);
+    expect(out as string).toContain("write anyway");
+    expect(log.mock.calls.flat().join(" ")).toContain("status 503");
+    log.mockRestore();
+  });
+  it("a search that times out is skipped with the timeout reason", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    ctx.research.provider = { id: "fake", search: async () => { throw new DOMException("timed out", "TimeoutError"); } };
+    const out = await researchTopicRun(ctx, { query: "AI news", window: null, site: null });
+    expect(out as string).toMatch(/^Skipped: the web search took too long/);
+    log.mockRestore();
+  });
+  it("has generous time budgets", async () => {
+    const { SEARCH_TIMEOUT_MS, PREFETCH_WALL_MS } = await import("../research/brief");
+    expect(SEARCH_TIMEOUT_MS).toBeGreaterThanOrEqual(60_000);
+    expect(PREFETCH_WALL_MS).toBeGreaterThanOrEqual(75_000);
+    expect(PREFETCH_WALL_MS).toBeLessThan(120_000);
+  });
+});

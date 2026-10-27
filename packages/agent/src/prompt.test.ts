@@ -17,6 +17,20 @@ const base: PromptInput = {
 };
 const input = (over: Partial<PromptInput> = {}): PromptInput => ({ ...base, ...over });
 
+describe("picker and research rules", () => {
+  it("always calls presentOptions for an angles request and never asks to paste a shown option", () => {
+    expect(STATIC_PREFIX).toContain("Angles on request");
+    expect(STATIC_PREFIX).toContain("ALWAYS call presentOptions");
+    expect(STATIC_PREFIX).toContain("Never ask them to paste or repeat options you showed");
+    expect(STATIC_PREFIX).toContain("that typed text is their chosen angle or idea");
+  });
+  it("never refuses a draft because research was skipped", () => {
+    expect(STATIC_PREFIX).toContain('Output starting with "Skipped:"');
+    expect(STATIC_PREFIX).toContain("NEVER refuse or stop");
+    expect(STATIC_PREFIX).toContain("live sources were unavailable");
+  });
+});
+
 describe("buildSystemPrompt", () => {
   it("states the angles-first policy and the picked-angle block", () => {
     expect(STATIC_PREFIX).toContain("Angles first");

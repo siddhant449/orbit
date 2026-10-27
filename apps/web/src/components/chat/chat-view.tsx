@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import useSWR from "swr";
 import { ArrowDown, SquarePen } from "lucide-react";
 import { toast } from "sonner";
-import { openPanelOf, swapOpening, toolLabel, type ChatUIMessage, type HookCard, type PanelDoc } from "@brandloop/agent/client";
+import { matchTypedAnswer, openPanelOf, swapOpening, toolLabel, type ChatUIMessage, type HookCard, type PanelDoc } from "@brandloop/agent/client";
 import { Button, useMediaQuery } from "@brandloop/ui";
 import { PostsIcon } from "@brandloop/ui/icons";
 import type { VoiceOption } from "@/components/home/voice-picker";
@@ -218,6 +218,14 @@ export function ChatView({
     }
     setDraft("");
     jumpToLatest();
+    // Typing "2nd" or an option's name while a picker is open answers that picker, like a click.
+    const open = openPanelOf(messages);
+    const typedId = open ? matchTypedAnswer(open.options, text) : null;
+    const typed = open?.options.find((o) => o.id === typedId);
+    if (open && typed) {
+      void sendOptionPick(typed.label, { pickerToolCallId: open.pickerToolCallId, optionId: typed.id }, { formatId: stickyPin.current && formatId === stickyPin.current ? formatId : null });
+      return;
+    }
     // A picked format applies to this one message: it rides in the request body and the chip clears.
     void send(text, { formatId });
     if (!stickyPin.current || formatId !== stickyPin.current) setFormatId(null);

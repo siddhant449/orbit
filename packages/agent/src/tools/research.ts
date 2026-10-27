@@ -3,7 +3,7 @@ import { tool } from "ai";
 import { z } from "zod";
 import type { TurnContext } from "../context";
 import { frameData } from "../data";
-import { BRIEF_CHARS, renderBrief, runResearch, type ResearchBrief } from "../research/brief";
+import { BRIEF_CHARS, describeFailure, renderBrief, runResearch, SKIPPED_PREFIX, type ResearchBrief } from "../research/brief";
 import { defaultWindow, resolveWindow } from "../research/window";
 import { capOutput } from "./cap";
 import { isAbort } from "./run";
@@ -47,9 +47,11 @@ export async function researchTopicRun(
     ctx.research.brief = brief;
     return { success: true, window: brief.window, items: brief.items, exclusions: brief.exclusions, provider: brief.provider, searchCount: brief.searchCount, reused: brief.reused };
   } catch (err) {
-    if (isAbort(err)) throw err;
-    console.error(`[agent] tool researchTopic failed: ${err instanceof Error ? err.message : String(err)}`);
-    return "Failed: something went wrong researching that.";
+    // The user stopping the turn unwinds it; research's own time budget running out only skips the research.
+    if (isAbort(err) && abortSignal?.aborted) throw err;
+    const timedOut = isAbort(err);
+    console.error(`[agent] tool researchTopic failed: ${describeFailure(err)}`);
+    return `${SKIPPED_PREFIX} research ${timedOut ? "took too long" : "hit a provider error"}, so there is none this time. Do not stop or refuse: carry on and write anyway, with no dated or specific news claims, and say in one short line that live sources were unavailable so you avoided specific news.`;
   }
 }
 

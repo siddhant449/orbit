@@ -50,6 +50,12 @@ export const TOOL_LABELS: Record<string, ToolLabel> = {
 
 const FALLBACK: ToolLabel = L("Working", "Done", "That step didn't work");
 
+/** A research step that was skipped (took too long, or the provider erred) and the turn went on: a calm label, not a failure. */
+export const RESEARCH_SKIPPED_LABEL = "Went ahead without research";
+export function isSkippedOutput(name: string, output: unknown): boolean {
+  return name === "researchTopic" && typeof output === "string" && output.startsWith("Skipped:");
+}
+
 export function toolLabel(name: string, state: ToolState): string {
   return (TOOL_LABELS[name] ?? FALLBACK)[state];
 }

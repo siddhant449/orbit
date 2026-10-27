@@ -1,4 +1,4 @@
-import { toolLabel, type ToolState } from "@brandloop/agent/client";
+import { isSkippedOutput, RESEARCH_SKIPPED_LABEL, toolLabel, type ToolState } from "@brandloop/agent/client";
 import { toolNameOf, toolStateOf, type ToolPartLike } from "./tool-row";
 
 export type Step = { label: string; state: ToolState; detail: string | null };
@@ -37,7 +37,8 @@ function stepDetail(part: ToolPartLike): string | null {
 export function summarizeSteps(parts: ToolPartLike[], durationMs?: number): StepsSummary {
   const steps = parts.map((p) => {
     const state = toolStateOf(p);
-    return { label: toolLabel(toolNameOf(p), state), state, detail: state === "done" ? stepDetail(p) : null };
+    const skipped = state === "done" && isSkippedOutput(toolNameOf(p), p.output);
+    return { label: skipped ? RESEARCH_SKIPPED_LABEL : toolLabel(toolNameOf(p), state), state, detail: state === "done" ? stepDetail(p) : null };
   });
   const running = steps.filter((s) => s.state === "active").at(-1);
   return {

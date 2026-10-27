@@ -190,6 +190,9 @@ function route(opts: CallOptions): ScriptStep {
     if (last.toolName === "createDocument" && systemText(opts.prompt).includes("<picked_angle>\nQuestion asked:")) {
       return { text: "Here's your first draft. What would you like to improve?" };
     }
+    if (last.toolName === "createDocument" && /\[e2e:research-fails\]/.test(text)) {
+      return { text: "Here's your draft. Live sources were unavailable, so I avoided specific news." };
+    }
     if (last.toolName === "delegateWriting" && /\[e2e:needs-facts\]/.test(text)) {
       return { text: `Before I write this I need two facts only you have. ${SCRIPTED_QUESTIONS.map((q, i) => `${i + 1}. ${q}`).join(" ")}` };
     }
@@ -207,8 +210,8 @@ function route(opts: CallOptions): ScriptStep {
   if (angle && openLine) {
     return call("updateDocument", { description: text.slice(0, 2_000), editRequirements: ["Take the picked angle"], editScope: "whole-document", restoreVersion: null });
   }
-  if (!angle && has.has("presentOptions") && /\bdifferent angles\b/i.test(text) && openLine) {
-    return call("presentOptions", scriptedAngles("post", true));
+  if (!angle && has.has("presentOptions") && /\b(different|other|some|more)\s+angles?\b|\bangles\b/i.test(text)) {
+    return call("presentOptions", scriptedAngles(openLine ? "post" : "this idea", Boolean(openLine)));
   }
   // Angles only for a bare topic: a comparison, question or stance already carries direction and is written directly.
   const topic = !openLine && /\b(create|write|make)\b[^.]*\bpost on\s+(.+?)[.!?]*$/i.exec(text)?.[2];
@@ -449,6 +452,8 @@ export function fakeResearchProvider(): ResearchProvider {
   return {
     id: "fake",
     async search(q) {
+      // The e2e marker simulates a provider that never answers.
+      if (q.query.includes("[e2e:research-fails]")) throw new Error("Simulated provider failure");
       return { answer: `Results for: ${q.query.slice(0, 80)}`, citations: FAKE_CITATIONS };
     },
   };

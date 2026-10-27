@@ -66,3 +66,39 @@ describe("resolveOptionPick", () => {
     expect(resolveOptionPick(stored, forged)?.brief).toBe("SECRET-BRIEF-A");
   });
 });
+
+import { pickerModelText, resolveTypedPick } from "./options";
+
+describe("model output of a picker", () => {
+  it("lists the question and numbered options, never a brief", () => {
+    const text = pickerModelText(presentOptionsOutput(input));
+    expect(text).toContain("Which angle should the LLM post take?");
+    expect(text).toContain("1. The myth (Contrarian.)");
+    expect(text).toContain("2. The steps (Practical.)");
+    expect(text).toContain("Stop now and wait");
+    expect(text).not.toContain("SECRET-BRIEF");
+  });
+  it("includes the source badge for ideas and passes failure strings through", () => {
+    const out = { shown: true, question: "Which idea?", options: [{ id: "i", label: "Hook", explainer: "why", badge: "From your story" }] };
+    expect(pickerModelText(out)).toContain("1. Hook [From your story] (why)");
+    expect(pickerModelText("Failed: x")).toBe("Failed: x");
+  });
+});
+
+describe("resolveTypedPick", () => {
+  const msgs = [...stored.map((m, i) => ({ id: `m${i}`, ...m })), { id: "u2", role: "user", parts: [{ type: "text", text: "2nd" }] }];
+  it("turns an ordinal or a label into a pick of the open picker", () => {
+    expect(resolveTypedPick(msgs, "u2", "2nd")).toEqual({ pickerToolCallId: "call_1", optionId: "b" });
+    expect(resolveTypedPick(msgs, "u2", "the myth")).toEqual({ pickerToolCallId: "call_1", optionId: "a" });
+    expect(resolveResult(msgs, "2nd")).toMatchObject({ label: "The steps", brief: "SECRET-BRIEF-B" });
+  });
+  it("is null for own words, out of range, or when the picker was not the previous message", () => {
+    expect(resolveTypedPick(msgs, "u2", "Make it about cost")).toBeNull();
+    expect(resolveTypedPick(msgs, "u2", "5")).toBeNull();
+    const later = [...msgs, { id: "a3", role: "assistant", parts: [{ type: "text", text: "ok" }] }, { id: "u3", role: "user", parts: [] }];
+    expect(resolveTypedPick(later, "u3", "2nd")).toBeNull();
+  });
+});
+function resolveResult(m: { id: string; role: string; parts: unknown }[], text: string) {
+  return resolveOptionPick(m, resolveTypedPick(m, "u2", text));
+}

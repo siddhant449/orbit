@@ -24,6 +24,15 @@ const isToolWithOutput = (p: Part): p is Part & { output: unknown } =>
  */
 const isProviderExecuted = (p: Part) => "providerExecuted" in p && p.providerExecuted === true;
 
+const isPicker = (p: Part) => p.type === "tool-presentOptions" || p.type === "tool-generateIdeas";
+
+/** A picker's stored output without its hidden writing briefs (the model is told the options, never the briefs). */
+function withoutBriefs(output: unknown): unknown {
+  if (!output || typeof output !== "object" || !("briefs" in output)) return output;
+  const { briefs: _briefs, ...rest } = output as Record<string, unknown>;
+  return rest;
+}
+
 function truncateOutput(output: unknown, max: number): unknown {
   const text = typeof output === "string" ? output : JSON.stringify(output);
   if (text === undefined || text.length <= max) return output;
@@ -48,10 +57,13 @@ export function windowHistory(messages: ChatUIMessage[], opts: Partial<WindowOpt
   const o = { ...DEFAULTS, ...opts };
   let window = fromFirstUser(messages.slice(-o.maxMessages));
 
+  // The newest picker is kept whole however far back it is: the user may still be answering it.
+  const latestPicker = window.findLastIndex((m) => m.parts.some((p) => isPicker(p) && isToolWithOutput(p)));
   window = window.map((m, i) => {
     const old = i < window.length - o.fullToolOutputs;
     const parts = m.parts.filter((p) => !isReasoning(p) && !isProviderExecuted(p)).map((p) => {
       if (!isToolWithOutput(p)) return p;
+      if (isPicker(p)) return { ...p, output: old && i !== latestPicker ? OMITTED_OUTPUT : withoutBriefs(p.output) } as Part;
       return { ...p, output: old ? OMITTED_OUTPUT : truncateOutput(p.output, o.maxToolOutputChars) } as Part;
     });
     return { ...m, parts };

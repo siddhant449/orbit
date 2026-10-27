@@ -2,7 +2,7 @@
 // re-exports are `export type`, so no server code reaches a client bundle.
 export type { ActiveTask, ChatDataParts, ChatRequestBody, MessageMetadata } from "../types";
 export type { ChatTools, ChatUIMessage } from "../tools";
-export { CHECK_LABELS, HIDDEN_OUTPUT_TOOLS, isToolError, TOOL_LABELS, toolLabel, type ToolLabel, type ToolState } from "./labels";
+export { CHECK_LABELS, isSkippedOutput, RESEARCH_SKIPPED_LABEL, HIDDEN_OUTPUT_TOOLS, isToolError, TOOL_LABELS, toolLabel, type ToolLabel, type ToolState } from "./labels";
 export { groupChatsByDate, type HistoryGroupLabel } from "./history-groups";
 export { collapseToolRuns, type ToolGroup } from "./tool-runs";
 export { QUICK_LINKS, type QuickLinkKey } from "./quick-links";
@@ -35,7 +35,7 @@ export {
   type Range,
 } from "../writing/measure";
 export { enforcedChips } from "../writing/rules";
-export { openPanelOf, panelsOf, parseOptionsPanel, type OptionsPanel } from "./options";
+export { matchTypedAnswer, openPanelOf, panelsOf, parseOptionsPanel, type OptionsPanel } from "./options";
 export { hookMeta, parseHookCards, swapOpening, type HookCard } from "./hooks";
 export { CATEGORIES, FRAMEWORKS } from "../library";
 export { stripCitations } from "./sanitize";

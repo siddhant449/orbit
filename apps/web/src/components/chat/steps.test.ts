@@ -65,3 +65,12 @@ describe("formatDuration", () => {
     expect(summarizeSteps([{ ...part, type: "tool-searchKB" }]).steps[0]!.detail).toBeNull();
   });
 });
+
+describe("a skipped research step", () => {
+  it("reads calmly and does not count as failed", () => {
+    const part = { type: "tool-researchTopic", state: "output-available", output: "Skipped: the web search took too long." };
+    const s = summarizeSteps([part]);
+    expect(s.steps[0]).toMatchObject({ label: "Went ahead without research", state: "done" });
+    expect(s.failed).toBe(0);
+  });
+});

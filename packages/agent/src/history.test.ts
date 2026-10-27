@@ -92,3 +92,26 @@ describe("windowHistory", () => {
     expect(windowHistory([])).toEqual([]);
   });
 });
+
+describe("windowHistory pickers", () => {
+  const picker = (id: string) => ({
+    type: "tool-generateIdeas",
+    toolCallId: id,
+    state: "output-available",
+    input: { count: 5 },
+    output: { shown: true, question: "Which idea?", options: [{ id: "idea-1", label: "One", explainer: "e" }, { id: "idea-2", label: "Two", explainer: "e" }], briefs: { "idea-1": { brief: "SECRET".repeat(900), category: null } } },
+  });
+  it("keeps the newest picker's options even when far back, and never carries its briefs", () => {
+    const msgs = [text("user", "ideas"), msg("assistant", [picker("p1")]), ...alternating(10).map((m, i) => text(i % 2 === 0 ? "user" : "assistant", `later ${i}`))];
+    const out = windowHistory(msgs, { fullToolOutputs: 2 });
+    const part = out[1]!.parts[0] as { output: { question?: string; briefs?: unknown } };
+    expect(part.output.question).toBe("Which idea?");
+    expect(JSON.stringify(part.output)).not.toContain("SECRET");
+  });
+  it("omits an older picker once a newer one exists", () => {
+    const msgs = [text("user", "a"), msg("assistant", [picker("p1")]), text("user", "b"), msg("assistant", [picker("p2")]), ...alternating(8)];
+    const out = windowHistory(msgs, { fullToolOutputs: 2 });
+    expect((out[1]!.parts[0] as { output: unknown }).output).toBe(OMITTED_OUTPUT);
+    expect((out[3]!.parts[0] as { output: { question?: string } }).output.question).toBe("Which idea?");
+  });
+});

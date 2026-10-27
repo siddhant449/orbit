@@ -6,7 +6,7 @@ import type { TurnContext } from "../context";
 import { defuseTags, oneLine } from "../data";
 import { gatePurposes, HOOK_PURPOSES, HOOK_PURPOSE_IDS, pickPurposes, type HookPurpose } from "../library";
 import { assignSources, sourceBadge, type AssignInput, type IdeaSource } from "../writing/ideas";
-import { presentOptionsOutput, type PresentOptionsInput, type PresentOptionsOutput } from "./options";
+import { pickerModelText, presentOptionsOutput, type PresentOptionsInput, type PresentOptionsOutput } from "./options";
 import { isAbort } from "./run";
 
 /** What a set of ideas can be built from, as plain data (the user's own material only). */
@@ -205,7 +205,7 @@ export function ideaTools(ctx: TurnContext) {
         "Post ideas, shown to the user as a picker. Use it for \"post ideas\", \"what should I post\" and \"ideas for this week\", never delegateWriting. The server assigns each idea a different piece of the user's own material (knowledge item, story, strategy pillar, this week's research) and writes it; you pass only how many (3 to 6, null means 5). The turn ends on the picker: add at most one short sentence, never list the ideas in text. When the user picks one, write it from the <picked_angle> brief.",
       inputSchema: z.object({ count: z.number().int().min(3).max(6).nullable() }),
       execute: ({ count }, { abortSignal }) => generateIdeasRun(ctx, { count }, abortSignal),
-      toModelOutput: ({ output }) => ({ type: "text", value: typeof output === "string" ? output : "The ideas are on the user's screen. Stop now and wait for their pick." }),
+      toModelOutput: ({ output }) => ({ type: "text", value: pickerModelText(output) }),
     }),
   };
 }

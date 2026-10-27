@@ -42,7 +42,7 @@ import type { RunRegistry } from "./registry";
 import { titleChat } from "./title";
 import { isAbort } from "./tools/run";
 import { buildTools, type ChatUIMessage } from "./tools";
-import { resolveOptionPick } from "./tools/options";
+import { resolveOptionPick, resolveTypedPick } from "./tools/options";
 import { ActiveTaskSchema, type ActiveTask, type ChatRequestBody, type MessageMetadata } from "./types";
 
 export type ChatDeps = {
@@ -509,6 +509,10 @@ export async function runChatTurn(
     const parsed = ActiveTaskSchema.safeParse((await lastAssistantContext(chatId))?.activeTask);
     const prevTask: ActiveTask | null = parsed.success ? parsed.data : null;
 
+    // A typed "2nd" or a clear label match to the picker this reply answers is a click on that option; any other text is the user's own answer.
+    const optionPick = body.optionPick ?? (body.uiAction || body.quickLinkKey ? null : resolveTypedPick(stored, requestMessageId, userText));
+    const pickedAngle = resolveOptionPick(stored, optionPick);
+
     const ctx: TurnContext = {
       profileId,
       userId,
@@ -529,7 +533,7 @@ export async function runChatTurn(
       },
       writer: null,
       handoffs: new Map(),
-      pickedAngle: resolveOptionPick(stored, body.optionPick),
+      pickedAngle,
       documentRef: { current: await getChatDocument(profileId, chatId) },
       documentContext: body.documentContext ?? null,
       visuals: deps.visuals ?? null,
@@ -548,7 +552,7 @@ export async function runChatTurn(
         calls: 0,
         // The first step must research when the web is on, a provider exists and the request is about current events. An
         // angle pick is not: its label can say "this week" without the post needing news.
-        required: Boolean(deps.research) && body.webSearchEnabled && !resolveOptionPick(stored, body.optionPick) && isTimely(userText).timely,
+        required: Boolean(deps.research) && body.webSearchEnabled && !pickedAngle && isTimely(userText).timely,
       },
       deadline: new Date(Date.now() + (deps.turnTimeoutMs ?? TURN_TIMEOUT_MS)),
     };

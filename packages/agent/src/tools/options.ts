@@ -1,5 +1,6 @@
 import { tool } from "ai";
 import { z } from "zod";
+import { parseOptionsPanel, matchTypedAnswer } from "../client/options";
 import { CATEGORIES } from "../library/categories";
 
 const OptionInput = z.object({
@@ -56,6 +57,20 @@ export function presentOptionsOutput(input: PresentOptionsInput): PresentOptions
   };
 }
 
+const STOP_AND_WAIT = "The picker is on the user's screen. Stop now and wait for their answer: do not list the options in text.";
+
+/**
+ * What the model sees of a picker it showed: the question and the numbered options (label, why it works, source badge), never
+ * the hidden briefs. This is also what later turns see, so "the second one" can be read against it.
+ */
+export function pickerModelText(output: unknown): string {
+  if (typeof output === "string") return output;
+  const o = output as { question?: unknown; options?: { label?: unknown; explainer?: unknown; badge?: unknown }[] } | null;
+  if (!o || typeof o.question !== "string" || !Array.isArray(o.options)) return STOP_AND_WAIT;
+  const rows = o.options.map((x, i) => `${i + 1}. ${String(x?.label ?? "")}${typeof x?.badge === "string" && x.badge ? ` [${x.badge}]` : ""}${typeof x?.explainer === "string" && x.explainer ? ` (${x.explainer})` : ""}`);
+  return `Shown to the user: "${o.question}"\n${rows.join("\n")}\n${STOP_AND_WAIT}`;
+}
+
 export type OptionPick = { pickerToolCallId: string; optionId: string };
 export type PickedAngle = { question: string; label: string; brief: string; category: string | null };
 
@@ -104,7 +119,25 @@ export function optionTools() {
         `Ask the user to choose between options, shown as a panel above their message box. Use it for a new post when the user gave only a topic: offer 3 or 4 distinct angles. \`question\` is the heading. Each option has a short \`label\`, a one-line \`explainer\` of why it works, and a hidden \`brief\`: complete writing instructions for that angle, grounded in what you know about the user, never inventing personal facts, and a \`category\` (the kind of post that angle is, one of: ${CATEGORIES.map((c) => c.id).join(", ")}; null if none fits). Set \`recommendedOptionId\` to the best fit (null if none). Pass null for fields you do not need; allowFreeInput null means true. The turn ends after this call: add at most the one-sentence \`preamble\`, never list the options in text.`,
       inputSchema: PresentOptionsInput,
       execute: (input) => presentOptionsOutput(input),
-      toModelOutput: () => ({ type: "text", value: "The options are on the user's screen. Stop now and wait for their pick." }),
+      toModelOutput: ({ output }) => ({ type: "text", value: pickerModelText(output) }),
     }),
   };
+}
+
+/**
+ * A typed reply to the picker the newest assistant message left open ("2nd", "option 2", a clear match to one label), as the
+ * pick a click would have sent. Null when the reply is anything else: that stays the user's own answer.
+ */
+export function resolveTypedPick(messages: { id: string; role: string; parts: unknown }[], requestMessageId: string, text: string): OptionPick | null {
+  const at = messages.findIndex((m) => m.id === requestMessageId);
+  const prev = at > 0 ? messages[at - 1] : null;
+  if (!prev || prev.role !== "assistant" || !Array.isArray(prev.parts)) return null;
+  const panels = (prev.parts as { type: string; state?: string; toolCallId?: string; output?: unknown }[]).flatMap((p) => {
+    const panel = parseOptionsPanel(p);
+    return panel ? [panel] : [];
+  });
+  const panel = panels.at(-1);
+  if (!panel) return null;
+  const optionId = matchTypedAnswer(panel.options, text);
+  return optionId ? { pickerToolCallId: panel.pickerToolCallId, optionId } : null;
 }
