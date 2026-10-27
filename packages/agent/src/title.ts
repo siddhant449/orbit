@@ -30,7 +30,7 @@ function clean(raw: string): string {
 export async function titleChat(ai: AiClient, chatId: string, userText: string): Promise<string> {
   let title = "";
   try {
-    title = clean(await ai.text({ model: "extract", system: TITLE_SYSTEM, prompt: userText.slice(0, 2_000) }));
+    title = clean(await ai.text({ feature: "title", model: "extract", system: TITLE_SYSTEM, prompt: userText.slice(0, 2_000) }));
   } catch (err) {
     console.error(`[agent] chat title failed: ${err instanceof Error ? err.message : String(err)}`);
   }

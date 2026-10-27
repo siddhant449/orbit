@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { unstable_cache } from "next/cache";
 import { auth, currentUser } from "@clerk/nextjs/server";
+import { isAdminEmail } from "@/lib/admin-email";
 import { ensureAccount, findAccountByClerkId, type AccountState } from "@brandloop/db";
 
 /** Tag on every cached account read. Writers that change a profile, user, team or membership expire it (see `expireAccountCache`). */
@@ -72,6 +73,8 @@ export type ShellAccount = {
   role: AccountState["role"];
   profiles: { id: string; name: string; avatarUrl: string | null }[];
   currentProfileId: string | null;
+  /** Show the "Admin" entry in the profile menu. Cosmetic only: /admin checks the allow-list itself on every request. */
+  isAdmin?: boolean;
 };
 
 /** The subset of the account the client shell needs. */
@@ -82,5 +85,6 @@ export function toShellAccount(account: AccountState): ShellAccount {
     role: account.role,
     profiles: account.profiles.map((p) => ({ id: p.id, name: p.name, avatarUrl: p.avatarUrl })),
     currentProfileId: account.currentProfile?.id ?? null,
+    isAdmin: isAdminEmail(account.user.email),
   };
 }

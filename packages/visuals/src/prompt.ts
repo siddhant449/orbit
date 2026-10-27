@@ -87,6 +87,7 @@ Write one or two sentences saying exactly what to change. Do not mention what st
 export async function rewriteEditInstruction(ai: AiClient, instruction: string, context: { userPrompt?: string }): Promise<string> {
   try {
     const out = await ai.text({
+      feature: "images",
       model: "extract",
       system: REWRITE_SYSTEM,
       prompt: `<context>\nThe image was made from: ${defuse((context.userPrompt ?? "").slice(0, 500))}\n</context>\n<note>\n${defuse(instruction.slice(0, 1_000))}\n</note>`,

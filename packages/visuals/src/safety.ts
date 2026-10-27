@@ -217,6 +217,7 @@ export async function checkVisualRequest(ai: AiClient | null, text: string, opts
   try {
     const framed = trimmed.slice(0, MAX_CLASSIFIED).replace(/[<>]/g, (c) => (c === "<" ? "‹" : "›"));
     const verdict = await ai.json({
+      feature: "moderation",
       model: "extract",
       system: CLASSIFIER_SYSTEM,
       prompt: `<request>\n${framed}\n</request>`,

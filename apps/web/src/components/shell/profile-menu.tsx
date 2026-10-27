@@ -6,7 +6,7 @@ import { useClerk } from "@clerk/nextjs";
 import { DropdownMenu } from "radix-ui";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
-import { Monitor, Moon, Sun, UserPlus } from "lucide-react";
+import { Monitor, Moon, ShieldCheck, Sun, UserPlus } from "lucide-react";
 import { CheckIcon, ChevronUpIcon, SettingsIcon, SignOutIcon } from "@brandloop/ui/icons";
 import { cn } from "@brandloop/ui";
 import { switchProfileAction } from "@/app/(app)/actions";
@@ -112,6 +112,14 @@ export function ProfileMenu({ iconOnly = false, settingsActive = false }: { icon
                 Settings
               </Link>
             </DropdownMenu.Item>
+            {account.isAdmin && (
+              <DropdownMenu.Item className={itemClass} asChild>
+                <Link href="/admin">
+                  <ShieldCheck aria-hidden="true" />
+                  Admin
+                </Link>
+              </DropdownMenu.Item>
+            )}
             <div role="radiogroup" aria-label="Theme" className="mx-1 my-1.5 grid grid-cols-3 gap-1">
               {themes.map(({ value, label, icon: Icon }) => (
                 <button

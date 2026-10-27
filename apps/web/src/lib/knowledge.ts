@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createAiClient, createEmbedder } from "@brandloop/ai";
+import { bindEmbedder, bindUsage, createAiClient, createEmbedder } from "@brandloop/ai";
 import { KnowledgeError, KnowledgeNotFoundError, type KnowledgeItem } from "@brandloop/db";
 import { IngestError, ingestKnowledge, localUploadStore } from "@brandloop/knowledge";
 import { startJob } from "@/lib/run-job";
@@ -9,7 +9,7 @@ export const uploadStore = localUploadStore();
 /** Starts the KNOWLEDGE_INGEST job for an item after the response is sent. */
 export function startIngest(profileId: string, itemId: string) {
   return startJob("KNOWLEDGE_INGEST", profileId, { itemId }, () =>
-    ingestKnowledge({ ai: createAiClient(), embedder: createEmbedder(), store: uploadStore }, itemId),
+    ingestKnowledge({ ai: bindUsage(createAiClient(), { profileId, feature: "other" }), embedder: bindEmbedder(createEmbedder(), { profileId }), store: uploadStore }, itemId),
   );
 }
 

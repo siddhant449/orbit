@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { importMemories } from "@brandloop/db";
 import { getAccount } from "@/lib/account";
-import { requireAi, startJob } from "@/lib/run-job";
+import { requireAiFor, startJob } from "@/lib/run-job";
 
 export async function POST(request: Request) {
   const { currentProfile } = await getAccount();
@@ -14,7 +14,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "That's too long. Keep it under 50,000 characters." }, { status: 400 });
   }
 
-  const unavailable = requireAi();
+  const unavailable = await requireAiFor(currentProfile.id);
   if (unavailable) return unavailable;
 
   const { jobId } = await startJob("MEMORY_IMPORT", currentProfile.id, { length: text.length }, (ai) =>

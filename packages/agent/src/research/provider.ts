@@ -3,7 +3,8 @@ import { generateText } from "ai";
 import type { ResearchWindow } from "./window";
 
 export type Citation = { url: string; title: string; snippet: string | null };
-export type SearchResult = { answer: string; citations: Citation[] };
+/** `usage` and `model` are the provider's own accounting when it reports any (read by the usage ledger). */
+export type SearchResult = { answer: string; citations: Citation[]; usage?: { inputTokens?: number | undefined; outputTokens?: number | undefined }; model?: string };
 export interface ResearchProvider {
   id: "openai" | "perplexity" | "fake";
   search(q: { query: string; window: ResearchWindow; maxResults: number }, signal: AbortSignal): Promise<SearchResult>;
@@ -22,7 +23,7 @@ export function openaiResearch(model: LanguageModel, webSearch: Tool): ResearchP
         abortSignal: signal,
       });
       const citations = res.sources.flatMap((s): Citation[] => (s.sourceType === "url" ? [{ url: s.url, title: s.title ?? s.url, snippet: null }] : []));
-      return { answer: res.text, citations: citations.slice(0, q.maxResults) };
+      return { answer: res.text, citations: citations.slice(0, q.maxResults), usage: res.totalUsage ?? res.usage, model: typeof model === "string" ? model : model.modelId };
     },
   };
 }

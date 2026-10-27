@@ -2,6 +2,7 @@ import { APICallError, generateText, NoObjectGeneratedError, Output } from "ai";
 import type { FinishReason, LanguageModel, ModelMessage } from "ai";
 import { z } from "zod";
 import { getModel, type ModelAlias } from "./provider";
+import type { AiFeature } from "./usage";
 
 export { resolveModel, type ModelAlias } from "./provider";
 
@@ -20,6 +21,10 @@ type BaseOpts = {
   images?: AiImage[];
   /** Cancels the request (a stopped chat turn or its deadline); the call rejects with the abort error. */
   abortSignal?: AbortSignal;
+  /** What the call is for, on the usage ledger (read by `bindUsage`; the client itself ignores it). */
+  feature?: AiFeature;
+  /** Called with the provider's token counts when the call completes (how `bindUsage` meters real calls). */
+  onUsage?: (usage: { inputTokens?: number | undefined; outputTokens?: number | undefined }) => void;
 };
 
 export type AiClient = {
@@ -97,7 +102,7 @@ export function createAiClient(
   };
 
   return {
-    async text({ model, system, prompt, images, abortSignal }) {
+    async text({ model, system, prompt, images, abortSignal, onUsage }) {
       let result;
       try {
         result = await generateText({
@@ -110,10 +115,11 @@ export function createAiClient(
       } catch (err) {
         rethrowClearly(err);
       }
+      onUsage?.(result.totalUsage ?? result.usage);
       assertCompleted(result.finishReason);
       return result.text.trim();
     },
-    async json<T>({ model, system, prompt, images, schema, abortSignal }: BaseOpts & { schema: z.ZodType<T> }) {
+    async json<T>({ model, system, prompt, images, schema, abortSignal, onUsage }: BaseOpts & { schema: z.ZodType<T> }) {
       let result;
       try {
         result = await generateText({
@@ -127,6 +133,7 @@ export function createAiClient(
       } catch (err) {
         rethrowClearly(err);
       }
+      onUsage?.(result.totalUsage ?? result.usage);
       assertCompleted(result.finishReason);
       return result.output;
     },

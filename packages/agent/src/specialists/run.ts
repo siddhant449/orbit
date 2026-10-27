@@ -1,4 +1,4 @@
-import { AiUnavailableError, type AiClient, type ModelAlias } from "@brandloop/ai";
+import { AiUnavailableError, type AiClient, type AiFeature, type ModelAlias } from "@brandloop/ai";
 import { NoObjectGeneratedError } from "ai";
 import { z } from "zod";
 import { defuseTags } from "../data";
@@ -40,6 +40,13 @@ function derivePost(raw: unknown, render: { bullet: "-" | "•"; numbered: boole
   const first = blocks[0];
   return { ...out, payload: { ...p, draft: renderBlocks(blocks, render), hook: (first ? first.lines.join("\n").trim() : "").slice(0, 200) } };
 }
+
+const FEATURE: Record<SpecialistKind, AiFeature> = {
+  "post-writing": "writing",
+  "final-review": "review",
+  "personal-grounding": "writing",
+  "content-planning": "writing",
+};
 
 const MODEL_ALIAS: Record<SpecialistKind, ModelAlias> = {
   "post-writing": "generate",
@@ -113,6 +120,7 @@ export async function runSpecialist<K extends SpecialistKind>(
     signal?.throwIfAborted();
     try {
       const raw = await ai.json({
+        feature: FEATURE[kind],
         model: MODEL_ALIAS[kind],
         system: systemFor(kind, input.skills, attempt > 0),
         prompt,

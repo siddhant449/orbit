@@ -183,7 +183,7 @@ export async function rewriteCluster(ai: AiClient, cluster: RefRow[], onCall?: (
   let note: string | null = null;
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     const prompt = promptFor(cluster, note);
-    const out = await ai.json({ model: "extract", system: SYSTEM, prompt, schema: RewriteSchema });
+    const out = await ai.json({ feature: "other", model: "extract", system: SYSTEM, prompt, schema: RewriteSchema });
     onCall?.(SYSTEM.length + prompt.length, JSON.stringify(out).length);
     const d = RewriteSchema.parse(out);
     const text = [d.skeleton, ...d.beats].join("\n");

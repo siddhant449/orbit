@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { extractOwnStyle, MAX_EXPORT_BYTES, parseSharesExport, prepareOwnStyle, validateStylePosts } from "@brandloop/db";
 import { getAccount } from "@/lib/account";
-import { requireAi, startJob } from "@/lib/run-job";
+import { requireAiFor, startJob } from "@/lib/run-job";
 
 /**
  * Learn the profile's own writing style. Accepts `{posts}` JSON (3-30 pasted posts) or a multipart LinkedIn export
@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: (err as Error).message }, { status: 400 });
   }
 
-  const unavailable = requireAi();
+  const unavailable = await requireAiFor(currentProfile.id);
   if (unavailable) return unavailable;
 
   const { voiceStyleId } = await prepareOwnStyle(currentProfile.id, posts, source, postedAt);

@@ -175,6 +175,9 @@ const PRICES: Record<string, [number, number]> = {
   "gpt-6-sol": [2.5, 10],
   "gpt-6-luna": [0.3, 1.2],
   "gpt-5.5": [2, 8],
+  // Embeddings bill input tokens only.
+  "text-embedding-3-small": [0.02, 0],
+  "text-embedding-3-large": [0.13, 0],
 };
 const DEFAULT_PRICE: [number, number] = [2.5, 10];
 

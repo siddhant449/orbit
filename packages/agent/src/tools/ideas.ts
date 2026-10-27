@@ -126,7 +126,7 @@ export async function writeIdeas(
     material.recentTitles.length ? `<recent_posts>\n${material.recentTitles.map((t) => `- ${defuseTags(oneLine(t))}`).join("\n")}\n</recent_posts>` : "",
     `Return ${slots.length} ideas, one for each slot.`,
   ].filter(Boolean).join("\n\n");
-  const raw = IdeasModelSchema.parse(await ai.json({ model: "extract", system: IDEAS_SYSTEM, prompt, schema: IdeasModelSchema, abortSignal }));
+  const raw = IdeasModelSchema.parse(await ai.json({ feature: "ideas", model: "extract", system: IDEAS_SYSTEM, prompt, schema: IdeasModelSchema, abortSignal }));
   const cards: IdeaCard[] = [];
   const openers = new Set<string>();
   for (const idea of raw.ideas) {

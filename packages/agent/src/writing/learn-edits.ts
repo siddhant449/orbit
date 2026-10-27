@@ -135,6 +135,7 @@ export async function learnFromEdit(ai: AiClient, input: LearnInput): Promise<Le
   if (delta.ratio < LEARN_MIN_RATIO || !addedText || isWritingRequest(addedText)) return unchanged;
 
   const proposed = await ai.json({
+    feature: "style-learning",
     model: "extract",
     system: SYSTEM,
     prompt: `<current_rules>\n${JSON.stringify(old)}\n</current_rules>\n<removed>\n${fence(delta.removed.join("\n"))}\n</removed>\n<added>\n${fence(addedText)}\n</added>`,

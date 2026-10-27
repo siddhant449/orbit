@@ -1,7 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { createAiClient } from "@brandloop/ai";
 import { scriptedAi } from "@brandloop/agent";
-import { getSelectedVoice } from "@brandloop/db";
+import { getSelectedVoice, isAiBlocked, ownerOfProfile } from "@brandloop/db";
 import { getAccount } from "@/lib/account";
 import { isMockMode } from "@/lib/chat-deps";
 import { GENERATE_LIMIT, makeGenerateHandler } from "@/lib/carousel/api";
@@ -16,6 +16,10 @@ export const POST = makeGenerateHandler({
     return { signedIn: true, profileId: (await getAccount()).currentProfile?.id ?? null };
   },
   ai: () => (isMockMode() ? scriptedAi() : createAiClient()),
+  aiPaused: async (profileId) => {
+    const owner = await ownerOfProfile(profileId);
+    return owner ? isAiBlocked(owner.userId) : false;
+  },
   aiAvailable: () => isMockMode() || Boolean(process.env.OPENAI_API_KEY),
   voice: async (profileId) => {
     const v = await getSelectedVoice(profileId);

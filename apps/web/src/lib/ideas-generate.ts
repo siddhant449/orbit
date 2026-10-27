@@ -78,7 +78,7 @@ export async function generateIdeas(ai: AiClient, ctx: IdeasContext, count: numb
   const { system, prompt } = buildIdeasPrompt(ctx, count);
   let raw: unknown[];
   try {
-    raw = (await ai.json({ model: "generate", system, prompt, schema: IdeasWireSchema, abortSignal })).ideas;
+    raw = (await ai.json({ feature: "ideas", model: "generate", system, prompt, schema: IdeasWireSchema, abortSignal })).ideas;
   } catch (err) {
     if (err instanceof AiUnavailableError) throw err;
     throw new IdeasGenerationError("Orbit couldn't generate ideas this time. Try again.", { cause: err });

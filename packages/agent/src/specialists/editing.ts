@@ -90,6 +90,7 @@ export async function editDocumentText(
     signal?.throwIfAborted();
     try {
       const raw = await ai.json({
+        feature: "editing",
         model: "generate",
         system: system(input.editScope, missed !== null),
         // The model's own report of what it missed is data: it goes in the user prompt, never the system prompt.

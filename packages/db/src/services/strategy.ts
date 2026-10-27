@@ -130,7 +130,7 @@ export async function draftStrategy(ai: AiClient, profileId: string, hints: Stra
     "Return the goal and why, positioning and why, a tagline, their expertise and why, a content mix across the five content types, " +
     "an audience balance across broad/narrow/niche with a short note each, posts per week by format with a note, and two or three recurring weekly series.";
 
-  return ai.json({ model: "generate", system: SYSTEM, prompt, schema: StrategySchema });
+  return ai.json({ feature: "strategy", model: "generate", system: SYSTEM, prompt, schema: StrategySchema });
 }
 
 export async function generateStrategy(ai: AiClient, profileId: string): Promise<Strategy> {

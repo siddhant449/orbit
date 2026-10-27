@@ -1,4 +1,4 @@
-import { limitMessage, type AiClient, type Embedder } from "@brandloop/ai";
+import { AI_PAUSED_MESSAGE, bindEmbedder, bindModerate, bindUsage, limitMessage, reportUsage, type AiClient, type Embedder } from "@brandloop/ai";
 import {
   ChatError,
   claimRun,
@@ -241,6 +241,13 @@ export async function runChatTurn(
   const { profileId, userId } = caller;
   const { id: chatId, runId } = body;
   const requestMessageId = body.message.id;
+  // Every model call of this turn (the orchestrator, specialists, ideas, hooks, title, embeddings, moderation) reports to the usage ledger for this caller.
+  const who = { userId, profileId, chatId };
+  const metered = {
+    ai: bindUsage(deps.ai, who),
+    embedder: deps.embedder ? bindEmbedder(deps.embedder, who) : null,
+    moderate: deps.safety ? bindModerate(deps.safety.moderate, who) : null,
+  };
 
   const totalText = body.message.parts.reduce((n, p) => n + (p.type === "text" ? p.text.length : 0), 0);
   if (totalText > LIMITS.messageChars) {
@@ -251,7 +258,11 @@ export async function runChatTurn(
     );
   }
 
-  const denied = await deps.safety?.check(profileId);
+  // An admin paused AI for this account: refuse before the message is stored or any model is called.
+  if (await deps.safety?.isBlocked?.(userId)) {
+    return Response.json({ code: "ai_paused", cause: AI_PAUSED_MESSAGE, error: AI_PAUSED_MESSAGE }, { status: 403 });
+  }
+  const denied = await deps.safety?.check(profileId, userId);
   if (denied && !denied.ok) {
     return Response.json(
       { code: denied.kind === "rate" ? "rate_limited" : "daily_limit", cause: limitMessage(denied), error: limitMessage(denied), retryAfterSec: denied.retryAfterSec },
@@ -285,7 +296,7 @@ export async function runChatTurn(
   }
   const { ctx, instructions, window, modelMessages, prevTask, controller, userText } = setup;
   // A refused message still gets a normal turn (stored, streamed, lock released), answered by a fixed reply and no tools.
-  const verdict = deps.safety ? await screenInput(userText, deps.safety.moderate) : ({ ok: true } as const);
+  const verdict = deps.safety ? await screenInput(userText, metered.moderate!) : ({ ok: true } as const);
   if (!verdict.ok) log(`input refused (${verdict.kind})`, new Error("policy"));
   const tools = verdict.ok ? setup.tools : ({} as typeof setup.tools);
   const turnModel = verdict.ok ? deps.model : scriptedModel([{ text: verdict.message }], { chunkDelayMs: 5 });
@@ -360,7 +371,10 @@ export async function runChatTurn(
         },
         onFinish: ({ totalUsage }) => {
           charged = true;
-          if (verdict.ok) void deps.safety?.recordUsage(profileId, modelId, totalUsage).catch(() => {});
+          if (verdict.ok) {
+            void deps.safety?.recordUsage(profileId, modelId, totalUsage).catch(() => {});
+            reportUsage({ ...who, feature: "chat", model: modelId, inputTokens: totalUsage?.inputTokens ?? 0, outputTokens: totalUsage?.outputTokens ?? 0, ok: !streamFailed });
+          }
         },
       });
       // Keep the model stream flowing to the end no matter who reads the UI stream.
@@ -386,19 +400,20 @@ export async function runChatTurn(
         let parts = toStoredParts(responseMessage.parts);
         if (finish !== "stop") parts = finalizeAbortedParts(parts);
         // Stopped, failed or timed-out turns never reach onFinish but still cost money: charge what was seen, else an estimate.
-        if (finish !== "stop" && verdict.ok && !charged && deps.safety) {
+        if (finish !== "stop" && verdict.ok && !charged) {
           charged = true;
           const estIn = Math.ceil((instructions.length + JSON.stringify(modelMessages).length) / 4);
           const estOut = Math.ceil(textOf(parts).length / 4) + 200;
           const usage = { inputTokens: Math.max(usageSoFar, estIn), outputTokens: estOut };
-          void deps.safety.recordUsage(profileId, modelId, usage).catch(() => {});
+          void deps.safety?.recordUsage(profileId, modelId, usage).catch(() => {});
+          reportUsage({ ...who, feature: "chat", model: modelId, ...usage, ok: false });
         }
         if (blockedMessage) {
           outputRefused = true;
           parts = [{ type: "text", text: blockedMessage }] as typeof parts;
         } else if (finish === "stop" && verdict.ok && deps.safety) {
           // The reply was already streamed; what is stored (and shown on reload) is the refusal instead.
-          const out = await screenOutput(textOf(parts), deps.safety.moderate);
+          const out = await screenOutput(textOf(parts), metered.moderate!);
           if (!out.ok) {
             log("assistant reply withheld (moderation)", new Error("policy"));
             outputRefused = true;
@@ -438,7 +453,7 @@ export async function runChatTurn(
             ...(!verdict.ok || outputRefused ? { refused: true } : {}),
           },
         });
-        if (defaultTitle && userText) deps.after(async () => void (await titleChat(deps.ai, chatId, userText)));
+        if (defaultTitle && userText) deps.after(async () => void (await titleChat(metered.ai, chatId, userText)));
       } catch (err) {
         log("saving the assistant message failed", err);
       } finally {
@@ -522,8 +537,8 @@ export async function runChatTurn(
       userText,
       // Continue the active task's id, so tools and the ledger agree on it.
       taskId: prevTask?.status === "active" ? prevTask.taskId : newId(),
-      ai: deps.ai,
-      embedder: deps.embedder,
+      ai: metered.ai,
+      embedder: metered.embedder,
       selections: {
         knowledgeIds: body.selectedKnowledgeBaseIds,
         writingStyleId: body.selectedWritingStyleId,
@@ -539,7 +554,7 @@ export async function runChatTurn(
       visuals: deps.visuals ?? null,
       screenText: deps.safety
         ? async (text) => {
-            const out = await screenOutput(text, deps.safety!.moderate);
+            const out = await screenOutput(text, metered.moderate!);
             if (out.ok) return null;
             blockedMessage = out.message;
             return out.message;

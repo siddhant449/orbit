@@ -1,6 +1,6 @@
 import { after } from "next/server";
 import { createJobDriver, type EnqueueOptions, type JobContext, type JobDriver } from "@brandloop/jobs";
-import { createAiClient } from "@brandloop/ai";
+import { bindUsage, createAiClient } from "@brandloop/ai";
 import { LEARN_DELAY_MS, noteDocumentEdit, runStyleLearn, scriptedAi } from "@brandloop/agent";
 import { isMockMode } from "@/lib/chat-deps";
 import { getVisualDeps } from "@/lib/visuals/deps";
@@ -36,7 +36,7 @@ function driver(): JobDriver {
       "style.learn-from-edit": async (payload: { profileId: string; documentId: string; token: string }) => {
         if (pendingLearn.get(payload.documentId) !== payload.token) return;
         pendingLearn.delete(payload.documentId);
-        await runStyleLearn(isMockMode() ? scriptedAi() : createAiClient(), payload);
+        await runStyleLearn(bindUsage(isMockMode() ? scriptedAi() : createAiClient(), { profileId: payload.profileId, feature: "style-learning" }), payload);
       },
       "visual.generate": visualJob("generate"), "visual.edit": visualJob("edit"), "visual.logo": visualJob("logo"),
     },

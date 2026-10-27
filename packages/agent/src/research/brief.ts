@@ -1,4 +1,4 @@
-import type { AiClient } from "@brandloop/ai";
+import { approxTokens, reportUsage, type AiClient } from "@brandloop/ai";
 import { DAILY_SEARCH_CAP, findFreshBrief, saveResearchBrief, searchesToday } from "@brandloop/db";
 import { normalizeResearch, type Exclusion, type ResearchItem } from "./normalize";
 import type { ResearchProvider, SearchResult } from "./provider";
@@ -64,6 +64,19 @@ export type PrefetchDeps = {
   now?: () => Date;
 };
 
+/** One provider search, reported to the usage ledger (the provider's token counts, else an estimate from the text). */
+async function metered(deps: PrefetchDeps, query: string, signal: AbortSignal, window: ResearchWindow): Promise<SearchResult> {
+  const who = { profileId: deps.profileId, chatId: deps.chatId };
+  try {
+    const r = await deps.provider.search({ query, window, maxResults: 8 }, signal);
+    reportUsage({ ...who, feature: "research", model: r.model ?? deps.provider.id, inputTokens: r.usage?.inputTokens ?? approxTokens(query.length), outputTokens: r.usage?.outputTokens ?? approxTokens(r.answer.length), ok: true });
+    return r;
+  } catch (err) {
+    reportUsage({ ...who, feature: "research", model: deps.provider.id, inputTokens: approxTokens(query.length), outputTokens: 0, ok: false });
+    throw err;
+  }
+}
+
 /**
  * Searches in parallel (three facets, 60 s each, 75 s in all), normalises, stores the brief and returns it. A fresh brief for
  * the same chat, window and topic is reused without a search; the per-profile daily cap returns the refusal text.
@@ -79,7 +92,7 @@ export async function runResearch(deps: PrefetchDeps, topic: string, window: Res
   const wall = AbortSignal.any([AbortSignal.timeout(PREFETCH_WALL_MS), ...(deps.signal ? [deps.signal] : [])]);
   const queries = buildFacetQueries(topic, window, deps.strategy);
   const settled = await Promise.allSettled(
-    queries.map((query) => deps.provider.search({ query, window, maxResults: 8 }, AbortSignal.any([AbortSignal.timeout(SEARCH_TIMEOUT_MS), wall]))),
+    queries.map((query) => metered(deps, query, AbortSignal.any([AbortSignal.timeout(SEARCH_TIMEOUT_MS), wall]), window)),
   );
   deps.signal?.throwIfAborted();
   const raw = settled.flatMap((s): SearchResult[] => (s.status === "fulfilled" ? [s.value] : []));

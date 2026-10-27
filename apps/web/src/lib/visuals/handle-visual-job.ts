@@ -6,6 +6,7 @@ import {
   buildEditPrompt, buildVisualPrompt, compositeLogo, cropToAspect, LOGO_DEFAULT, ProviderError, rewriteEditInstruction, sizeFor, type ImageInput,
   type LogoPlacement,
 } from "@brandloop/visuals";
+import { bindUsage, imageCostMicroUsd, reportUsage } from "@brandloop/ai";
 import { readFile, storeFile } from "@/lib/storage";
 import type { VisualDeps } from "./deps";
 
@@ -41,6 +42,19 @@ export function toProviderError(err: unknown, log: (m: string) => void): Provide
   return new ProviderError("unavailable", true);
 }
 
+/** One provider image call on the usage ledger: priced per image (an estimate by quality); the mock provider costs nothing. A failed call is a row with no cost. */
+async function metered<T>(deps: VisualDeps, visual: Visual, fn: () => Promise<T>): Promise<T> {
+  const row = { profileId: visual.profileId, teamId: visual.teamId, feature: "images" as const, model: deps.provider.id, inputTokens: 0, outputTokens: 0 };
+  try {
+    const out = await fn();
+    reportUsage({ ...row, costMicroUsd: deps.provider.id.startsWith("mock") ? 0 : imageCostMicroUsd(deps.quality), ok: true });
+    return out;
+  } catch (err) {
+    reportUsage({ ...row, costMicroUsd: 0, ok: false });
+    throw err;
+  }
+}
+
 /** Runs `fn` with an AbortSignal that fires after the deadline. */
 export async function withDeadline<T>(ms: number, fn: (signal: AbortSignal) => Promise<T>): Promise<T> {
   const ac = new AbortController();
@@ -69,8 +83,10 @@ async function generate(deps: VisualDeps, visual: Visual): Promise<void> {
     hasReference: Boolean(reference),
   });
   const size = sizeFor(visual.aspect);
-  const { image } = await withDeadline(deps.timeoutMs, (abortSignal) =>
-    deps.provider.generate({ prompt: builtPrompt, size: size.provider, quality: deps.quality, references: reference ? [reference] : undefined, abortSignal }),
+  const { image } = await metered(deps, visual, () =>
+    withDeadline(deps.timeoutMs, (abortSignal) =>
+      deps.provider.generate({ prompt: builtPrompt, size: size.provider, quality: deps.quality, references: reference ? [reference] : undefined, abortSignal }),
+    ),
   );
   const cropped = await cropToAspect(image.bytes, visual.aspect);
   const stored = await storeFile(visual.profileId, visual.teamId, "VISUAL", cropped.bytes, "image/png");
@@ -94,10 +110,10 @@ async function currentImage(visual: Visual): Promise<{ bytes: Buffer; mediaType:
 async function edit(deps: VisualDeps, visual: Visual): Promise<void> {
   const instruction = String((visual.opInput as { instruction?: unknown } | null)?.instruction ?? "").trim();
   if (!instruction) throw new ProviderError("refused", false);
-  const rewritten = deps.ai ? await rewriteEditInstruction(deps.ai, instruction, { userPrompt: visual.userPrompt }) : instruction;
+  const rewritten = deps.ai ? await rewriteEditInstruction(bindUsage(deps.ai, { profileId: visual.profileId, teamId: visual.teamId, feature: "images" }), instruction, { userPrompt: visual.userPrompt }) : instruction;
   const image = await currentImage(visual);
-  const { image: out } = await withDeadline(deps.timeoutMs, (abortSignal) =>
-    deps.provider.edit({ image, prompt: buildEditPrompt(rewritten), quality: deps.quality, abortSignal }),
+  const { image: out } = await metered(deps, visual, () =>
+    withDeadline(deps.timeoutMs, (abortSignal) => deps.provider.edit({ image, prompt: buildEditPrompt(rewritten), quality: deps.quality, abortSignal })),
   );
   const cropped = await cropToAspect(out.bytes, visual.aspect);
   const stored = await storeFile(visual.profileId, visual.teamId, "VISUAL", cropped.bytes, "image/png");

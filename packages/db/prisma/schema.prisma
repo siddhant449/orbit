@@ -21,6 +21,10 @@ model User {
   name             String?
   currentProfileId String?
   currentProfile   Profile?     @relation("CurrentProfile", fields: [currentProfileId], references: [id], onDelete: SetNull)
+  /// Admin-set daily AI cost cap in millionths of a dollar; null = the app default (CHAT_DAILY_COST_USD).
+  dailyCapMicroUsd Int?
+  /// Admin switch: when true every AI entry point refuses before any model call.
+  aiBlocked        Boolean      @default(false)
   memberships      Membership[]
   ownedProfiles    Profile[]    @relation("ProfileOwner")
   createdAt        DateTime     @default(now())
@@ -749,4 +753,25 @@ model TemplateUse {
 
   @@index([profileId, createdAt])
   @@index([templateId])
+}
+
+/// One row per AI call (model, embedding, image, moderation). Never holds prompt or output text. Costs are Orbit's estimates (tokens x price table).
+model AiUsage {
+  id           String   @id @default(cuid())
+  createdAt    DateTime @default(now())
+  /// No foreign keys: the ledger outlives deleted users, teams and chats.
+  userId       String?
+  teamId       String?
+  profileId    String?
+  chatId       String?
+  feature      String
+  model        String
+  inputTokens  Int      @default(0)
+  outputTokens Int      @default(0)
+  costMicroUsd Int      @default(0)
+  ok           Boolean  @default(true)
+
+  @@index([createdAt])
+  @@index([userId, createdAt])
+  @@index([feature, createdAt])
 }

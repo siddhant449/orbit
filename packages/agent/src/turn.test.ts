@@ -1,3 +1,4 @@
+import { setUsageRecorder, type UsageEvent } from "@brandloop/ai";
 import { fakeEmbedder } from "@brandloop/ai/testing";
 import {
   claimRun,
@@ -565,6 +566,42 @@ describe("runChatTurn safety", () => {
     expect(json.code).toBe("rate_limited");
     expect(json.cause).toMatch(/2 minutes/);
     expect(await getChat(p, chatId)).toBeNull();
+  });
+
+  it("a paused account is refused with the polite message before anything is stored or any model is called", async () => {
+    const model = scriptedModel([{ text: "SHOULD NOT RUN" }]);
+    const moderate = vi.fn(async () => ({ flagged: false, categories: [] as string[] }));
+    const check = vi.fn(async () => allow);
+    const res = await runChatTurn(deps(model, { safety: safety({ isBlocked: async (id) => id === u, moderate, check }) }), caller, body("hi"));
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ code: "ai_paused", cause: "AI is paused for your account. Contact support." });
+    expect(model.doStreamCalls).toHaveLength(0);
+    expect(moderate).not.toHaveBeenCalled();
+    expect(check).not.toHaveBeenCalled();
+    expect(await getChat(p, chatId)).toBeNull();
+  });
+
+  it("passes the user to the limit check (so a per-user cap can apply)", async () => {
+    const check = vi.fn(async () => allow);
+    const res = await runChatTurn(deps(scriptedModel([{ text: "Hi." }]), { safety: safety({ check }) }), caller, body("hi"));
+    await res.text();
+    await settle();
+    expect(check).toHaveBeenCalledWith(p, u);
+  });
+
+  it("reports the turn to the usage ledger as 'chat' with who and the model's token counts, and the moderation checks", async () => {
+    const events: UsageEvent[] = [];
+    setUsageRecorder((e) => events.push(e));
+    try {
+      const res = await runChatTurn(deps(scriptedModel([{ text: "Hi." }]), { safety: safety() }), caller, body("hi"));
+      await res.text();
+      await settle();
+    } finally {
+      setUsageRecorder(null);
+    }
+    expect(events.find((e) => e.feature === "chat")).toMatchObject({ userId: u, profileId: p, chatId, model: "mock-model-id", inputTokens: 10, ok: true });
+    expect(events.filter((e) => e.feature === "moderation").length).toBeGreaterThanOrEqual(2);
+    expect(JSON.stringify(events)).not.toContain("Hi.");
   });
 
   it("records the model's token usage after a normal turn", async () => {
