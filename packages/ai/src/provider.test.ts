@@ -53,3 +53,18 @@ describe("webSearchTool", () => {
     expect(t.id).toBe("openai.web_search");
   });
 });
+
+describe("write alias", () => {
+  it("follows the generate model unless AI_MODEL_WRITE is set", async () => {
+    const { resolveModel } = await import("./provider");
+    const before = { w: process.env.AI_MODEL_WRITE, g: process.env.AI_MODEL_GENERATE };
+    delete process.env.AI_MODEL_WRITE;
+    delete process.env.AI_MODEL_GENERATE;
+    expect(resolveModel("write")).toBe("gpt-6-luna");
+    process.env.AI_MODEL_WRITE = "gpt-6.1-sol";
+    expect(resolveModel("write")).toBe("gpt-6.1-sol");
+    expect(resolveModel("generate")).toBe("gpt-6-luna");
+    if (before.w === undefined) delete process.env.AI_MODEL_WRITE; else process.env.AI_MODEL_WRITE = before.w;
+    if (before.g !== undefined) process.env.AI_MODEL_GENERATE = before.g;
+  });
+});

@@ -359,7 +359,7 @@ export async function proposeDocumentEditsRun(
       `<request>\n${defuseTags(input.instruction)}\n</request>`,
       `<passage>\n${defuseTags(input.targetText)}\n</passage>`,
     ].join("\n\n");
-    const raw = await ctx.ai.json({ feature: "editing", model: "generate", system: PROPOSE_SYSTEM, prompt, schema: z.object({ replacement: z.string() }), abortSignal });
+    const raw = await ctx.ai.json({ feature: "editing", model: "write", system: PROPOSE_SYSTEM, prompt, schema: z.object({ replacement: z.string() }), abortSignal });
     const replacement = stripCitations(z.object({ replacement: z.string() }).parse(raw).replacement);
     // A passage can't be linted as a post, but the rules that work on characters apply to it too.
     const tidy = lastResort(mechanicalFix(replacement, grounding.rules, grounding.style.bullet).text, grounding.rules).text;

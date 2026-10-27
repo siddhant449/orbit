@@ -92,7 +92,7 @@ export async function editDocumentText(
     try {
       const raw = await ai.json({
         feature: "editing",
-        model: "generate",
+        model: "write",
         system: system(input.editScope, missed !== null),
         // The model's own report of what it missed is data: it goes in the user prompt, never the system prompt.
         prompt: missed ? `${base}\n\n<missed_requirements>\n${missed.map((m) => `- ${oneLine(defuseTags(m)).slice(0, 300)}`).join("\n")}\n</missed_requirements>` : base,

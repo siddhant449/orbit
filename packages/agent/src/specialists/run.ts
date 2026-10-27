@@ -49,7 +49,7 @@ const FEATURE: Record<SpecialistKind, AiFeature> = {
 };
 
 const MODEL_ALIAS: Record<SpecialistKind, ModelAlias> = {
-  "post-writing": "generate",
+  "post-writing": "write",
   "final-review": "generate",
   "personal-grounding": "extract",
   "content-planning": "generate",

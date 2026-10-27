@@ -173,7 +173,7 @@ export async function polishDraft(
         `<post_blocks>\n${defuseTags(JSON.stringify({ blocks }))}\n</post_blocks>`,
         `<problems>\n${toRepair.map((v, i) => `${i + 1}. ${defuseTags(describe(v))}`).join("\n")}\n</problems>`,
       ].join("\n\n");
-      const raw = await ai.json({ feature: "polish", model: "generate", system: REPAIR_SYSTEM, prompt, schema: RepairSchema, abortSignal: input.abortSignal });
+      const raw = await ai.json({ feature: "polish", model: "write", system: REPAIR_SYSTEM, prompt, schema: RepairSchema, abortSignal: input.abortSignal });
       const repaired = RepairSchema.parse(raw).blocks;
       const repairedText = mechanicalFix(renderBlocks(repaired, input.render), rules, input.render.bullet).text;
       if (repairedText.trim()) {

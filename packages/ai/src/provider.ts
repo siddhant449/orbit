@@ -1,13 +1,15 @@
 import { createOpenAI, openai } from "@ai-sdk/openai";
 import type { EmbeddingModel, LanguageModel, Tool } from "ai";
 
-export type ModelAlias = "generate" | "extract";
+export type ModelAlias = "generate" | "extract" | "write";
 
 /**
- * Maps a model alias to an OpenAI model ID. Override per environment with
- * AI_MODEL_GENERATE / AI_MODEL_EXTRACT.
+ * Maps a model alias to an OpenAI model ID. Override per environment with AI_MODEL_GENERATE / AI_MODEL_EXTRACT /
+ * AI_MODEL_WRITE. "write" is the step that writes or rewrites post text (writer, editor, hooks, repair); it follows
+ * "generate" unless AI_MODEL_WRITE is set, so it can use a stronger model than the rest of the turn.
  */
 export function resolveModel(alias: ModelAlias): string {
+  if (alias === "write") return process.env.AI_MODEL_WRITE ?? resolveModel("generate");
   return alias === "generate"
     ? (process.env.AI_MODEL_GENERATE ?? "gpt-6-luna")
     : (process.env.AI_MODEL_EXTRACT ?? "gpt-6-luna");

@@ -111,6 +111,7 @@ export function bindUsage(client: AiClient, who: UsageWho & { feature?: AiFeatur
 function resolveAlias(alias: string): string {
   if (alias === "generate") return process.env.AI_MODEL_GENERATE ?? "gpt-6-luna";
   if (alias === "extract") return process.env.AI_MODEL_EXTRACT ?? "gpt-6-luna";
+  if (alias === "write") return process.env.AI_MODEL_WRITE ?? resolveAlias("generate");
   return alias;
 }
 
