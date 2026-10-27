@@ -11,7 +11,7 @@ describe("getModel", () => {
     vi.stubEnv("AI_MODEL_GENERATE", undefined);
     vi.stubEnv("AI_MODEL_EXTRACT", undefined);
     expect(typeof getModel("generate")).toBe("object");
-    expect((getModel("generate") as { modelId: string }).modelId).toBe("gpt-6.1-sol");
+    expect((getModel("generate") as { modelId: string }).modelId).toBe("gpt-6-luna");
     expect((getModel("extract") as { modelId: string }).modelId).toBe("gpt-6-luna");
   });
 
@@ -23,7 +23,7 @@ describe("getModel", () => {
     try {
       const generate = getModel("generate", "sk-test-not-real") as { modelId: string; provider: string };
       const extract = getModel("extract", "sk-test-not-real") as { modelId: string; provider: string };
-      expect(generate.modelId).toBe("gpt-6.1-sol");
+      expect(generate.modelId).toBe("gpt-6-luna");
       expect(extract.modelId).toBe("gpt-6-luna");
       expect(generate.provider).toContain("openai");
       expect(fetchSpy).not.toHaveBeenCalled();

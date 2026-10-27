@@ -46,7 +46,7 @@ describe("getChatDeps", () => {
     vi.stubEnv("AI_MOCK_MODEL", "1");
     vi.stubEnv("AI_MODEL_GENERATE", undefined);
     const deps = getChatDeps();
-    expect(modelIdOf(deps.model)).toBe("gpt-6.1-sol");
+    expect(modelIdOf(deps.model)).toBe("gpt-6-luna");
     expect((deps.webSearchTool as { id: string }).id).toBe("openai.web_search");
   });
 

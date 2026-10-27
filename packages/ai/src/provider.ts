@@ -9,7 +9,7 @@ export type ModelAlias = "generate" | "extract";
  */
 export function resolveModel(alias: ModelAlias): string {
   return alias === "generate"
-    ? (process.env.AI_MODEL_GENERATE ?? "gpt-6.1-sol")
+    ? (process.env.AI_MODEL_GENERATE ?? "gpt-6-luna")
     : (process.env.AI_MODEL_EXTRACT ?? "gpt-6-luna");
 }
 

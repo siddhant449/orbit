@@ -362,11 +362,13 @@ describe("AI model pick", () => {
 
   it("lists the allowlist, saves a valid pick per profile and rejects anything else", async () => {
     const first = await (await getAiModelHandler()).json();
-    expect(first).toMatchObject({ model: null, default: "gpt-6.1-sol" });
+    expect(first).toMatchObject({ model: null, default: "gpt-6-luna" });
     expect(first.models.map((m: { id: string }) => m.id)).toContain("gpt-6-luna");
     expect((await put("gpt-6-luna")).status).toBe(200);
     expect((await (await getAiModelHandler()).json()).model).toBe("gpt-6-luna");
     expect((await put("gpt-9-fake")).status).toBe(400);
+    // The costlier models are switched off: picking them is refused.
+    for (const costly of ["gpt-6.1-sol", "gpt-6-sol", "gpt-5.5"]) expect((await put(costly)).status).toBe(400);
     expect((await put("")).status).toBe(400);
     expect((await (await getAiModelHandler()).json()).model).toBe("gpt-6-luna");
     expect((await put(null)).status).toBe(200);

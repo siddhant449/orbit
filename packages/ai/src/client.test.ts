@@ -308,7 +308,7 @@ describe("resolveModel", () => {
   it("has OpenAI defaults", () => {
     vi.stubEnv("AI_MODEL_GENERATE", undefined);
     vi.stubEnv("AI_MODEL_EXTRACT", undefined);
-    expect(resolveModel("generate")).toBe("gpt-6.1-sol");
+    expect(resolveModel("generate")).toBe("gpt-6-luna");
     expect(resolveModel("extract")).toBe("gpt-6-luna");
   });
 
