@@ -3,7 +3,7 @@ import type { ResearchProvider } from "./research/provider";
 import { isTimely } from "./research/timely";
 import { isIdeasRequest } from "./writing/ideas";
 import { renderBlocks, type WriterBlock } from "./writing/render";
-import { simulateReadableStream, type LanguageModel } from "ai";
+import { APICallError, simulateReadableStream, type LanguageModel } from "ai";
 import { MockLanguageModelV4 } from "ai/test";
 
 /**
@@ -317,7 +317,22 @@ export function createScriptedChatModel(opts: { chunkDelayMs?: number } = {}): L
     modelId: "mock-chat",
     // Pretend every http(s) file URL is fetched by the provider, so mock runs never download attachments.
     supportedUrls: { "*/*": [/^https?:\/\//] },
-    doStream: async (call) => play(route(call), opts.chunkDelayMs ?? 5),
+    doStream: async (call) => {
+      // Offline stand-in for the provider running out of credits (what the real client sees after quotaAwareFetch).
+      const lastUser = [...call.prompt].reverse().find((m) => m.role === "user");
+      const text = typeof lastUser?.content === "string" ? lastUser.content : (lastUser?.content ?? []).map((p) => (p.type === "text" ? p.text : "")).join(" ");
+      if (/\bsimulate-ai-quota\b/i.test(text)) {
+        throw new APICallError({
+          message: "You have no credits remaining. Check your plan and billing details.",
+          url: "https://api.openai.com/v1/responses",
+          requestBodyValues: {},
+          statusCode: 402,
+          responseBody: JSON.stringify({ error: { message: "You have no credits remaining.", type: "insufficient_quota", code: "insufficient_quota" } }),
+          isRetryable: false,
+        });
+      }
+      return play(route(call), opts.chunkDelayMs ?? 5);
+    },
   });
 }
 

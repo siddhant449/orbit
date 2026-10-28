@@ -36,11 +36,16 @@ export function dropsOnRetry(err: unknown): boolean {
 const NETWORK = /failed to fetch|networkerror|load failed|network request failed/i;
 const FALLBACK = "Something went wrong while answering. Try again.";
 
+/** Mirrors AI_UNAVAILABLE_USER_MESSAGE in @brandloop/ai (not imported: this file ships to the browser). */
+const UNAVAILABLE = "Orbit's AI is temporarily unavailable. Please try again in a little while.";
+/** Provider wording that must never reach a user, whichever layer let it through. */
+const PROVIDER_TEXT = /insufficient_quota|no credits|billing|openai|api key|quota|platform\./i;
+
 export function friendlyError(err: unknown): string {
   if (err instanceof TypeError && NETWORK.test(err.message)) {
     return "Brandloop couldn't be reached. Check your connection, then try again.";
   }
-  if (err instanceof Error) return err.message || FALLBACK;
+  if (err instanceof Error) return PROVIDER_TEXT.test(err.message) ? UNAVAILABLE : err.message || FALLBACK;
   return FALLBACK;
 }
 

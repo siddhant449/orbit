@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { bindUsage, createAiClient } from "@brandloop/ai";
+import { aiErrorUserMessage, bindUsage, createAiClient } from "@brandloop/ai";
 import { scriptedAi } from "@brandloop/agent";
 import { audienceText, draftStrategy, getOnboarding, ONBOARDING_GOALS } from "@brandloop/db";
 import { getAccount } from "@/lib/account";
@@ -33,6 +33,9 @@ export async function POST() {
     if (answers.goal) draft.goal = ONBOARDING_GOALS[answers.goal.goal].strategyGoal;
     return NextResponse.json({ strategy: draft });
   } catch (err) {
+    // Provider outages were already logged once, by class, where the call failed.
+    const down = aiErrorUserMessage(err);
+    if (down) return NextResponse.json({ error: down }, { status: 503 });
     console.error(`[onboarding] strategy draft failed: ${err instanceof Error ? err.message : String(err)}`);
     return NextResponse.json({ error: err instanceof Error && /OPENAI_API_KEY/.test(err.message) ? AI_UNAVAILABLE_MESSAGE : "Couldn't draft your strategy. Try again." }, { status: 502 });
   }

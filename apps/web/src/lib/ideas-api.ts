@@ -1,4 +1,4 @@
-import { AI_PAUSED_MESSAGE, AiUnavailableError, bindUsage, createAiClient, StrategySchema, type AiClient } from "@brandloop/ai";
+import { AI_PAUSED_MESSAGE, aiErrorUserMessage, AiUnavailableError, bindUsage, createAiClient, StrategySchema, type AiClient } from "@brandloop/ai";
 import { assignSources, loadIdeaMaterial, scriptedAi, sourceBadge } from "@brandloop/agent";
 import { getStrategy, isAiBlocked, listMemory, prisma, renderCoreSections, renderMemoryIndex } from "@brandloop/db";
 import { z } from "zod";
@@ -116,6 +116,8 @@ export async function postIdeasHandler(request: Request, deps: IdeasDeps = {}): 
     return Response.json(response);
   } catch (err) {
     if (err instanceof AiUnavailableError) return fail(503, AI_UNAVAILABLE_MESSAGE);
+    const down = aiErrorUserMessage(err instanceof IdeasGenerationError ? err.cause : err);
+    if (down) return fail(503, down);
     if (err instanceof IdeasGenerationError) {
       console.error(`[ideas] generation failed: ${err.cause instanceof Error ? err.cause.message : err.message}`);
       return fail(502, err.message);

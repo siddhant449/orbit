@@ -11,7 +11,7 @@ import {
   prisma,
   upsertMemory,
 } from "@brandloop/db";
-import { tool, type LanguageModel } from "ai";
+import { APICallError, tool, type LanguageModel } from "ai";
 import { MockLanguageModelV4 } from "ai/test";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -248,6 +248,28 @@ describe("runChatTurn", () => {
     const last = (await listMessages(p, chatId)).at(-1)!;
     expect(last.role).toBe("assistant");
     expect((last.context as any).finish).toBe("error");
+  });
+
+  it("tells the user the AI is unavailable (no provider text) when the account is out of credits, with one request", async () => {
+    const err = new APICallError({
+      message: "You have no credits remaining. Add credits at https://platform.openai.com/billing",
+      url: "https://api.openai.com/v1/responses",
+      requestBodyValues: {},
+      statusCode: 429,
+      responseBody: JSON.stringify({ error: { message: "You have no credits remaining.", code: "insufficient_quota" } }),
+      isRetryable: false,
+    });
+    const model = new MockLanguageModelV4({ doStream: async () => { throw err; } });
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const sse = await (await runChatTurn(deps(model), caller, body("Hi"))).text();
+    expect(sse).toContain("Orbit's AI is temporarily unavailable. Please try again in a little while.");
+    expect(sse).not.toMatch(/credits|billing|platform\.openai/i);
+    expect(model.doStreamCalls).toHaveLength(1);
+    const lines = spy.mock.calls.map((c) => String(c[0])).filter((l) => l.startsWith("[ai]"));
+    expect(lines).toEqual(["[ai] chat model failed: quota (status 429) [AI_APICallError]"]);
+    spy.mockRestore();
+    await settle();
+    expect(((await listMessages(p, chatId)).at(-1)!.context as any).finish).toBe("error");
   });
 
   it("windows history sent to the model", async () => {

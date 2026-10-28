@@ -58,6 +58,8 @@ describe("openai adapter", () => {
       [apiError(503, "{}"), "unavailable", true],
       [apiError(429, "{}"), "unavailable", true],
       [apiError(401, '{"error":{"message":"Incorrect API key provided: sk-test-SECRET"}}'), "unavailable", false],
+      [apiError(429, '{"error":{"message":"You have no credits remaining","code":"insufficient_quota"}}'), "unavailable", false],
+      [apiError(429, '{"error":{"message":"Rate limit reached","code":"rate_limit_exceeded"}}'), "unavailable", true],
       [Object.assign(new Error("aborted"), { name: "AbortError" }), "timeout", false],
       [Object.assign(new Error("timed out"), { name: "TimeoutError" }), "timeout", false],
       [new TypeError("fetch failed"), "unavailable", true],

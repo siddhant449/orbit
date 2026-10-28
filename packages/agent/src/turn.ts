@@ -1,4 +1,4 @@
-import { AI_PAUSED_MESSAGE, bindEmbedder, bindModerate, bindUsage, limitMessage, reportUsage, type AiClient, type Embedder } from "@brandloop/ai";
+import { AI_PAUSED_MESSAGE, aiErrorUserMessage, reportProviderError, bindEmbedder, bindModerate, bindUsage, limitMessage, reportUsage, type AiClient, type Embedder } from "@brandloop/ai";
 import {
   ChatError,
   claimRun,
@@ -331,8 +331,10 @@ export async function runChatTurn(
   /** Top-level failures (model, network, processing) fail the turn; tool step errors are recoverable. */
   const streamErrorText = (err: unknown) => {
     streamFailed = true;
-    log("chat stream error", err);
-    return STREAM_ERROR_TEXT;
+    // Out of credits, a rejected key or an outage: say so plainly, and never pass provider text on to the user.
+    const unavailable = aiErrorUserMessage(err);
+    if (reportProviderError(err, "chat stream failed") === "other") log("chat stream error", err);
+    return unavailable ?? STREAM_ERROR_TEXT;
   };
   // The SDK reports an invalid tool call twice: once with the error object (tool-input-error), then with
   // its string form (tool-output-error). Remember the text made for the object so the string maps to it.
@@ -393,7 +395,8 @@ export async function runChatTurn(
         },
         onError: ({ error }) => {
           streamFailed = true;
-          log("chat model error", error);
+          // Provider failures are logged once, by class and status; anything else keeps its message.
+          if (reportProviderError(error, "chat model failed") === "other") log("chat model error", error);
         },
         onStepFinish: (step) => {
           usageSoFar += (step.usage?.inputTokens ?? 0) + (step.usage?.outputTokens ?? 0);

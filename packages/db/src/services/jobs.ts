@@ -1,3 +1,4 @@
+import { aiErrorUserMessage } from "@brandloop/ai";
 import { prisma } from "../client";
 import type { BackgroundJob, JobKind } from "../generated/prisma/client";
 
@@ -17,7 +18,8 @@ export async function runJob(jobId: string, fn: () => Promise<unknown>): Promise
       data: { status: "DONE", output: (result ?? {}) as object },
     });
   } catch (err) {
-    const error = err instanceof Error ? err.message : "Something went wrong";
+    // Never store provider text (billing links, key hints) where the user can read it.
+    const error = aiErrorUserMessage(err) ?? (err instanceof Error ? err.message : "Something went wrong");
     await prisma.backgroundJob.update({ where: { id: jobId }, data: { status: "FAILED", error } });
   }
 }

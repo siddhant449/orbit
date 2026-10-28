@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildChart, featureRows, parseCapUsd, usd } from "./admin-format";
+import { alertMessage, buildChart, featureRows, parseCapUsd, usd } from "./admin-format";
 
 describe("usd", () => {
   it("shows cents above a dollar and four places below it", () => {
@@ -53,5 +53,15 @@ describe("featureRows", () => {
     const rows = featureRows({ today: { a: 1 }, week: { a: 2, b: 5 }, month: { a: 3, b: 9 } });
     expect(rows.map((r) => r.feature)).toEqual(["b", "a"]);
     expect(rows[1]).toEqual({ feature: "a", today: 1, week: 2, month: 3 });
+  });
+});
+
+describe("alertMessage", () => {
+  const t = () => "04:40 UTC";
+  it("is null when healthy", () => expect(alertMessage(null, t)).toBeNull());
+  it("names each cause", () => {
+    expect(alertMessage({ cls: "quota", since: 1 }, t)).toMatch(/credits exhausted.*since 04:40 UTC.*Billing/);
+    expect(alertMessage({ cls: "auth", since: 1 }, t)).toMatch(/key rejected/);
+    expect(alertMessage({ cls: "outage", since: 1 }, t)).toMatch(/outage/);
   });
 });

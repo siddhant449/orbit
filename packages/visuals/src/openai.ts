@@ -1,3 +1,4 @@
+import { classifyAiError, describeAiError, quotaAwareFetch, reportProviderError } from "@brandloop/ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { APICallError, generateImage, type ImageModel } from "ai";
 import { ProviderError } from "./errors";
@@ -31,6 +32,13 @@ export function mapProviderError(err: unknown, log: (m: string) => void = () => 
     if ((status === 400 || status === 422) && /moderation|safety system|content[_ ]policy|policy_violation|safety/i.test(body)) {
       return new ProviderError("refused", false, undefined, status);
     }
+    const cls = classifyAiError(err);
+    if (cls === "quota" || cls === "auth") {
+      // Retrying never helps; the admin banner and the log carry the cause, the user only sees "unavailable".
+      log(`[visuals] openai: ${describeAiError(err)}`);
+      reportProviderError(err, "image call failed");
+      return new ProviderError("unavailable", false, undefined, status);
+    }
     if (status === 429 || status === 408 || (status !== undefined && status >= 500)) {
       log(`[visuals] openai: HTTP ${status}`);
       return new ProviderError("unavailable", true, undefined, status);
@@ -57,7 +65,7 @@ function sniff(bytes: Buffer): ImageInput["mediaType"] | null {
 
 export function openAiImageProvider(deps: OpenAiImageDeps): ImageProvider {
   const run = deps.generate ?? generateImage;
-  const openai = createOpenAI({ apiKey: deps.apiKey });
+  const openai = createOpenAI({ apiKey: deps.apiKey, fetch: quotaAwareFetch() });
   const modelFor = deps.imageModel ?? ((id: string) => openai.image(id));
   const log = deps.log ?? ((m: string) => console.warn(m));
   const editModel = deps.editModel ?? deps.model;

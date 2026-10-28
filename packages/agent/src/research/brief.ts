@@ -1,4 +1,4 @@
-import { approxTokens, reportUsage, type AiClient } from "@brandloop/ai";
+import { approxTokens, classifyAiError, describeAiError, isProviderDown, reportProviderError, reportUsage, type AiClient } from "@brandloop/ai";
 import { DAILY_SEARCH_CAP, findFreshBrief, saveResearchBrief, searchesToday } from "@brandloop/db";
 import { normalizeResearch, type Exclusion, type ResearchItem } from "./normalize";
 import type { ResearchProvider, SearchResult } from "./provider";
@@ -50,6 +50,7 @@ const isTimeout = (err: unknown) => err instanceof Error && (err.name === "Timeo
 /** What went wrong, safe for logs: the error's name, message and HTTP status. Never keys, headers or prompt text. */
 export function describeFailure(err: unknown): string {
   if (!(err instanceof Error)) return "unknown error";
+  if (isProviderDown(classifyAiError(err))) return describeAiError(err);
   const status = (err as { statusCode?: unknown; status?: unknown }).statusCode ?? (err as { status?: unknown }).status;
   return `${err.name}: ${err.message.slice(0, 200)}${typeof status === "number" ? ` (status ${status})` : ""}`;
 }
@@ -72,6 +73,7 @@ async function metered(deps: PrefetchDeps, query: string, signal: AbortSignal, w
     reportUsage({ ...who, feature: "research", model: r.model ?? deps.provider.id, inputTokens: r.usage?.inputTokens ?? approxTokens(query.length), outputTokens: r.usage?.outputTokens ?? approxTokens(r.answer.length), ok: true });
     return r;
   } catch (err) {
+    reportProviderError(err, "research search failed");
     reportUsage({ ...who, feature: "research", model: deps.provider.id, inputTokens: approxTokens(query.length), outputTokens: 0, ok: false });
     throw err;
   }
@@ -98,7 +100,8 @@ export async function runResearch(deps: PrefetchDeps, topic: string, window: Res
   const raw = settled.flatMap((s): SearchResult[] => (s.status === "fulfilled" ? [s.value] : []));
   const searchCount = settled.length;
   const failures = settled.flatMap((s) => (s.status === "rejected" ? [s.reason] : []));
-  for (const reason of failures) console.error(`[agent] research search failed: ${describeFailure(reason)}`);
+  // Provider-down failures were already logged once, by class, where they happened.
+  for (const reason of failures.filter((f) => !isProviderDown(classifyAiError(f)))) console.error(`[agent] research search failed: ${describeFailure(reason)}`);
   if (raw.length === 0) {
     await saveResearchBrief(deps.profileId, deps.chatId, { topic, windowStart: window.start, windowEnd: window.end, provider: deps.provider.id, items: [], exclusions: [], searchCount });
     const why = failures.some((f) => isTimeout(f)) ? "the web search took too long" : "the web search provider returned an error";

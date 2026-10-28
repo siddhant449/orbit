@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { chatDailyCapMicroUsd } from "@brandloop/ai";
+import { chatDailyCapMicroUsd, getProviderAlert } from "@brandloop/ai";
 import { spendByDay, spendPerUser, spendTotals, userBreakdown, USER_SORTS, type UserSort } from "@brandloop/db";
 import { prisma } from "@brandloop/db";
 import { cn } from "@brandloop/ui";
@@ -7,7 +7,7 @@ import { PageBody, PageHeader, SectionHeading } from "@/components/page";
 import { LimitControls } from "@/components/admin/limit-controls";
 import { SpendChart } from "@/components/admin/spend-chart";
 import { requireAdmin } from "@/lib/admin";
-import { buildChart, compactNumber, featureLabel, featureRows, sumTotals, usd } from "@/lib/admin-format";
+import { alertMessage, buildChart, compactNumber, featureLabel, featureRows, sumTotals, usd } from "@/lib/admin-format";
 
 type Search = { q?: string; sort?: string; dir?: string; page?: string; user?: string };
 
@@ -42,6 +42,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const detail = sp.user ? await prisma.user.findUnique({ where: { id: sp.user }, select: { id: true, name: true, email: true } }) : null;
   const breakdown = detail ? await userBreakdown(detail.id, now) : [];
 
+  const alert = await getProviderAlert().catch(() => null);
+  const alertText = alertMessage(alert, (ms) => new Date(ms).toISOString().slice(11, 16) + " UTC");
   const chart = buildChart(days, 30, now);
   const defaultCap = chatDailyCapMicroUsd();
   const defaultCapUsd = (defaultCap / 1_000_000).toString();
@@ -75,6 +77,11 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         }
       />
       <PageBody className="flex flex-col gap-10">
+        {alertText ? (
+          <div role="alert" data-provider-alert className="rounded-card border border-red-500/40 bg-red-500/10 px-5 py-4 text-[15px] font-medium text-text">
+            {alertText}
+          </div>
+        ) : null}
         <section aria-label="Totals" className="grid gap-4 sm:grid-cols-3" data-admin-totals>
           {stats.map((s) => (
             <div key={s.label} className="orbit-panel flex min-w-0 flex-col gap-3 p-5">

@@ -81,6 +81,9 @@ describe("errors", () => {
     expect(friendlyError(new TypeError("Load failed"))).toBe(net);
     expect(friendlyError(new ChatRequestError("message_too_long", "That message is too long.", 413))).toBe("That message is too long.");
     expect(friendlyError(new Error("Something went wrong while answering. Try again."))).toBe("Something went wrong while answering. Try again.");
+    const unavailable = "Orbit's AI is temporarily unavailable. Please try again in a little while.";
+    expect(friendlyError(new Error(unavailable))).toBe(unavailable);
+    expect(friendlyError(new Error("You have no credits remaining. Add credits at platform.openai.com/billing"))).toBe(unavailable);
     expect(friendlyError(new Error(""))).toBe("Something went wrong while answering. Try again.");
   });
 });

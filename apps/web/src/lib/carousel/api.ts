@@ -1,4 +1,4 @@
-import { AI_PAUSED_MESSAGE, AiUnavailableError, bindUsage, type AiClient } from "@brandloop/ai";
+import { AI_PAUSED_MESSAGE, aiErrorUserMessage, AiUnavailableError, bindUsage, type AiClient } from "@brandloop/ai";
 import { readCappedJson } from "@/lib/chat-request";
 import { AI_UNAVAILABLE_MESSAGE } from "@/lib/run-job";
 import { generateSlides, GenerateRequestSchema, type VoiceGuide } from "./ai";
@@ -52,6 +52,8 @@ export function makeGenerateHandler(deps: GenerateDeps) {
       return Response.json({ slides });
     } catch (err) {
       if (err instanceof AiUnavailableError) return fail(503, AI_UNAVAILABLE_MESSAGE);
+      const down = aiErrorUserMessage(err);
+      if (down) return fail(503, down);
       console.error(`[carousel] generate failed: ${err instanceof Error ? err.message : String(err)}`);
       return fail(502, "Orbit couldn't write the slides this time. Try again.");
     }
