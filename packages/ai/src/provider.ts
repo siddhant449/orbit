@@ -1,5 +1,9 @@
-import { createOpenAI, openai } from "@ai-sdk/openai";
+import { createOpenAI, openai as plainOpenai } from "@ai-sdk/openai";
 import type { EmbeddingModel, LanguageModel, Tool } from "ai";
+import { quotaAwareFetch } from "./errors";
+
+/** Every OpenAI call goes through here so an out-of-credits answer is never retried (see `quotaAwareFetch`). Without a key it reads OPENAI_API_KEY at request time. */
+const provider = (apiKey?: string) => createOpenAI({ ...(apiKey ? { apiKey } : {}), fetch: quotaAwareFetch() });
 
 export type ModelAlias = "generate" | "extract" | "write";
 
@@ -25,12 +29,12 @@ export function resolveModel(alias: ModelAlias): string {
  */
 export function getModel(alias: ModelAlias, apiKey?: string): LanguageModel {
   const id = resolveModel(alias);
-  return apiKey ? createOpenAI({ apiKey })(id) : openai(id);
+  return provider(apiKey)(id);
 }
 
 /** A specific chat model by ID (the user's pick). The caller checks the ID against `isChatModel` first. */
 export function getModelById(id: string, apiKey?: string): LanguageModel {
-  return apiKey ? createOpenAI({ apiKey })(id) : openai(id);
+  return provider(apiKey)(id);
 }
 
 /** Embedding model ID. Override with AI_MODEL_EMBED. */
@@ -41,7 +45,7 @@ export function resolveEmbeddingModel(): string {
 /** The AI SDK embedding model. Lazy like getModel: never reads the key at build time. */
 export function getEmbeddingModel(apiKey?: string): EmbeddingModel {
   const id = resolveEmbeddingModel();
-  return apiKey ? createOpenAI({ apiKey }).embedding(id) : openai.embedding(id);
+  return provider(apiKey).embedding(id);
 }
 
 /**
@@ -49,5 +53,5 @@ export function getEmbeddingModel(apiKey?: string): EmbeddingModel {
  * result back). Registered under the tool key `web_search`. Building it never reads the key.
  */
 export function webSearchTool(): Tool {
-  return openai.tools.webSearch({}) as Tool;
+  return plainOpenai.tools.webSearch({}) as Tool;
 }

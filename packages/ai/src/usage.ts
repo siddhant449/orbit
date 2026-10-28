@@ -1,6 +1,7 @@
 import type { AiClient } from "./client";
 import type { Embedder } from "./embed";
 import type { Moderate } from "./moderation";
+import { reportProviderError, recordProviderSuccess } from "./provider-alert";
 import { estimateCostMicroUsd } from "./usage-limits";
 
 /**
@@ -57,6 +58,7 @@ export function setUsageGate(gate: Gate | null): void {
 
 /** Reports one call. Fire-and-forget: never throws, never waits. */
 export function reportUsage(event: Omit<UsageEvent, "costMicroUsd"> & { costMicroUsd?: number }): void {
+  if (event.ok) recordProviderSuccess();
   const { recorder } = reg();
   if (!recorder) return;
   try {
@@ -97,6 +99,7 @@ export function bindUsage(client: AiClient, who: UsageWho & { feature?: AiFeatur
       return out;
     } catch (err) {
       const usage = seen ?? { inputTokens: 0, outputTokens: 0 };
+      reportProviderError(err, `${feature} call failed`);
       reportUsage({ ...who, feature, model: modelId, ...usage, ok: false });
       throw err;
     }
@@ -126,6 +129,7 @@ export function bindEmbedder(embedder: Embedder, who: UsageWho, model = process.
         reportUsage({ ...who, feature: "embeddings", model, inputTokens, outputTokens: 0, ok: true });
         return out;
       } catch (err) {
+        reportProviderError(err, "embeddings call failed");
         reportUsage({ ...who, feature: "embeddings", model, inputTokens: 0, outputTokens: 0, ok: false });
         throw err;
       }
