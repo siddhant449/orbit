@@ -87,12 +87,16 @@ export function featureRows(totals: PeriodTotals): { feature: string; today: num
     .sort((a, b) => b.month - a.month);
 }
 
-export type AlertView = { cls: "quota" | "auth" | "outage"; since: number };
+export type AlertView = { cls: "quota" | "auth" | "outage"; since: number; /** Set when the Gemini fallback has been answering calls. */ fallbackAt?: number | undefined };
 
 /** The admin banner text for an active provider alert (see getProviderAlert), or null when all is well. */
 export function alertMessage(alert: AlertView | null, time: (ms: number) => string): string | null {
   if (!alert) return null;
   const at = time(alert.since);
+  if (alert.fallbackAt !== undefined) {
+    const why = alert.cls === "quota" ? "credits exhausted" : alert.cls === "auth" ? "key rejected" : "provider outage";
+    return `OpenAI unavailable (${why}): running on Gemini fallback since ${at}. Fix OpenAI to move back.`;
+  }
   if (alert.cls === "quota") return `OpenAI credits exhausted: AI is down for all users since ${at}. Add credits at OpenAI > Billing.`;
   if (alert.cls === "auth") return `OpenAI key rejected: AI is down for all users since ${at}. Check OPENAI_API_KEY.`;
   return `OpenAI provider outage: AI calls have been failing since ${at}.`;

@@ -47,7 +47,9 @@ async function metered<T>(deps: VisualDeps, visual: Visual, fn: () => Promise<T>
   const row = { profileId: visual.profileId, teamId: visual.teamId, feature: "images" as const, model: deps.provider.id, inputTokens: 0, outputTokens: 0 };
   try {
     const out = await fn();
-    reportUsage({ ...row, costMicroUsd: deps.provider.id.startsWith("mock") ? 0 : imageCostMicroUsd(deps.quality), ok: true });
+    // A fallback image says which model made it; that is the model the ledger shows.
+    const used = (out as { model?: unknown } | null)?.model;
+    reportUsage({ ...row, ...(typeof used === "string" ? { model: used } : {}), costMicroUsd: deps.provider.id.startsWith("mock") ? 0 : imageCostMicroUsd(deps.quality), ok: true });
     return out;
   } catch (err) {
     reportUsage({ ...row, costMicroUsd: 0, ok: false });

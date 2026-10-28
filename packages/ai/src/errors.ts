@@ -15,7 +15,7 @@ export const AI_UNAVAILABLE_USER_MESSAGE = "Orbit's AI is temporarily unavailabl
 /** Status OpenAI quota errors are rewritten to (see `quotaAwareFetch`): 402 is never retried by the AI SDK. */
 const QUOTA_STATUS = 402;
 
-const QUOTA_TEXT = /insufficient_quota|no credits remaining|exceeded your current quota|billing[_ ](hard[_ ])?limit|check your plan and billing/i;
+const QUOTA_TEXT = /insufficient_quota|no credits remaining|exceeded your current quota|billing[_ ](hard[_ ])?limit|check your plan and billing|free_tier|limit: 0/i;
 const NETWORK_TEXT = /fetch failed|ECONNRESET|ETIMEDOUT|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|socket hang up|network/i;
 
 /** The error itself plus whatever it wraps (RetryError.lastError, `cause`), outermost first. Cycle-safe. */
@@ -40,7 +40,9 @@ function bodyCode(body: unknown): { code: string; text: string } {
   }
   const e = (parsed as { error?: { code?: unknown; type?: unknown; message?: unknown } } | null | undefined)?.error;
   const code = typeof e?.code === "string" ? e.code : typeof e?.type === "string" ? e.type : "";
-  return { code, text: `${code} ${typeof e?.message === "string" ? e.message : ""}` };
+  // Gemini's errors carry a numeric `code` and a `status` string such as PERMISSION_DENIED.
+  const status = typeof (e as { status?: unknown } | undefined)?.status === "string" ? (e as { status: string }).status : "";
+  return { code, text: `${code} ${status} ${typeof e?.message === "string" ? e.message : ""}` };
 }
 
 function classifyOne(err: unknown): AiErrorClass | null {
@@ -48,7 +50,7 @@ function classifyOne(err: unknown): AiErrorClass | null {
     const { code, text } = bodyCode(err.responseBody ?? (err.data as unknown));
     const status = err.statusCode;
     if (code === "insufficient_quota" || status === QUOTA_STATUS || (status === 429 && QUOTA_TEXT.test(text))) return "quota";
-    if (status === 401 || code === "invalid_api_key") return "auth";
+    if (status === 401 || code === "invalid_api_key" || (status === 403 && /PERMISSION_DENIED/.test(text)) || (status === 400 && /API key not valid|API_KEY_INVALID/i.test(text + String(err.responseBody)))) return "auth";
     if (status === 429) return "rate_limit";
     if (status === undefined || status === 408 || status >= 500) return "outage";
     return null;

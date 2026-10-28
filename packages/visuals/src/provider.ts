@@ -4,7 +4,8 @@ import { openAiImageProvider } from "./openai";
 
 export type ImageInput = { bytes: Buffer; mediaType: "image/png" | "image/jpeg" | "image/webp" };
 export type ImageQuality = "low" | "medium" | "high";
-export type ImageResult = { image: ImageInput; revisedPrompt?: string };
+/** `model` is set only when a fallback model produced the image (the usage ledger records it). */
+export type ImageResult = { image: ImageInput; revisedPrompt?: string; model?: string };
 
 export type GenerateOptions = {
   prompt: string;

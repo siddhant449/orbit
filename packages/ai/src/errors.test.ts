@@ -30,6 +30,12 @@ describe("classifyAiError", () => {
     expect(classifyAiError(api(undefined, undefined, "Cannot connect to API: fetch failed"))).toBe("outage");
     expect(classifyAiError(new TypeError("fetch failed"))).toBe("outage");
   });
+  it("classifies Gemini's own errors the same way", () => {
+    expect(classifyAiError(api(429, { error: { code: 429, status: "RESOURCE_EXHAUSTED", message: "Quota exceeded for metric ... free_tier ... limit: 0" } }))).toBe("quota");
+    expect(classifyAiError(api(503, { error: { code: 503, status: "UNAVAILABLE", message: "The model is overloaded." } }))).toBe("outage");
+    expect(classifyAiError(api(400, { error: { code: 400, status: "INVALID_ARGUMENT", message: "API key not valid. Please pass a valid API key." } }))).toBe("auth");
+    expect(classifyAiError(api(403, { error: { code: 403, status: "PERMISSION_DENIED", message: "denied" } }))).toBe("auth");
+  });
   it("names a plain 429 as rate_limit", () => {
     expect(classifyAiError(api(429, RATE_BODY))).toBe("rate_limit");
   });

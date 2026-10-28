@@ -1,6 +1,7 @@
 import type { AiClient } from "./client";
 import type { Embedder } from "./embed";
 import type { Moderate } from "./moderation";
+import { isGeminiModelId } from "./gemini";
 import { reportProviderError, recordProviderSuccess } from "./provider-alert";
 import { estimateCostMicroUsd } from "./usage-limits";
 
@@ -58,7 +59,8 @@ export function setUsageGate(gate: Gate | null): void {
 
 /** Reports one call. Fire-and-forget: never throws, never waits. */
 export function reportUsage(event: Omit<UsageEvent, "costMicroUsd"> & { costMicroUsd?: number }): void {
-  if (event.ok) recordProviderSuccess();
+  // A Gemini answer means the fallback is carrying the load, not that the primary recovered.
+  if (event.ok && !isGeminiModelId(event.model)) recordProviderSuccess();
   const { recorder } = reg();
   if (!recorder) return;
   try {
@@ -86,19 +88,19 @@ export const approxTokens = (chars: number): number => Math.ceil(chars / 4);
  */
 export function bindUsage(client: AiClient, who: UsageWho & { feature?: AiFeature }): AiClient {
   const base: AiClient = client;
-  const run = async <T>(opts: { model: string; system: string; prompt: string; feature?: AiFeature | undefined }, call: (onUsage: (u: { inputTokens?: number | undefined; outputTokens?: number | undefined }) => void) => Promise<T>, outLen: (r: T) => number): Promise<T> => {
+  const run = async <T>(opts: { model: string; system: string; prompt: string; feature?: AiFeature | undefined }, call: (onUsage: (u: { inputTokens?: number | undefined; outputTokens?: number | undefined; model?: string | undefined }) => void) => Promise<T>, outLen: (r: T) => number): Promise<T> => {
     await assertAiAllowed(who);
     const feature = opts.feature ?? who.feature ?? "other";
-    let seen: { inputTokens: number; outputTokens: number } | null = null;
+    const held: { seen: { inputTokens: number; outputTokens: number; model?: string | undefined } | null } = { seen: null };
     const model = typeof opts.model === "string" ? opts.model : "unknown";
     const modelId = resolveAlias(model);
     try {
-      const out = await call((u) => (seen = { inputTokens: u.inputTokens ?? 0, outputTokens: u.outputTokens ?? 0 }));
-      const usage = seen ?? { inputTokens: approxTokens(opts.system.length + opts.prompt.length), outputTokens: approxTokens(outLen(out)) };
-      reportUsage({ ...who, feature, model: modelId, ...usage, ok: true });
+      const out = await call((u) => (held.seen = { inputTokens: u.inputTokens ?? 0, outputTokens: u.outputTokens ?? 0, model: u.model }));
+      const usage = held.seen ?? { inputTokens: approxTokens(opts.system.length + opts.prompt.length), outputTokens: approxTokens(outLen(out)) };
+      reportUsage({ ...who, feature, model: held.seen?.model ?? modelId, inputTokens: usage.inputTokens, outputTokens: usage.outputTokens, ok: true });
       return out;
     } catch (err) {
-      const usage = seen ?? { inputTokens: 0, outputTokens: 0 };
+      const usage = held.seen ?? { inputTokens: 0, outputTokens: 0 };
       reportProviderError(err, `${feature} call failed`);
       reportUsage({ ...who, feature, model: modelId, ...usage, ok: false });
       throw err;

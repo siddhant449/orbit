@@ -63,5 +63,6 @@ describe("alertMessage", () => {
     expect(alertMessage({ cls: "quota", since: 1 }, t)).toMatch(/credits exhausted.*since 04:40 UTC.*Billing/);
     expect(alertMessage({ cls: "auth", since: 1 }, t)).toMatch(/key rejected/);
     expect(alertMessage({ cls: "outage", since: 1 }, t)).toMatch(/outage/);
+    expect(alertMessage({ cls: "quota", since: 1, fallbackAt: 2 }, t)).toMatch(/OpenAI unavailable.*running on Gemini fallback/);
   });
 });

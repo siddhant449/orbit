@@ -1,4 +1,4 @@
-import { classifyAiError, describeAiError, quotaAwareFetch, reportProviderError } from "@brandloop/ai";
+import { classifyAiError, describeAiError, getGeminiImageModel, isProviderDown, quotaAwareFetch, recordFallbackSuccess, reportProviderError } from "@brandloop/ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { APICallError, generateImage, type ImageModel } from "ai";
 import { ProviderError } from "./errors";
@@ -13,6 +13,8 @@ export type OpenAiImageDeps = {
   /** Test seams. */
   generate?: typeof generateImage;
   imageModel?: (id: string) => ImageModel;
+  /** Gemini image model for the one-shot fallback (default: GEMINI_API_KEY / GEMINI_IMAGE_MODEL from the environment; null disables it). */
+  fallbackModel?: (() => ImageModel | null) | null;
   /** Operator log line: model and HTTP status only, never the key, the prompt or the response body. */
   log?: (message: string) => void;
 };
@@ -83,7 +85,23 @@ export function openAiImageProvider(deps: OpenAiImageDeps): ImageProvider {
         providerOptions: { openai: { quality, moderation: "auto" } },
       });
     } catch (err) {
-      throw mapProviderError(err, log);
+      const mapped = mapProviderError(err, log);
+      // OpenAI is out of credits, rejecting the key or down: one try on Gemini (no mask support, so masked edits stay failed).
+      const hasMask = typeof prompt !== "string" && "mask" in prompt && Boolean(prompt.mask);
+      const fb = isProviderDown(classifyAiError(err)) && !hasMask && !signal?.aborted ? (deps.fallbackModel === undefined ? getGeminiImageModel() : (deps.fallbackModel?.() ?? null)) : null;
+      if (!fb) throw mapped;
+      try {
+        const r = await run({ model: fb, prompt: typeof prompt === "string" ? prompt : { text: prompt.text ?? "", images: prompt.images }, maxRetries: 0, abortSignal: signal });
+        const fbBytes = Buffer.from(r.image.uint8Array);
+        const fbType = sniff(fbBytes);
+        if (!fbType) throw new ProviderError("bad_output", false);
+        recordFallbackSuccess();
+        return { image: { bytes: fbBytes, mediaType: fbType }, model: typeof fb === "string" ? fb : fb.modelId };
+      } catch (fbErr) {
+        log(`[visuals] fallback image model failed: ${describeAiError(fbErr)}`);
+        reportProviderError(fbErr, "image fallback failed");
+        throw mapped;
+      }
     }
     const bytes = Buffer.from(result.image.uint8Array);
     const mediaType = sniff(bytes);

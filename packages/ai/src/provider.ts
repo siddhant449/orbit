@@ -1,6 +1,7 @@
 import { createOpenAI, openai as plainOpenai } from "@ai-sdk/openai";
 import type { EmbeddingModel, LanguageModel, Tool } from "ai";
 import { quotaAwareFetch } from "./errors";
+import { withGeminiFallback } from "./fallback";
 
 /** Every OpenAI call goes through here so an out-of-credits answer is never retried (see `quotaAwareFetch`). Without a key it reads OPENAI_API_KEY at request time. */
 const provider = (apiKey?: string) => createOpenAI({ ...(apiKey ? { apiKey } : {}), fetch: quotaAwareFetch() });
@@ -27,14 +28,14 @@ export function resolveModel(alias: ModelAlias): string {
  * Pass `apiKey` to bind a specific key; otherwise the default provider reads
  * OPENAI_API_KEY from the environment when a request is made.
  */
-export function getModel(alias: ModelAlias, apiKey?: string): LanguageModel {
-  const id = resolveModel(alias);
-  return provider(apiKey)(id);
+export function getModel(alias: ModelAlias, apiKey?: string, opts: { fallback?: boolean } = {}): LanguageModel {
+  const model = provider(apiKey)(resolveModel(alias));
+  return opts.fallback === false ? model : withGeminiFallback(model, alias);
 }
 
 /** A specific chat model by ID (the user's pick). The caller checks the ID against `isChatModel` first. */
 export function getModelById(id: string, apiKey?: string): LanguageModel {
-  return provider(apiKey)(id);
+  return withGeminiFallback(provider(apiKey)(id), "generate");
 }
 
 /** Embedding model ID. Override with AI_MODEL_EMBED. */

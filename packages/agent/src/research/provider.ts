@@ -1,5 +1,6 @@
 import type { LanguageModel, Tool } from "ai";
 import { generateText } from "ai";
+import { classifyAiError, isProviderDown, recordFallbackSuccess, reportProviderError } from "@brandloop/ai";
 import type { ResearchWindow } from "./window";
 
 export type Citation = { url: string; title: string; snippet: string | null };
@@ -11,19 +12,39 @@ export interface ResearchProvider {
 }
 
 /** OpenAI's hosted web search through the existing provider (design §6.2). The citations are the URLs it really returned. */
-export function openaiResearch(model: LanguageModel, webSearch: Tool): ResearchProvider {
+export function openaiResearch(model: LanguageModel, webSearch: Tool, fallback: { model: LanguageModel; tool: Tool } | null = null): ResearchProvider {
+  const run = async (m: LanguageModel, toolName: string, tool: Tool, q: { query: string; maxResults: number }, signal: AbortSignal, maxRetries?: number): Promise<SearchResult> => {
+    const res = await generateText({
+      model: m,
+      tools: { [toolName]: tool },
+      // Gemini cannot be forced to call its grounding tool by name; it searches on its own for a news question.
+      ...(toolName === "web_search" ? { toolChoice: { type: "tool" as const, toolName } } : {}),
+      prompt: q.query,
+      abortSignal: signal,
+      ...(maxRetries !== undefined ? { maxRetries } : {}),
+    });
+    // Only URLs the provider itself returned are citations.
+    const citations = res.sources.flatMap((s): Citation[] => (s.sourceType === "url" ? [{ url: s.url, title: s.title ?? s.url, snippet: null }] : []));
+    return { answer: res.text, citations: citations.slice(0, q.maxResults), usage: res.totalUsage ?? res.usage, model: typeof m === "string" ? m : m.modelId };
+  };
   return {
     id: "openai",
     async search(q, signal) {
-      const res = await generateText({
-        model,
-        tools: { web_search: webSearch },
-        toolChoice: { type: "tool", toolName: "web_search" },
-        prompt: q.query,
-        abortSignal: signal,
-      });
-      const citations = res.sources.flatMap((s): Citation[] => (s.sourceType === "url" ? [{ url: s.url, title: s.title ?? s.url, snippet: null }] : []));
-      return { answer: res.text, citations: citations.slice(0, q.maxResults), usage: res.totalUsage ?? res.usage, model: typeof model === "string" ? model : model.modelId };
+      try {
+        return await run(model, "web_search", webSearch, q, signal);
+      } catch (err) {
+        // OpenAI is out of credits, rejecting the key or down: one try on Gemini with Google Search grounding.
+        if (!fallback || signal.aborted || !isProviderDown(classifyAiError(err))) throw err;
+        reportProviderError(err, "research search failed, trying the fallback");
+        try {
+          const out = await run(fallback.model, "google_search", fallback.tool, q, signal, 0);
+          recordFallbackSuccess();
+          return out;
+        } catch (fbErr) {
+          reportProviderError(fbErr, "research fallback failed");
+          throw err;
+        }
+      }
     },
   };
 }
@@ -67,9 +88,9 @@ export function perplexityResearch(apiKey: string, fetchImpl: typeof globalThis.
 /** Perplexity when asked for and keyed; otherwise OpenAI's web search when its model and tool are supplied; otherwise none. */
 export function selectResearchProvider(
   env: Record<string, string | undefined>,
-  deps: { model?: LanguageModel | null; webSearch?: Tool | null; fetch?: typeof globalThis.fetch } = {},
+  deps: { model?: LanguageModel | null; webSearch?: Tool | null; fallback?: { model: LanguageModel; tool: Tool } | null; fetch?: typeof globalThis.fetch } = {},
 ): ResearchProvider | null {
   if (env.RESEARCH_PROVIDER === "perplexity" && env.PERPLEXITY_API_KEY) return perplexityResearch(env.PERPLEXITY_API_KEY, deps.fetch);
-  if (deps.model && deps.webSearch) return openaiResearch(deps.model, deps.webSearch);
+  if (deps.model && deps.webSearch) return openaiResearch(deps.model, deps.webSearch, deps.fallback ?? null);
   return null;
 }

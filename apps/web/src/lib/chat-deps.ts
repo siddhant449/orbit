@@ -1,5 +1,5 @@
 import { after } from "next/server";
-import { createAiClient, createEmbedder, getModel, getModelById, webSearchTool } from "@brandloop/ai";
+import { createAiClient, createEmbedder, geminiResearchFallback, getModel, getModelById, webSearchTool } from "@brandloop/ai";
 import { createChatSafety } from "@/lib/chat-safety";
 import { fakeEmbedder } from "@brandloop/ai/testing";
 import { visualsEnabled } from "@/lib/visuals/deps";
@@ -47,6 +47,6 @@ export function getChatDeps(modelId?: string | null): ChatDeps {
     embedder: createEmbedder(),
     webSearchTool: search,
     // Dated research: OpenAI's web search through the extract model by default, Perplexity when RESEARCH_PROVIDER says so.
-    research: selectResearchProvider(process.env, { model: getModel("extract"), webSearch: search }),
+    research: selectResearchProvider(process.env, { model: getModel("extract", undefined, { fallback: false }), webSearch: search, fallback: geminiResearchFallback() }),
   };
 }
