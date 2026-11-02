@@ -49,6 +49,9 @@ function classifyOne(err: unknown): AiErrorClass | null {
   if (APICallError.isInstance(err)) {
     const { code, text } = bodyCode(err.responseBody ?? (err.data as unknown));
     const status = err.statusCode;
+    // Gemini words its per-minute limit like an empty account ("exceeded your current quota"); its quota id tells them apart.
+    const raw = String(err.responseBody ?? "");
+    if (status === 429 && /PerMinute|PerSecond/.test(raw) && !/limit: 0|"quotaValue":\s*"0"/.test(raw)) return "rate_limit";
     if (code === "insufficient_quota" || status === QUOTA_STATUS || (status === 429 && QUOTA_TEXT.test(text))) return "quota";
     if (status === 401 || code === "invalid_api_key" || (status === 403 && /PERMISSION_DENIED/.test(text)) || (status === 400 && /API key not valid|API_KEY_INVALID/i.test(text + String(err.responseBody)))) return "auth";
     if (status === 429) return "rate_limit";
@@ -69,6 +72,16 @@ export function classifyAiError(err: unknown): AiErrorClass {
     if (c) return c;
   }
   return "other";
+}
+
+/** The wait the provider asked for before retrying (Gemini's RetryInfo `retryDelay`, e.g. "33s"), in ms, if it gave one. */
+export function retryDelayMs(err: unknown): number | undefined {
+  for (const e of chain(err)) {
+    if (!APICallError.isInstance(e)) continue;
+    const m = /"retryDelay":\s*"(\d+(?:\.\d+)?)s"/.exec(String(e.responseBody ?? ""));
+    if (m) return Math.round(Number(m[1]) * 1000);
+  }
+  return undefined;
 }
 
 /** True when the class means AI is down for everyone until someone acts or the provider recovers. */

@@ -69,6 +69,40 @@ describe("withFallback", () => {
     expect(err.statusCode).toBe(402);
     expect(fb.doGenerateCalls).toHaveLength(1);
   });
+  it("Gemini briefly overloaded: retried after a short wait, then answers", async () => {
+    let calls = 0;
+    const fb = new MockLanguageModelV4({
+      modelId: "gemini-3.5-flash",
+      doGenerate: async () => {
+        if (calls++ === 0) throw apiErr(503);
+        return textResult("second try");
+      },
+    });
+    const res = await generateText({ model: withFallback(failing(quota()), () => fb, { retryDelaysMs: [0, 0] }), prompt: "hi" });
+    expect(res.text).toBe("second try");
+    expect(calls).toBe(2);
+  });
+  it("Gemini overloaded every time: a bounded number of tries, then the original error", async () => {
+    const fb = failing(apiErr(503));
+    const err = await generateText({ model: withFallback(failing(quota()), () => fb, { retryDelaysMs: [0, 0] }), prompt: "hi" }).catch((e) => e);
+    expect(err.statusCode).toBe(402);
+    expect(fb.doGenerateCalls).toHaveLength(3);
+  });
+  it("Gemini per-minute limit: waits the delay it asks for (capped), then answers", async () => {
+    let calls = 0;
+    const busy = apiErr(429, { error: { code: 429, status: "RESOURCE_EXHAUSTED", message: "You exceeded your current quota", details: [{ quotaId: "GenerateRequestsPerMinutePerProjectPerModel-FreeTier" }, { retryDelay: "33s" }] } });
+    const fb = new MockLanguageModelV4({
+      modelId: "gemini-3.5-flash",
+      doGenerate: async () => {
+        if (calls++ === 0) throw busy;
+        return textResult("after the wait");
+      },
+    });
+    const t0 = Date.now();
+    const res = await generateText({ model: withFallback(failing(quota()), () => fb, { retryDelaysMs: [0, 0], maxWaitMs: 20 }), prompt: "hi" });
+    expect(res.text).toBe("after the wait");
+    expect(Date.now() - t0).toBeGreaterThanOrEqual(15);
+  });
   it("no fallback model: the primary error surfaces", async () => {
     await expect(generateText({ model: withFallback(failing(quota()), () => null), prompt: "hi" })).rejects.toBeInstanceOf(APICallError);
   });
