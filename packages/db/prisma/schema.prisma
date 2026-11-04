@@ -524,7 +524,7 @@ model Visual {
   customInstructions String?
   useBrandColours    Boolean         @default(true)
   referenceId        String?
-  /// "openai:<model>" | "gemini:<model>" | "mock"
+  /// "openai:<model>" | "mock"
   provider           String?
   currentVersion     Int             @default(0)
   editCount          Int             @default(0)

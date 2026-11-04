@@ -12,20 +12,19 @@ const FAIL_TTL_SEC = 3600;
 const OK_THROTTLE_MS = 60_000;
 const CLASSES: ProviderDownClass[] = ["quota", "auth", "outage"];
 
-export type ProviderAlert = { cls: ProviderDownClass; since: number; lastAt: number; /** Set when calls have been answered by the Gemini fallback since the alert began. */ fallbackAt?: number };
+export type ProviderAlert = { cls: ProviderDownClass; since: number; lastAt: number };
 
 type Hooks = { store?: CounterStore; now?: () => number };
 const g = globalThis as unknown as { __orbitAlert?: { lastOk: number; seen: WeakSet<object> } };
 const state = () => (g.__orbitAlert ??= { lastOk: 0, seen: new WeakSet() });
 
 /** Pure: the active alert given failure times per class and success times, or null. Worst class wins (quota, auth, outage). */
-export function evaluateAlert(failures: Record<ProviderDownClass, number[]>, oks: number[], now: number, fallbacks: number[] = []): ProviderAlert | null {
+export function evaluateAlert(failures: Record<ProviderDownClass, number[]>, oks: number[], now: number): ProviderAlert | null {
   const lastOk = oks.length ? Math.max(...oks) : 0;
   for (const cls of CLASSES) {
     const live = failures[cls].filter((t) => t > lastOk && t >= now - ALERT_WINDOW_MS).sort((a, b) => a - b);
     if (live.length) {
-      const fb = fallbacks.filter((t) => t >= live[0]!);
-      return { cls, since: live[0]!, lastAt: live.at(-1)!, ...(fb.length ? { fallbackAt: Math.max(...fb) } : {}) };
+      return { cls, since: live[0]!, lastAt: live.at(-1)! };
     }
   }
   return null;
@@ -35,11 +34,6 @@ export function evaluateAlert(failures: Record<ProviderDownClass, number[]>, oks
 export function recordProviderFailure(cls: AiErrorClass, { store = defaultCounterStore(), now = Date.now }: Hooks = {}): void {
   if (!isProviderDown(cls)) return;
   void store.addEvent(`ai:fail:${cls}`, now(), FAIL_TTL_SEC).catch(() => {});
-}
-
-/** Records that the Gemini fallback answered a call (the primary was down). Not a primary success: it does not clear the alert. */
-export function recordFallbackSuccess({ store = defaultCounterStore(), now = Date.now }: Hooks = {}): void {
-  void store.addEvent("ai:fallback", now(), FAIL_TTL_SEC).catch(() => {});
 }
 
 /** Records a successful call (at most once a minute per process, so healthy traffic costs almost nothing). */
@@ -73,8 +67,8 @@ export async function getProviderAlert({ store = defaultCounterStore(), now = Da
   const t = now();
   const since = t - ALERT_WINDOW_MS;
   try {
-    const [quota, auth, outage, ok, fb] = await Promise.all([store.events("ai:fail:quota", since), store.events("ai:fail:auth", since), store.events("ai:fail:outage", since), store.events("ai:ok", since), store.events("ai:fallback", since)]);
-    return evaluateAlert({ quota, auth, outage }, ok, t, fb);
+    const [quota, auth, outage, ok] = await Promise.all([store.events("ai:fail:quota", since), store.events("ai:fail:auth", since), store.events("ai:fail:outage", since), store.events("ai:ok", since)]);
+    return evaluateAlert({ quota, auth, outage }, ok, t);
   } catch {
     return null;
   }

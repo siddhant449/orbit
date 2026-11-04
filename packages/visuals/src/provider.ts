@@ -22,9 +22,9 @@ export type EditOptions = {
   abortSignal?: AbortSignal;
 };
 
-/** The seam every image backend sits behind (OpenAI today, Gemini optional, a mock for tests and dev). */
+/** The seam every image backend sits behind (OpenAI, a mock for tests and dev). */
 export type ImageProvider = {
-  /** "openai:<model>" | "gemini:<model>" | "mock" */
+  /** "openai:<model>" | "mock" */
   id: string;
   generate(o: GenerateOptions): Promise<ImageResult>;
   edit(o: EditOptions): Promise<ImageResult>;
@@ -38,7 +38,7 @@ export type ProviderEnv = Partial<
 >;
 
 /**
- * VISUALS_PROVIDER = openai | mock (gemini is not built yet). Default: OpenAI whenever OPENAI_API_KEY is set (dev
+ * VISUALS_PROVIDER = openai | mock. Default: OpenAI whenever OPENAI_API_KEY is set (dev
  * included, so the app never shows placeholder art where real images are possible); without a key, the mock outside
  * production. Tests and the offline e2e server ask for the mock explicitly. The mock is refused in production.
  */
@@ -56,8 +56,6 @@ export function createImageProvider(env: ProviderEnv = process.env): ImageProvid
       const editModel = env.VISUALS_OPENAI_EDIT_MODEL?.trim() || (env.VISUALS_OPENAI_MODEL?.trim() ? model : DEFAULT_OPENAI_EDIT_MODEL);
       return openAiImageProvider({ apiKey, model, editModel });
     }
-    case "gemini":
-      throw new Error("The gemini image provider is not available yet");
     default:
       throw new Error(`Unknown VISUALS_PROVIDER "${requested}" (use openai or mock)`);
   }

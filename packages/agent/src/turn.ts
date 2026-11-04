@@ -1,4 +1,4 @@
-import { AI_PAUSED_MESSAGE, aiErrorUserMessage, fallbackModelOf, reportProviderError, bindEmbedder, bindModerate, bindUsage, limitMessage, reportUsage, type AiClient, type Embedder } from "@brandloop/ai";
+import { AI_PAUSED_MESSAGE, aiErrorUserMessage, reportProviderError, bindEmbedder, bindModerate, bindUsage, limitMessage, reportUsage, type AiClient, type Embedder } from "@brandloop/ai";
 import {
   ChatError,
   claimRun,
@@ -327,8 +327,6 @@ export async function runChatTurn(
   let streamFailed = false;
   let charged = false;
   let usageSoFar = 0;
-  /** Set when the Gemini fallback answered a step: the model that really ran, for the ledger and the cost counter. */
-  let fallbackUsed: string | undefined;
   let outputRefused = false;
 
   /** Top-level failures (model, network, processing) fail the turn; tool step errors are recoverable. */
@@ -406,14 +404,13 @@ export async function runChatTurn(
           if (reportProviderError(error, "chat model failed") === "other") log("chat model error", error);
         },
         onStepFinish: (step) => {
-          fallbackUsed = fallbackModelOf(step.providerMetadata) ?? fallbackUsed;
           usageSoFar += (step.usage?.inputTokens ?? 0) + (step.usage?.outputTokens ?? 0);
         },
         onFinish: ({ totalUsage }) => {
           charged = true;
           if (verdict.ok) {
-            void deps.safety?.recordUsage(profileId, fallbackUsed ?? modelId, totalUsage).catch(() => {});
-            reportUsage({ ...who, feature: "chat", model: fallbackUsed ?? modelId, inputTokens: totalUsage?.inputTokens ?? 0, outputTokens: totalUsage?.outputTokens ?? 0, ok: !streamFailed });
+            void deps.safety?.recordUsage(profileId, modelId, totalUsage).catch(() => {});
+            reportUsage({ ...who, feature: "chat", model: modelId, inputTokens: totalUsage?.inputTokens ?? 0, outputTokens: totalUsage?.outputTokens ?? 0, ok: !streamFailed });
           }
         },
       });

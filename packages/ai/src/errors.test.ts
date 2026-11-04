@@ -1,6 +1,6 @@
 import { APICallError, generateText, RetryError, streamText } from "ai";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { AI_UNAVAILABLE_USER_MESSAGE, aiErrorUserMessage, classifyAiError, describeAiError, retryDelayMs } from "./errors";
+import { AI_UNAVAILABLE_USER_MESSAGE, aiErrorUserMessage, classifyAiError, describeAiError } from "./errors";
 import { createAiClient } from "./client";
 import { createEmbedder } from "./embed";
 import { getModel } from "./provider";
@@ -29,30 +29,6 @@ describe("classifyAiError", () => {
     expect(classifyAiError(api(500, { error: { message: "The server had an error" } }))).toBe("outage");
     expect(classifyAiError(api(undefined, undefined, "Cannot connect to API: fetch failed"))).toBe("outage");
     expect(classifyAiError(new TypeError("fetch failed"))).toBe("outage");
-  });
-  it("classifies Gemini's own errors the same way", () => {
-    expect(classifyAiError(api(429, { error: { code: 429, status: "RESOURCE_EXHAUSTED", message: "Quota exceeded for metric ... free_tier ... limit: 0" } }))).toBe("quota");
-    expect(classifyAiError(api(503, { error: { code: 503, status: "UNAVAILABLE", message: "The model is overloaded." } }))).toBe("outage");
-    expect(classifyAiError(api(400, { error: { code: 400, status: "INVALID_ARGUMENT", message: "API key not valid. Please pass a valid API key." } }))).toBe("auth");
-    expect(classifyAiError(api(403, { error: { code: 403, status: "PERMISSION_DENIED", message: "denied" } }))).toBe("auth");
-  });
-  it("tells Gemini's per-minute limit (rate_limit, with its retry delay) from an empty or zero quota", () => {
-    const perMinute = {
-      error: {
-        code: 429,
-        status: "RESOURCE_EXHAUSTED",
-        message: "You exceeded your current quota, please check your plan and billing details.",
-        details: [
-          { "@type": "type.googleapis.com/google.rpc.QuotaFailure", violations: [{ quotaId: "GenerateRequestsPerMinutePerProjectPerModel-FreeTier", quotaValue: "5" }] },
-          { "@type": "type.googleapis.com/google.rpc.RetryInfo", retryDelay: "33s" },
-        ],
-      },
-    };
-    expect(classifyAiError(api(429, perMinute))).toBe("rate_limit");
-    expect(retryDelayMs(api(429, perMinute))).toBe(33_000);
-    const zero = { error: { ...perMinute.error, details: [{ "@type": "type.googleapis.com/google.rpc.QuotaFailure", violations: [{ quotaId: "GenerateRequestsPerMinutePerProjectPerModel-FreeTier", quotaValue: "0" }] }] } };
-    expect(classifyAiError(api(429, zero))).toBe("quota");
-    expect(retryDelayMs(api(429, QUOTA_BODY))).toBeUndefined();
   });
   it("names a plain 429 as rate_limit", () => {
     expect(classifyAiError(api(429, RATE_BODY))).toBe("rate_limit");
