@@ -203,13 +203,20 @@ function route(opts: CallOptions): ScriptStep {
     if (last.toolName === "createDocument" && /\[e2e:research-fails\]/.test(text)) {
       return { text: "Here's your draft. Live sources were unavailable, so I avoided specific news." };
     }
-    if (last.toolName === "delegateWriting" && /\[e2e:needs-facts\]/.test(text)) {
-      return { text: `Before I write this I need two facts only you have. ${SCRIPTED_QUESTIONS.map((q, i) => `${i + 1}. ${q}`).join(" ")}` };
+    if (last.toolName === "delegateWriting" && (/\[e2e:needs-facts\]/.test(text) || /ask me one or two short questions first/i.test(text))) {
+      return { text: QUESTIONS_LINE };
     }
     if (last.toolName === "delegateWriting") {
       return call("createDocument", { title: SCRIPTED_TITLE, kind: "text", specialistHandoffToolCallId: last.toolCallId });
     }
     return { text: AFTER_TOOL[last.toolName] ?? "Done." };
+  }
+  // The sprint-day prompt asks for questions first; the answers message ("Here are my answers:") means write now.
+  if (/^Here are my answers:/.test(text.trim()) && has.has("delegateWriting")) {
+    return call("delegateWriting", { request: `Write a short LinkedIn post for the user. Use their answers:\n${text.slice(0, 3_000)}`, specialty: "post", personalDetails: "allowed", overrides: null, chosenHook: null, templateSlug: null });
+  }
+  if (/ask me one or two short questions first/i.test(text) && has.has("delegateWriting")) {
+    return call("delegateWriting", { request: `[e2e:needs-facts] Write a short LinkedIn post for the user. Their request: ${text.slice(0, 1_000)}`, specialty: "post", personalDetails: "allowed", overrides: null, chosenHook: null, templateSlug: null });
   }
   const angle = systemText(opts.prompt).includes("<picked_angle>\nQuestion asked:");
   const openLine = openDocumentFirstLine(opts.prompt);
@@ -361,7 +368,7 @@ const CANNED: unknown[] = [
       postType: "framework",
       blocks: SCRIPTED_BLOCKS,
       facts: [],
-      missingFacts: [],
+      missingFacts: [], suggestions: [],
       clarifyingQuestion: null,
     },
   },
@@ -533,14 +540,16 @@ function mockResearchPost(prompt: string): unknown | null {
         { kind: "close", lines: ["Try it on one real task this week."] },
       ],
       facts: [{ text: `Northwind Labs released a smaller model on ${first[1]} ${month}.`, source: "research", ref: "r1" }],
-      missingFacts: [],
+      missingFacts: [], suggestions: [],
       clarifyingQuestion: null,
     },
   };
 }
 
 /** Keyword routes, tried before CANNED: one schema can return a different canned output per scenario. */
+export const SCRIPTED_SUGGESTIONS = [["My first hire, a few years in", "The person who joined when it was just me"], []];
 export const SCRIPTED_QUESTIONS = ["Who was your first hire, and when did you hire them?", "What changed for the team after they joined?"];
+export const QUESTIONS_LINE = "A couple of details only you know, then I'll draft it.";
 const WALL =
   "A proof of concept answers one narrow question about whether the idea can work at all, while a minimum viable product answers a much wider one about real demand, about paying users, about retention and about what the team should build next";
 export const EMOJI_DRAFT_BLOCKS: WriterBlock[] = [
@@ -608,7 +617,7 @@ const ROUTES: { match: RegExp; output: unknown }[] = [
           { kind: "close", lines: ["Build the smallest thing that can prove you wrong."] },
         ],
         facts: [],
-        missingFacts: [],
+        missingFacts: [], suggestions: [],
         clarifyingQuestion: null,
       },
     },
@@ -622,7 +631,7 @@ const ROUTES: { match: RegExp; output: unknown }[] = [
       missingInput: [],
       confidence: "medium",
       parentAction: "create-document",
-      payload: { readiness: "ready", title: "Wrong thing first", postType: "opinion", blocks: EMOJI_DRAFT_BLOCKS, facts: [], missingFacts: [], clarifyingQuestion: null },
+      payload: { readiness: "ready", title: "Wrong thing first", postType: "opinion", blocks: EMOJI_DRAFT_BLOCKS, facts: [], missingFacts: [], suggestions: [], clarifyingQuestion: null },
     },
   },
   // The polish pass's repair call (writing/polish.ts) carries the same request, so it matches the marker too.
@@ -643,6 +652,7 @@ const ROUTES: { match: RegExp; output: unknown }[] = [
         blocks: [],
         facts: [],
         missingFacts: SCRIPTED_QUESTIONS,
+        suggestions: SCRIPTED_SUGGESTIONS,
         clarifyingQuestion: SCRIPTED_QUESTIONS[0],
       },
     },

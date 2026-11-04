@@ -74,3 +74,11 @@ describe("a skipped research step", () => {
     expect(s.failed).toBe(0);
   });
 });
+
+describe("needs-details label", () => {
+  it("does not say Draft ready when the writer asked for details", async () => {
+    const { summarizeSteps } = await import("./steps");
+    const part = { type: "tool-delegateWriting", state: "output-available", toolCallId: "a", output: { payload: { readiness: "needs-user-input" } } } as never;
+    expect(summarizeSteps([part]).steps[0]!.label).toBe("Needs a few details from you");
+  });
+});

@@ -56,6 +56,13 @@ export function isSkippedOutput(name: string, output: unknown): boolean {
   return name === "researchTopic" && typeof output === "string" && output.startsWith("Skipped:");
 }
 
+/** A writer handoff that asked for details instead of drafting: the row must not claim "Draft ready". */
+export const NEEDS_DETAILS_LABEL = "Needs a few details from you";
+export function needsUserInput(name: string, output: unknown): boolean {
+  if (name !== "delegateWriting" || !output || typeof output !== "object") return false;
+  return (output as { payload?: { readiness?: unknown } }).payload?.readiness === "needs-user-input";
+}
+
 export function toolLabel(name: string, state: ToolState): string {
   return (TOOL_LABELS[name] ?? FALLBACK)[state];
 }
