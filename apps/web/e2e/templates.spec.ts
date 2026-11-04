@@ -72,10 +72,12 @@ test("browse, save, use a template, see it on the draft card, rotate and swap", 
   await page.keyboard.press("Escape");
 
   // Save persists across a reload and shows under Saved.
-  const put = page.waitForResponse((r) => r.request().method() === "PUT" && r.url().includes("/save"));
   await card.getByRole("button", { name: `Save ${pick.title}` }).click();
-  expect((await put).ok()).toBe(true);
-  await expect(card.getByRole("button", { name: `Unsave ${pick.title}` })).toBeVisible();
+  const post = page.waitForResponse((r) => r.request().method() === "POST" && new URL(r.url()).pathname === "/api/saves");
+  await page.locator("[data-save-menu]").getByLabel("Save to All saves").check();
+  expect((await post).status()).toBe(201);
+  await page.keyboard.press("Escape");
+  await expect(card.getByRole("button", { name: `Saved ${pick.title}` })).toBeVisible();
   await page.reload();
   await page.getByRole("button", { name: "Saved", exact: true }).click();
   await expect(page.locator(`[data-template-card="${pick.slug}"]`)).toBeVisible({ timeout: 15_000 });

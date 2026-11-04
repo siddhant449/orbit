@@ -39,6 +39,8 @@ export function SaveMenu({ kind, refId, snapshot, label, initialItemId, initialS
   const [open, setOpen] = useState(false);
   const [known, setKnown] = useState<Known | undefined>(initialItemId === undefined ? undefined : initialItemId === null ? null : { id: initialItemId, spaceIds: [] });
   const [busy, setBusy] = useState(false);
+  // What the checkboxes show while a request is in flight, so a click answers at once.
+  const [optimistic, setOptimistic] = useState<{ all: boolean; spaceIds: string[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [making, setMaking] = useState(false);
   const [name, setName] = useState("");
@@ -69,14 +71,16 @@ export function SaveMenu({ kind, refId, snapshot, label, initialItemId, initialS
     void mutate(isSavesKey);
   };
 
-  async function run(task: () => Promise<void>) {
+  async function run(task: () => Promise<void>, next?: { all: boolean; spaceIds: string[] }) {
     setBusy(true);
     setError(null);
+    setOptimistic(next ?? null);
     try {
       await task();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong. Try again.");
     }
+    setOptimistic(null);
     setBusy(false);
   }
 
@@ -84,20 +88,27 @@ export function SaveMenu({ kind, refId, snapshot, label, initialItemId, initialS
     fetchJson<{ item: SavedItemDto }>("/api/saves", "POST", { kind, refId, snapshot, spaceIds }).then(({ item }) => settle({ id: item.id, spaceIds: item.spaceIds }));
 
   const toggleAll = () =>
-    run(async () => {
-      if (known) {
-        await fetchJson(`/api/saves/${known.id}`, "DELETE");
-        settle(null);
-      } else await save([]);
-    });
+    run(
+      async () => {
+        if (known) {
+          await fetchJson(`/api/saves/${known.id}`, "DELETE");
+          settle(null);
+        } else await save([]);
+      },
+      { all: !known, spaceIds: [] },
+    );
 
-  const toggleSpace = (id: string) =>
-    run(async () => {
-      if (!known) return save([id]);
-      const spaceIds = known.spaceIds.includes(id) ? known.spaceIds.filter((s) => s !== id) : [...known.spaceIds, id];
-      const { item } = await fetchJson<{ item: SavedItemDto }>(`/api/saves/${known.id}`, "PATCH", { spaceIds });
-      settle({ id: item.id, spaceIds: item.spaceIds });
-    });
+  const toggleSpace = (id: string) => {
+    const spaceIds = known?.spaceIds.includes(id) ? known.spaceIds.filter((s) => s !== id) : [...(known?.spaceIds ?? []), id];
+    return run(
+      async () => {
+        if (!known) return save([id]);
+        const { item } = await fetchJson<{ item: SavedItemDto }>(`/api/saves/${known.id}`, "PATCH", { spaceIds });
+        settle({ id: item.id, spaceIds: item.spaceIds });
+      },
+      { all: true, spaceIds },
+    );
+  };
 
   const createSpace = () =>
     run(async () => {
@@ -147,14 +158,14 @@ export function SaveMenu({ kind, refId, snapshot, label, initialItemId, initialS
           className="orbit-panel z-50 w-[min(300px,calc(100vw-32px))] rounded-card p-1.5 shadow-[var(--panel-highlight),var(--shadow-draft)] data-[state=open]:animate-[orbit-pop_200ms_var(--ease-out)_both]"
         >
           <label className={row}>
-            <input type="checkbox" className={box} checked={known !== undefined && known !== null} disabled={busy || known === undefined} onChange={() => void toggleAll()} />
+            <input type="checkbox" className={box} checked={optimistic ? optimistic.all : known !== undefined && known !== null} disabled={busy || known === undefined} onChange={() => void toggleAll()} />
             Save to All saves
           </label>
           {(spaces.data?.spaces.length ?? 0) > 0 && (
             <div role="group" aria-label="Spaces" data-lenis-prevent className="mt-1 max-h-[min(240px,40dvh)] overflow-y-auto border-t border-line-row pt-1">
               {spaces.data!.spaces.map((s) => (
                 <label key={s.id} className={row}>
-                  <input type="checkbox" className={box} checked={known?.spaceIds.includes(s.id) ?? false} disabled={busy || known === undefined} onChange={() => void toggleSpace(s.id)} />
+                  <input type="checkbox" className={box} checked={optimistic ? optimistic.spaceIds.includes(s.id) : (known?.spaceIds.includes(s.id) ?? false)} disabled={busy || known === undefined} onChange={() => void toggleSpace(s.id)} />
                   <span className="min-w-0 truncate">{s.name}</span>
                 </label>
               ))}
