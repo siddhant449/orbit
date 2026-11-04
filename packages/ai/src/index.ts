@@ -10,5 +10,3 @@ export * from "./style";
 export * from "./usage";
 export * from "./errors";
 export * from "./provider-alert";
-export * from "./gemini";
-export { withFallback, withGeminiFallback, fallbackModelOf } from "./fallback";

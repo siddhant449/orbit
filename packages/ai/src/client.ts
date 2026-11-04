@@ -2,7 +2,6 @@ import { APICallError, generateText, NoObjectGeneratedError, Output } from "ai";
 import type { FinishReason, LanguageModel, ModelMessage } from "ai";
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import { fallbackModelOf } from "./fallback";
 import { getModel, type ModelAlias } from "./provider";
 import type { AiFeature } from "./usage";
 
@@ -26,7 +25,7 @@ type BaseOpts = {
   /** What the call is for, on the usage ledger (read by `bindUsage`; the client itself ignores it). */
   feature?: AiFeature;
   /** Called with the provider's token counts when the call completes (how `bindUsage` meters real calls). */
-  onUsage?: (usage: { inputTokens?: number | undefined; outputTokens?: number | undefined; /** Set when the Gemini fallback answered: the model that really ran. */ model?: string | undefined }) => void;
+  onUsage?: (usage: { inputTokens?: number | undefined; outputTokens?: number | undefined; }) => void;
 };
 
 export type AiClient = {
@@ -126,7 +125,7 @@ export function createAiClient(
       } catch (err) {
         rethrowClearly(err);
       }
-      onUsage?.({ ...(result.totalUsage ?? result.usage), model: fallbackModelOf(result.providerMetadata) });
+      onUsage?.({ ...(result.totalUsage ?? result.usage) });
       assertCompleted(result.finishReason);
       return result.text.trim();
     },
@@ -145,7 +144,7 @@ export function createAiClient(
       } catch (err) {
         rethrowClearly(err);
       }
-      onUsage?.({ ...(result.totalUsage ?? result.usage), model: fallbackModelOf(result.providerMetadata) });
+      onUsage?.({ ...(result.totalUsage ?? result.usage) });
       assertCompleted(result.finishReason);
       return result.output;
     },

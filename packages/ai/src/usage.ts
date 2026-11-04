@@ -1,7 +1,6 @@
 import type { AiClient } from "./client";
 import type { Embedder } from "./embed";
 import type { Moderate } from "./moderation";
-import { isGeminiModelId } from "./gemini";
 import { reportProviderError, recordProviderSuccess } from "./provider-alert";
 import { estimateCostMicroUsd } from "./usage-limits";
 
@@ -59,8 +58,7 @@ export function setUsageGate(gate: Gate | null): void {
 
 /** Reports one call. Fire-and-forget: never throws, never waits. */
 export function reportUsage(event: Omit<UsageEvent, "costMicroUsd"> & { costMicroUsd?: number }): void {
-  // A Gemini answer means the fallback is carrying the load, not that the primary recovered.
-  if (event.ok && !isGeminiModelId(event.model)) recordProviderSuccess();
+  if (event.ok) recordProviderSuccess();
   const { recorder } = reg();
   if (!recorder) return;
   try {

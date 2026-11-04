@@ -20,9 +20,8 @@ describe("createImageProvider", () => {
     expect(() => createImageProvider({ VISUALS_PROVIDER: "openai" })).toThrow(/OPENAI_API_KEY/);
   });
 
-  it("rejects unknown providers and does not yet ship gemini", () => {
+  it("rejects unknown providers", () => {
     expect(() => createImageProvider({ VISUALS_PROVIDER: "midjourney" })).toThrow(/VISUALS_PROVIDER/);
-    expect(() => createImageProvider({ VISUALS_PROVIDER: "gemini" })).toThrow(/not available/i);
   });
 
   it("the mock is refused in production even if asked for", () => {

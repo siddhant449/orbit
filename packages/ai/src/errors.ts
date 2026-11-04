@@ -15,7 +15,7 @@ export const AI_UNAVAILABLE_USER_MESSAGE = "Orbit's AI is temporarily unavailabl
 /** Status OpenAI quota errors are rewritten to (see `quotaAwareFetch`): 402 is never retried by the AI SDK. */
 const QUOTA_STATUS = 402;
 
-const QUOTA_TEXT = /insufficient_quota|no credits remaining|exceeded your current quota|billing[_ ](hard[_ ])?limit|check your plan and billing|free_tier|limit: 0/i;
+const QUOTA_TEXT = /insufficient_quota|no credits remaining|exceeded your current quota|billing[_ ](hard[_ ])?limit|check your plan and billing/i;
 const NETWORK_TEXT = /fetch failed|ECONNRESET|ETIMEDOUT|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|socket hang up|network/i;
 
 /** The error itself plus whatever it wraps (RetryError.lastError, `cause`), outermost first. Cycle-safe. */
@@ -40,20 +40,15 @@ function bodyCode(body: unknown): { code: string; text: string } {
   }
   const e = (parsed as { error?: { code?: unknown; type?: unknown; message?: unknown } } | null | undefined)?.error;
   const code = typeof e?.code === "string" ? e.code : typeof e?.type === "string" ? e.type : "";
-  // Gemini's errors carry a numeric `code` and a `status` string such as PERMISSION_DENIED.
-  const status = typeof (e as { status?: unknown } | undefined)?.status === "string" ? (e as { status: string }).status : "";
-  return { code, text: `${code} ${status} ${typeof e?.message === "string" ? e.message : ""}` };
+  return { code, text: `${code} ${typeof e?.message === "string" ? e.message : ""}` };
 }
 
 function classifyOne(err: unknown): AiErrorClass | null {
   if (APICallError.isInstance(err)) {
     const { code, text } = bodyCode(err.responseBody ?? (err.data as unknown));
     const status = err.statusCode;
-    // Gemini words its per-minute limit like an empty account ("exceeded your current quota"); its quota id tells them apart.
-    const raw = String(err.responseBody ?? "");
-    if (status === 429 && /PerMinute|PerSecond/.test(raw) && !/limit: 0|"quotaValue":\s*"0"/.test(raw)) return "rate_limit";
     if (code === "insufficient_quota" || status === QUOTA_STATUS || (status === 429 && QUOTA_TEXT.test(text))) return "quota";
-    if (status === 401 || code === "invalid_api_key" || (status === 403 && /PERMISSION_DENIED/.test(text)) || (status === 400 && /API key not valid|API_KEY_INVALID/i.test(text + String(err.responseBody)))) return "auth";
+    if (status === 401 || code === "invalid_api_key") return "auth";
     if (status === 429) return "rate_limit";
     if (status === undefined || status === 408 || status >= 500) return "outage";
     return null;
@@ -72,16 +67,6 @@ export function classifyAiError(err: unknown): AiErrorClass {
     if (c) return c;
   }
   return "other";
-}
-
-/** The wait the provider asked for before retrying (Gemini's RetryInfo `retryDelay`, e.g. "33s"), in ms, if it gave one. */
-export function retryDelayMs(err: unknown): number | undefined {
-  for (const e of chain(err)) {
-    if (!APICallError.isInstance(e)) continue;
-    const m = /"retryDelay":\s*"(\d+(?:\.\d+)?)s"/.exec(String(e.responseBody ?? ""));
-    if (m) return Math.round(Number(m[1]) * 1000);
-  }
-  return undefined;
 }
 
 /** True when the class means AI is down for everyone until someone acts or the provider recovers. */
