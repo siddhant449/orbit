@@ -36,6 +36,7 @@ export const FEATURE_LABELS: Record<string, string> = {
   "memory-learning": "Memory learning",
   "style-learning": "Style learning",
   "style-extract": "Style extraction",
+  "template-from-post": "Template from a post",
   strategy: "Strategy",
   onboarding: "Onboarding",
   images: "Images",

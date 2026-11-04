@@ -13,7 +13,8 @@ const env = vi.hoisted(() => {
 vi.mock("@/lib/account", () => ({ getAccount: async () => env.account }));
 
 import { ensureAccount, prisma } from "@brandloop/db";
-import { getTemplatesHandler, setSavedHandler } from "./templates-api";
+import { createRateLimiter } from "./rate-limit";
+import { deleteTemplateHandler, fromPostHandler, getTemplatesHandler, patchTemplateHandler, postTemplateHandler, setLikedHandler, setSavedHandler } from "./templates-api";
 
 vi.setConfig({ testTimeout: 30_000, hookTimeout: 30_000 });
 
@@ -104,5 +105,48 @@ describe("PUT/DELETE /api/templates/:id/save", () => {
     as(b);
     expect((await setSavedHandler(own.id, true)).status).toBe(404);
     expect((await setSavedHandler("nope", true)).status).toBe(404);
+  });
+});
+
+describe("own templates, likes and from-post", () => {
+  const json = (body: unknown) => new Request("http://t/api/templates", { method: "POST", body: JSON.stringify(body) });
+  const ctx = (id: string) => ({ params: Promise.resolve({ id }) });
+  const input = { title: "Webtest mine", type: "POST", category: "lesson", skeleton: "I learned [lesson]." };
+
+  it("creates, edits, likes and deletes an own template; another profile gets 404", async () => {
+    const res = await postTemplateHandler(json(input));
+    expect(res.status).toBe(201);
+    const { template } = (await res.json()) as { template: { id: string; own: boolean } };
+    expect(template.own).toBe(true);
+    expect((await postTemplateHandler(json({ ...input, skeleton: "no slot" }))).status).toBe(400);
+    expect((await postTemplateHandler(json({ ...input, category: "nope" }))).status).toBe(400);
+    expect((await patchTemplateHandler(new Request("http://t", { method: "PATCH", body: JSON.stringify({ title: "Renamed" }) }), ctx(template.id))).status).toBe(200);
+    expect(((await (await setLikedHandler(template.id, true)).json()) as { likeCount: number }).likeCount).toBe(1);
+    const row = (await list("?search=Renamed&sort=popular")).items[0] as unknown as { liked: boolean; own: boolean; likeCount: number };
+    expect(row).toMatchObject({ liked: true, own: true, likeCount: 1 });
+    as(b);
+    expect((await patchTemplateHandler(new Request("http://t", { method: "PATCH", body: "{}" }), ctx(template.id))).status).toBe(404);
+    expect((await deleteTemplateHandler(new Request("http://t"), ctx(template.id))).status).toBe(404);
+    expect((await setLikedHandler(template.id, true)).status).toBe(404);
+    as(a);
+    expect((await deleteTemplateHandler(new Request("http://t"), ctx(template.id))).status).toBe(200);
+  });
+
+  it("from-post suggests a template with the scripted client, rate limits, and 404s on another profile's post", async () => {
+    const doc = await prisma.document.create({ data: { profileId: a.profileId, title: "Post" } });
+    await prisma.documentVersion.create({ data: { documentId: doc.id, version: 1, text: "I used to think X. Now I do Y.", source: "AI_CREATE" } });
+    const ai = {
+      json: async (o: { schema: { parse: (v: unknown) => unknown } }) => o.schema.parse({ title: "T", type: "POST", category: "lesson", skeleton: "I used to [x].", why: "w" }),
+      text: async () => "",
+    } as never;
+    const limiter = createRateLimiter({ limit: 1, windowMs: 60_000 });
+    const req = () => new Request("http://t/api/templates/from-post", { method: "POST", body: JSON.stringify({ documentId: doc.id }) });
+    const ok = await fromPostHandler(req(), { ai, limiter });
+    expect(ok.status).toBe(200);
+    expect(((await ok.json()) as { suggestion: { skeleton: string } }).suggestion.skeleton).toContain("[x]");
+    expect(await prisma.template.count({ where: { profileId: a.profileId, system: false, title: "T" } })).toBe(0);
+    expect((await fromPostHandler(req(), { ai, limiter })).status).toBe(429);
+    as(b);
+    expect((await fromPostHandler(req(), { ai, limiter: createRateLimiter({ limit: 5, windowMs: 60_000 }) })).status).toBe(404);
   });
 });
