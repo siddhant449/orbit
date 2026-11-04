@@ -1,15 +1,25 @@
-import { LibraryEmpty } from "@/components/ideas/library-empty";
+import { listSpaces } from "@brandloop/db";
+import { PageBody, PageHeader } from "@/components/page";
+import { SavesView } from "@/components/saves/saves-view";
+import { getAccount } from "@/lib/account";
 
 export const metadata = { title: "All saves" };
 
-export default function Page() {
+/** `?space=<id>` shows one space; an unknown or other profile's id falls back to a friendly message in the view. */
+export default async function Page({ searchParams }: { searchParams: Promise<{ space?: string | string[] }> }) {
+  const raw = (await searchParams).space;
+  const spaceId = typeof raw === "string" && raw ? raw : undefined;
+  const profileId = (await getAccount())?.currentProfile?.id;
+  const space = spaceId && profileId ? (await listSpaces(profileId)).find((s) => s.id === spaceId) : undefined;
   return (
-    <LibraryEmpty
-      title="All saves"
-      description="Everything you've saved: posts, hooks, ideas and images, organised into spaces."
-      heading="Your saved posts, hooks and ideas will appear here"
-      points={["Create spaces and drag items into them.", "Pin the spaces you use most."]}
-      needs="Saving isn't built yet, so there's nothing to show. Ideas you generate stay on For you for this browser tab."
-    />
+    <>
+      <PageHeader
+        title={space?.name ?? "All saves"}
+        subtitle={space ? undefined : "Everything you've saved: templates, hooks, ideas, posts and images. Group them into spaces from the sidebar."}
+      />
+      <PageBody>
+        <SavesView spaceId={spaceId} />
+      </PageBody>
+    </>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { SaveMenu } from "@/components/saves/save-menu";
 import { excerpt, relativeTime, type PostRow } from "./posts-view";
 import { CarouselBadge, rowHref } from "./shared";
 
@@ -38,10 +39,10 @@ export function List({ posts, now, timeZone, filtered }: { posts: PostRow[]; now
             {posts.map((p) => {
               const line = excerpt(p.text, p.title, 160);
               return (
-                <li key={p.id} className="border-b border-line-row last:border-b-0">
+                <li key={p.id} className="relative border-b border-line-row last:border-b-0">
                   <Link
                     href={rowHref(p)}
-                    className="orbit-transition grid gap-x-4 gap-y-1.5 px-5 py-4 hover:bg-panel-hover focus-visible:[outline-offset:-2px] md:grid-cols-[minmax(0,1fr)_88px_64px_120px] md:items-center"
+                    className="orbit-transition grid gap-x-4 gap-y-1.5 px-5 py-4 hover:bg-panel-hover focus-visible:[outline-offset:-2px] md:grid-cols-[minmax(0,1fr)_88px_64px_120px] md:items-center md:pr-16"
                   >
                     <span className="flex min-w-0 flex-col gap-1">
                       <span className="flex min-w-0 items-center gap-2">
@@ -61,6 +62,7 @@ export function List({ posts, now, timeZone, filtered }: { posts: PostRow[]; now
                       </span>
                     </span>
                   </Link>
+                  {p.kind !== "carousel" && <SaveMenu compact kind="POST" refId={p.id} snapshot={{ title: p.title, excerpt: line }} label={`post ${p.title}`} className="absolute right-3 top-3" />}
                 </li>
               );
             })}

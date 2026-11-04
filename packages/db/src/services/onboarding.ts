@@ -258,7 +258,7 @@ export async function getChecklist(profileId: string): Promise<ChecklistItem[] |
   const [documents, knowledge, templateSaves] = await Promise.all([
     prisma.document.count({ where: { profileId, deletedAt: null } }),
     prisma.knowledgeItem.count({ where: { profileId } }),
-    prisma.templateSave.count({ where: { profileId } }),
+    prisma.savedItem.count({ where: { profileId, kind: "TEMPLATE" } }),
   ]);
   return deriveChecklist({ documents, knowledge, templateSaves });
 }

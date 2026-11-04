@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { SaveMenu } from "@/components/saves/save-menu";
 import type { CSSProperties, ReactNode } from "react";
 import { StatusPill, cn } from "@brandloop/ui";
 import { PlusIcon } from "@brandloop/ui/icons";
@@ -117,30 +118,33 @@ function Column({ id, posts, now, filtered }: { id: ColumnId; posts: PostRow[]; 
 export function PostCard({ post, now, showStatus = false }: { post: PostRow; now: Date; showStatus?: boolean }) {
   const line = excerpt(post.text, post.title);
   return (
-    <Link
-      href={rowHref(post)}
-      className="orbit-panel orbit-panel--interactive flex flex-col gap-2.5 rounded-card-sm p-4 text-text"
-    >
-      <span className="flex items-start justify-between gap-2 text-[14px] font-medium leading-[1.3]">
-        {post.title}
-        {post.kind === "carousel" && <CarouselBadge />}
-      </span>
-      {line && <span className="line-clamp-2 text-[13px] leading-[1.45] text-text-2">{line}</span>}
-      <span className="flex items-center justify-between text-[11px] text-text-3">
-        {showStatus ? (
-          <StatusPill className="min-h-5 px-2 text-[10px]">
-            <span aria-hidden="true" className="size-1.5 rounded-full bg-faint" />
-            Draft
-          </StatusPill>
-        ) : (
-          <span>Draft</span>
-        )}
-        <span>
-          <span className="sr-only">Edited </span>
-          {relativeTime(post.updatedAt, now)}
+    <div className="relative">
+      <Link
+        href={rowHref(post)}
+        className="orbit-panel orbit-panel--interactive flex flex-col gap-2.5 rounded-card-sm p-4 text-text"
+      >
+        <span className={`flex items-start justify-between gap-2 text-[14px] font-medium leading-[1.3] ${post.kind === "carousel" ? "" : "pr-9"}`}>
+          {post.title}
+          {post.kind === "carousel" && <CarouselBadge />}
         </span>
-      </span>
-    </Link>
+        {line && <span className="line-clamp-2 text-[13px] leading-[1.45] text-text-2">{line}</span>}
+        <span className="flex items-center justify-between text-[11px] text-text-3">
+          {showStatus ? (
+            <StatusPill className="min-h-5 px-2 text-[10px]">
+              <span aria-hidden="true" className="size-1.5 rounded-full bg-faint" />
+              Draft
+            </StatusPill>
+          ) : (
+            <span>Draft</span>
+          )}
+          <span>
+            <span className="sr-only">Edited </span>
+            {relativeTime(post.updatedAt, now)}
+          </span>
+        </span>
+      </Link>
+      {post.kind !== "carousel" && <SaveMenu compact kind="POST" refId={post.id} snapshot={{ title: post.title, excerpt: line }} label={`post ${post.title}`} className="absolute right-2 top-2" />}
+    </div>
   );
 }
 

@@ -14,7 +14,7 @@ import { estimateCostMicroUsd } from "./usage-limits";
  */
 export const AI_FEATURES = [
   "chat", "writing", "editing", "polish", "review", "research", "ideas", "hooks", "title", "moderation",
-  "memory-learning", "style-learning", "style-extract", "strategy", "onboarding", "images", "embeddings", "other",
+  "memory-learning", "style-learning", "style-extract", "template-from-post", "strategy", "onboarding", "images", "embeddings", "other",
 ] as const;
 export type AiFeature = (typeof AI_FEATURES)[number];
 

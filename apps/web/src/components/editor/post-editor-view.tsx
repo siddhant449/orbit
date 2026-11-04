@@ -1,5 +1,6 @@
 "use client";
 
+import { SaveAsTemplate } from "@/components/templates/save-as-template";
 import { stripCitations } from "@brandloop/agent/client";
 import Link from "next/link";
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
@@ -521,6 +522,7 @@ export function PostEditorView({
                   <Button variant="secondary" size="icon" onClick={() => void copy()} aria-label="Copy post" title="Copy post">
                     <CopyIcon />
                   </Button>
+                  <SaveAsTemplate documentId={doc.id} />
                   <LinkedInAction label="Schedule" variant="secondary" />
                   <LinkedInAction label="Publish" variant="primary" />
                 </div>

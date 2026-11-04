@@ -676,6 +676,18 @@ function mockIdeas(prompt: string): unknown | null {
   };
 }
 
+/** The scripted answer to "turn this post into a template": a fixed skeleton with slots. */
+function mockTemplateFromPost(prompt: string): unknown | null {
+  if (!/<post>\n[\s\S]*\n<\/post>/.test(prompt) || !/reusable template/i.test(prompt)) return null;
+  return {
+    title: "Lesson from a mistake",
+    type: "POST",
+    category: "lesson",
+    skeleton: "[A surprising result in one line]\n\nI used to [old belief]. Then [what happened].\n\nThree things I do differently now:\n1. [First change]\n2. [Second change]\n3. [Third change]\n\n[A question for the reader]",
+    why: "Opens with a result, then shows the change in numbered steps.",
+  };
+}
+
 /** A specialist client for mock mode: `text` names chats, `json` returns the first canned output the schema accepts. */
 export function scriptedAi(): AiClient {
   return {
@@ -699,6 +711,11 @@ export function scriptedAi(): AiClient {
       const researched = mockResearchPost(prompt);
       if (researched) {
         const parsed = schema.safeParse(researched);
+        if (parsed.success) return parsed.data;
+      }
+      const template = mockTemplateFromPost(prompt);
+      if (template) {
+        const parsed = schema.safeParse(template);
         if (parsed.success) return parsed.data;
       }
       const ideas = mockIdeas(prompt);

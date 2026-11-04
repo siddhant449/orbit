@@ -14,7 +14,7 @@ const words = (text: string) => (text.toLowerCase().match(WORD) ?? []);
 
 /** The post templates this profile may use: the shipped ones and its own. Other profiles' templates never show up. */
 export async function postTemplates(profileId: string): Promise<TemplateRow[]> {
-  const { items } = await listTemplates({ type: "POST", limit: 2_000 });
+  const { items } = await listTemplates({ type: "POST", ownerProfileId: profileId, limit: 2_000 });
   return items.filter((t) => t.system || t.profileId === profileId);
 }
 
@@ -70,7 +70,7 @@ export function templateTools(ctx: TurnContext) {
       }),
       execute: ({ query, category }) =>
         runTool("searchTemplates", "template library", async () => {
-          const { items } = await listTemplates({ type: "POST", ...(category ? { category } : {}), ...(query?.trim() ? { search: query.trim() } : {}), limit: 60 });
+          const { items } = await listTemplates({ type: "POST", ownerProfileId: ctx.profileId, ...(category ? { category } : {}), ...(query?.trim() ? { search: query.trim() } : {}), limit: 60 });
           const mine = items.filter((t) => t.system || t.profileId === ctx.profileId).slice(0, SEARCH_RESULTS);
           return mine.length ? mine.map(summary).join("\n") : "No templates matched. Try a broader word or no category.";
         }),
