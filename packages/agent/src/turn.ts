@@ -29,6 +29,7 @@ import {
 } from "ai";
 import type { ResearchProvider } from "./research/provider";
 import { isTimely } from "./research/timely";
+import { wantsAnglesPanel } from "./writing/angles-intent";
 import { randomUUID } from "node:crypto";
 import type { TurnContext, VisualsToolDeps } from "./context";
 import { closingLine } from "./closing";
@@ -393,6 +394,10 @@ export async function runChatTurn(
           if (await isStopRequested(chatId, runId).catch(() => false)) controller.abort();
           // Server-decided research: the first step is a researchTopic call, whatever the model would have chosen.
           if (stepNumber === 0 && ctx.research.required && "researchTopic" in tools) return { toolChoice: { type: "tool" as const, toolName: "researchTopic" } } as never;
+          // Server-decided angles: a new post on a bare topic, or an explicit ask for angles/suggestions, opens the panel (after research when that ran first).
+          const wantsAngles = wantsAnglesPanel({ userText: ctx.userText, pickedAngle: Boolean(ctx.pickedAngle), hasPost: Boolean(ctx.documentRef.current) });
+          const anglesStep = ctx.research.required && "researchTopic" in tools ? 1 : 0;
+          if (stepNumber === anglesStep && wantsAngles && "presentOptions" in tools) return { toolChoice: { type: "tool" as const, toolName: "presentOptions" } } as never;
           return {};
         },
         onError: ({ error }) => {

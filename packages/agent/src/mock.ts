@@ -1,6 +1,7 @@
 import type { AiClient } from "@brandloop/ai";
 import type { ResearchProvider } from "./research/provider";
 import { isTimely } from "./research/timely";
+import { wantsAnglesPanel } from "./writing/angles-intent";
 import { isIdeasRequest } from "./writing/ideas";
 import { renderBlocks, type WriterBlock } from "./writing/render";
 import { APICallError, simulateReadableStream, type LanguageModel } from "ai";
@@ -227,7 +228,10 @@ function route(opts: CallOptions): ScriptStep {
   if (angle && openLine) {
     return call("updateDocument", { description: text.slice(0, 2_000), editRequirements: ["Take the picked angle"], editScope: "whole-document", restoreVersion: null });
   }
-  if (!angle && has.has("presentOptions") && /\b(different|other|some|more)\s+angles?\b|\bangles\b/i.test(text)) {
+  // The same intent the server uses to force the panel; a bare "post on <topic>" is handled below with its topic in the question.
+  const intent = wantsAnglesPanel({ userText: text, pickedAngle: angle, hasPost: Boolean(openLine) });
+  const bareOn = !openLine && /\bpost\s+(?:on|about)\b/i.test(text);
+  if (!angle && has.has("presentOptions") && !bareOn && (intent || /\b(different|other|some|more)\s+angles?\b|\bangles\b/i.test(text))) {
     return call("presentOptions", scriptedAngles(openLine ? "post" : "this idea", Boolean(openLine)));
   }
   // A typed answer to an open picker (no <picked_angle>: the server read it as the user's own words) is the angle to write.
