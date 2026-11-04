@@ -98,3 +98,32 @@ test("typing instead of picking is the user's own angle", async ({ page }) => {
   await expect(page.locator("[data-options-summary]")).toContainText("A: Make it about cost, with a draft", { timeout: 30_000 });
   await expect(page.locator("[data-options-panel]")).toHaveCount(0);
 });
+
+test("an ask for suggestions opens the angles panel; picking angle 1 drafts a post", async ({ page }) => {
+  await page.goto("/sign-in");
+  await clerk.signIn({ page, emailAddress: email! });
+  await page.goto("/");
+  const box = page.getByLabel("Message", { exact: true });
+  await box.fill("You decide and give me some suggestions for todays post.");
+  await box.press("Enter");
+  await expect(page).toHaveURL(CHAT_URL, { timeout: 30_000 });
+  const panel = page.locator("[data-options-panel]");
+  await expect(panel).toBeVisible({ timeout: 30_000 });
+  expect(await panel.locator("[data-option]").count()).toBeGreaterThanOrEqual(3);
+  await panel.locator("[data-option]").first().click();
+  const post = page.getByRole("dialog", { name: "MVP versus POC" });
+  await expect(post.locator("[data-post-text]")).toBeVisible({ timeout: 40_000 });
+  await expect(page.locator("[data-draft-card]")).toHaveCount(1);
+});
+
+test("a specific request writes directly, without the angles panel", async ({ page }) => {
+  await page.goto("/sign-in");
+  await clerk.signIn({ page, emailAddress: email! });
+  await page.goto("/");
+  const box = page.getByLabel("Message", { exact: true });
+  await box.fill("create a post on why small teams should skip fine-tuning");
+  await box.press("Enter");
+  await expect(page).toHaveURL(CHAT_URL, { timeout: 30_000 });
+  await expect(page.locator("[data-draft-card]")).toHaveCount(1, { timeout: 40_000 });
+  await expect(page.locator("[data-options-panel]")).toHaveCount(0);
+});

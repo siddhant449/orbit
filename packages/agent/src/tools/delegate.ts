@@ -146,7 +146,7 @@ export async function delegateWritingRun(
     // A pinned template whose inputs the user has not given never becomes a post, whatever the writer returned.
     if (missing.length > 0 && payload.readiness === "ready") {
       const questions = missing.map((m) => `What is ${m} for this post?`).slice(0, 5);
-      payload = { ...payload, readiness: "needs-user-input", draft: "", blocks: [], hook: "", missingFacts: questions, clarifyingQuestion: questions[0] ?? null };
+      payload = { ...payload, readiness: "needs-user-input", draft: "", blocks: [], hook: "", missingFacts: questions, suggestions: [], clarifyingQuestion: questions[0] ?? null };
       output.missingInput = questions;
       output.parentAction = "ask-user";
     }

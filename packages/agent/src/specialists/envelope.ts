@@ -31,6 +31,8 @@ export const PostWritingModelPayload = z.object({
   blocks: z.array(BlockSchema),
   facts: z.array(FactSchema),
   missingFacts: z.array(z.string()),
+  /** Per missing-fact question: up to 3 short starter phrasings drawn only from the user's own material (empty when none). */
+  suggestions: z.array(z.array(z.string())),
   clarifyingQuestion: z.string().nullable(),
 });
 
@@ -45,6 +47,7 @@ export const PostWritingPayload = z.object({
   blocks: z.array(BlockSchema).max(16).optional(),
   facts: z.array(FactSchema).max(12).optional(),
   missingFacts: z.array(z.string()).max(5).optional(),
+  suggestions: z.array(z.array(z.string().max(90)).max(3)).max(5).optional(),
 });
 export type PostWriting = z.infer<typeof PostWritingPayload>;
 

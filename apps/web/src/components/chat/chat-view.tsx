@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import useSWR from "swr";
 import { ArrowDown, SquarePen } from "lucide-react";
 import { toast } from "sonner";
-import { matchTypedAnswer, openPanelOf, swapOpening, toolLabel, type ChatUIMessage, type HookCard, type PanelDoc } from "@brandloop/agent/client";
+import { formatAnswers, matchTypedAnswer, openPanelOf, questionSetOf, swapOpening, toolLabel, type ChatUIMessage, type HookCard, type PanelDoc } from "@brandloop/agent/client";
 import { Button, useMediaQuery } from "@brandloop/ui";
 import { PostsIcon } from "@brandloop/ui/icons";
 import type { VoiceOption } from "@/components/home/voice-picker";
@@ -20,6 +20,7 @@ import { useChatSession } from "./use-chat-session";
 import { DESKTOP_PANEL, DocumentPanel, DocumentPanelContext } from "./document-panel";
 import { HookActionsContext } from "./hook-cards";
 import { OptionsPanel } from "./options-panel";
+import { QuestionDock } from "./question-dock";
 import { QuickLinkChips } from "./quick-link-chips";
 import { useDocument } from "./use-document";
 
@@ -218,6 +219,11 @@ export function ChatView({
     }
     setDraft("");
     jumpToLatest();
+    // While the question dock is open the composer answers the current question.
+    if (questionsShown) {
+      answerQuestion(text);
+      return;
+    }
     // Typing "2nd" or an option's name while a picker is open answers that picker, like a click.
     const open = openPanelOf(messages);
     const typedId = open ? matchTypedAnswer(open.options, text) : null;
@@ -229,6 +235,24 @@ export function ChatView({
     // A picked format applies to this one message: it rides in the request body and the chip clears.
     void send(text, { formatId });
     if (!stickyPin.current || formatId !== stickyPin.current) setFormatId(null);
+  }
+
+  // The question dock: the newest reply's writer questions, answered one by one from the composer or a suggestion.
+  const [dismissedQuestions, setDismissedQuestions] = useState<string | null>(null);
+  const [answerState, setAnswerState] = useState<{ id: string; answers: string[] }>({ id: "", answers: [] });
+  const questionSet = !busy ? questionSetOf(messages) : null;
+  const questionsShown = questionSet && questionSet.toolCallId !== dismissedQuestions ? questionSet : null;
+  const answers = questionsShown && answerState.id === questionsShown.toolCallId ? answerState.answers : [];
+
+  function answerQuestion(text: string) {
+    if (!questionsShown || busy) return;
+    const next = [...answers, text.trim()];
+    if (next.length >= questionsShown.questions.length) {
+      setAnswerState({ id: "", answers: [] });
+      void send(formatAnswers(questionsShown.questions, next), { formatId: null });
+      return;
+    }
+    setAnswerState({ id: questionsShown.toolCallId, answers: next });
   }
 
   function quickLink(key: string, prompt: string) {
@@ -386,8 +410,18 @@ export function ChatView({
               disabled={busy}
             />
           )}
+          {questionsShown && (
+            <QuestionDock
+              key={questionsShown.toolCallId}
+              set={questionsShown}
+              answers={answers}
+              onPick={answerQuestion}
+              onClose={() => setDismissedQuestions(questionsShown.toolCallId)}
+              disabled={busy}
+            />
+          )}
           <ChatComposer
-            placeholder={pickerShown?.allowFreeInput ? pickerShown.freeInputPlaceholder : undefined}
+            placeholder={questionsShown ? "Type your answer…" : pickerShown?.allowFreeInput ? pickerShown.freeInputPlaceholder : undefined}
             value={draft}
             onValueChange={setDraft}
             onSend={submit}

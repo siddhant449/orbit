@@ -13,11 +13,11 @@ const dropped = (names: string[]) => ALL.filter((n) => !names.includes(n)).sort(
 
 describe("tool gating table", () => {
   it("open post: no new drafts or templates, edit tools stay", () => {
-    expect(dropped(gate({ doc: true }))).toEqual(["createDocument", "delegateWriting", "readTemplate", "searchTemplates"]);
+    expect(dropped(gate({ doc: true }))).toEqual(["createDocument", "delegateWriting", "readTemplate", "researchTopic", "searchTemplates"]);
   });
   it("no post: edit tools go, drafting tools stay", () => {
     const names = gate({});
-    expect(dropped(names)).toEqual(["delegateEditing", "getPostVersions", "proposeDocumentEdits", "updateDocument"]);
+    expect(dropped(names)).toEqual(["delegateEditing", "getPostVersions", "proposeDocumentEdits", "researchTopic", "updateDocument"]);
     expect(names).toContain("delegateWriting");
     expect(names).toContain("createDocument");
     expect(names).toContain("searchTemplates");
@@ -33,6 +33,15 @@ describe("tool gating table", () => {
   });
   it("an ideas request drops templates only", () => {
     expect(dropped(gate({ text: "give me post ideas for this week" }))).toEqual(["delegateEditing", "getPostVersions", "proposeDocumentEdits", "readTemplate", "searchTemplates", "updateDocument"]);
+  });
+  it("a personal sprint prompt does not offer research", () => {
+    const text = "Day 1 of my 30-day sprint: The origin story. Help me write this post. Why you do this work at all. If you need details only I would know, ask me one or two short questions first, then draft it.";
+    expect(gate({ text })).not.toContain("researchTopic");
+  });
+  it("keeps research for timely asks, explicit source asks and picked angles", () => {
+    expect(gate({ text: "what changed in AI this week" })).toContain("researchTopic");
+    expect(gate({ text: "find stats on remote work" })).toContain("researchTopic");
+    expect(gate({ picked: true })).toContain("researchTopic");
   });
   it("never removes the always-needed memory and KB tools", () => {
     for (const s of [gate({}), gate({ doc: true }), gate({ picked: true })]) for (const n of ["viewMemory", "readMemory", "searchMemory", "saveMemory", "searchKB", "readKB"]) expect(s).toContain(n);
