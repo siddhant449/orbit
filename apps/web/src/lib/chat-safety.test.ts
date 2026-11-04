@@ -25,13 +25,13 @@ describe("chat safety with per-user controls", () => {
 
   it("the default cap applies until the user has their own, which then overrides it (both directions)", async () => {
     const s = safety();
-    // Spend $1 today. The default cap is $3, so the turn is allowed.
+    // Spend $1 today. The cap in tests is $3, so the turn is allowed.
     await s.recordUsage(profileId, "gpt-6-sol", { inputTokens: 400_000, outputTokens: 0 }); // 400k x $2.5/M = $1
     expect((await s.check(profileId, userId)).ok).toBe(true);
     // A $0.50 personal cap is below today's spend: refused.
     await setAiControls(userId, { dailyCapMicroUsd: 500_000 });
     expect(await s.check(profileId, userId)).toMatchObject({ ok: false, kind: "daily" });
-    // A $10 personal cap is above the $3 default: allowed even after more spend.
+    // A $10 personal cap is above the $3 test cap: allowed even after more spend.
     await setAiControls(userId, { dailyCapMicroUsd: 10_000_000 });
     await s.recordUsage(profileId, "gpt-6-sol", { inputTokens: 1_600_000, outputTokens: 0 }); // now $5 total
     expect((await s.check(profileId, userId)).ok).toBe(true);

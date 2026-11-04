@@ -29,7 +29,7 @@ export const visualsPaused = (env: Record<string, string | undefined> = process.
 /**
  * Cost guards for one image operation, run before any debit, enqueue or provider call: the kill switch, at most two
  * active operations per team, then a daily operation count per team (VISUALS_TEAM_DAILY_LIMIT, 40) and across the app
- * (VISUALS_GLOBAL_DAILY_LIMIT, 500). Counters share the chat's Redis helper and reset at UTC midnight.
+ * (VISUALS_GLOBAL_DAILY_LIMIT, 20). Counters share the chat's Redis helper and reset at UTC midnight.
  */
 export async function checkVisualLimits(profile: { id: string; teamId: string; ownerUserId?: string }, userId?: string): Promise<VisualLimit> {
   // An admin paused AI for this account: refused before any debit, enqueue or model call.
@@ -45,7 +45,7 @@ export async function checkVisualLimits(profile: { id: string; teamId: string; o
   const l = (limiter ??= createUsageLimiter({ store: defaultCounterStore() }));
   const team = await l.takeDaily("visuals-team", profile.teamId, envInt("VISUALS_TEAM_DAILY_LIMIT", 40));
   if (!team.ok) return { ok: false, status: 429, code: "daily_limit", message: "You've reached today's image limit. It resets at midnight UTC." };
-  const all = await l.takeDaily("visuals-global", "all", envInt("VISUALS_GLOBAL_DAILY_LIMIT", 500));
+  const all = await l.takeDaily("visuals-global", "all", envInt("VISUALS_GLOBAL_DAILY_LIMIT", 20));
   if (!all.ok) return { ok: false, status: 503, code: "visuals_paused", message: "Image generation is paused for today. Try again tomorrow." };
   return { ok: true };
 }

@@ -12,6 +12,8 @@ export default defineConfig({
     environment: "node",
     include: ["src/**/*.test.{ts,tsx}"],
     setupFiles: ["../../packages/db/src/vitest-setup.ts"],
+    // Tests are written against these caps; production runs on lower ones (the code defaults or the environment).
+    env: { CHAT_DAILY_COST_USD: "3", VISUALS_GLOBAL_DAILY_LIMIT: "500" },
     // Neon (Singapore) round trips are slow; DB-backed tests get more time, assertions are unchanged.
     testTimeout: 30_000,
     hookTimeout: 30_000,

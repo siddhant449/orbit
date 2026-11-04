@@ -195,7 +195,7 @@ export function estimateCostMicroUsd(modelId: string, usage: { inputTokens?: num
 export const CHAT_LIMITS = {
   turns: 20,
   windowSec: 600,
-  dailyUsd: 3,
+  dailyUsd: 0.5,
 } as const;
 
 export const chatDailyCapMicroUsd = (env: Record<string, string | undefined> = process.env): number => {
