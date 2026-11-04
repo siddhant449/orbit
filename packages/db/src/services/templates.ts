@@ -1,5 +1,6 @@
 import { Prisma, type Template, type TemplateType } from "../generated/prisma/client";
 import { prisma } from "../client";
+import { saveItem } from "./saves";
 
 export type TemplateRow = Template;
 export type SeedTemplate = {
@@ -27,10 +28,11 @@ export type TemplateQuery = {
 
 export async function listTemplates(q: TemplateQuery): Promise<{ items: (TemplateRow & { saved: boolean })[]; total: number }> {
   const search = q.search?.trim();
+  const savedIds = q.savedBy ? await savedTemplateIds(q.savedBy) : null;
   const where: Prisma.TemplateWhereInput = {
     ...(q.type ? { type: q.type } : {}),
     ...(q.category ? { category: q.category } : {}),
-    ...(q.savedBy ? { saves: { some: { profileId: q.savedBy } } } : {}),
+    ...(savedIds ? { id: { in: savedIds } } : {}),
     ...(q.ownerProfileId ? { AND: [{ OR: [{ system: true }, { profileId: q.ownerProfileId }] }] } : {}),
     ...(search
       ? {
@@ -50,11 +52,11 @@ export async function listTemplates(q: TemplateQuery): Promise<{ items: (Templat
       orderBy: [{ category: "asc" }, { title: "asc" }, { id: "asc" }],
       skip: q.offset ?? 0,
       take: q.limit ?? 50,
-      include: { saves: viewer ? { where: { profileId: viewer }, select: { profileId: true } } : false },
     }),
     prisma.template.count({ where }),
   ]);
-  const items = rows.map(({ saves, ...t }) => ({ ...t, saved: Array.isArray(saves) && saves.length > 0 }));
+  const saved = viewer ? new Set(savedIds ?? (await savedTemplateIds(viewer))) : new Set<string>();
+  const items = rows.map((t) => ({ ...t, saved: saved.has(t.id) }));
   return { items, total };
 }
 
@@ -62,11 +64,18 @@ export function getTemplateBySlug(slug: string): Promise<TemplateRow | null> {
   return prisma.template.findUnique({ where: { slug } });
 }
 
+async function savedTemplateIds(profileId: string): Promise<string[]> {
+  const rows = await prisma.savedItem.findMany({ where: { profileId, kind: "TEMPLATE", refId: { not: null } }, select: { refId: true } });
+  return rows.map((r) => r.refId!);
+}
+
+/** The heart/bookmark on a template card: one SavedItem per profile and template. */
 export async function setTemplateSaved(profileId: string, templateId: string, saved: boolean): Promise<void> {
   if (saved) {
-    await prisma.templateSave.upsert({ where: { profileId_templateId: { profileId, templateId } }, create: { profileId, templateId }, update: {} });
+    const t = await prisma.template.findUnique({ where: { id: templateId }, select: { title: true } });
+    await saveItem(profileId, { kind: "TEMPLATE", refId: templateId, snapshot: { title: t?.title ?? "" } });
   } else {
-    await prisma.templateSave.deleteMany({ where: { profileId, templateId } });
+    await prisma.savedItem.deleteMany({ where: { profileId, kind: "TEMPLATE", refId: templateId } });
   }
 }
 
