@@ -312,11 +312,14 @@ describe("resolveModel", () => {
     expect(resolveModel("extract")).toBe("gpt-6-luna");
   });
 
-  it("honours the AI_MODEL_* overrides", () => {
+  it("ignores AI_MODEL_* overrides that name a model outside the allowed (cheapest) set", () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
     vi.stubEnv("AI_MODEL_GENERATE", "custom-generate");
-    vi.stubEnv("AI_MODEL_EXTRACT", "custom-extract");
-    expect(resolveModel("generate")).toBe("custom-generate");
-    expect(resolveModel("extract")).toBe("custom-extract");
+    vi.stubEnv("AI_MODEL_EXTRACT", "gpt-6.1-sol");
+    expect(resolveModel("generate")).toBe("gpt-6-luna");
+    expect(resolveModel("extract")).toBe("gpt-6-luna");
+    vi.stubEnv("AI_MODEL_GENERATE", "gpt-6-luna");
+    expect(resolveModel("generate")).toBe("gpt-6-luna");
   });
 });
 

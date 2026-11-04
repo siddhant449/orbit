@@ -32,16 +32,15 @@ describe("getModel", () => {
     }
   });
 
-  it("applies the AI_MODEL_* overrides to a keyed model too", () => {
+  it("a disallowed AI_MODEL_* override falls back to Luna, keyed model too", () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
     vi.stubEnv("AI_MODEL_GENERATE", "custom-generate");
-    expect((getModel("generate", "sk-test-not-real") as { modelId: string }).modelId).toBe(
-      "custom-generate",
-    );
+    expect((getModel("generate", "sk-test-not-real") as { modelId: string }).modelId).toBe("gpt-6-luna");
   });
 
-  it("follows the AI_MODEL_* overrides", () => {
-    vi.stubEnv("AI_MODEL_EXTRACT", "custom-extract");
-    expect((getModel("extract") as { modelId: string }).modelId).toBe("custom-extract");
+  it("follows an allowed AI_MODEL_* override", () => {
+    vi.stubEnv("AI_MODEL_EXTRACT", "gpt-6-luna");
+    expect((getModel("extract") as { modelId: string }).modelId).toBe("gpt-6-luna");
   });
 });
 
@@ -55,14 +54,17 @@ describe("webSearchTool", () => {
 });
 
 describe("write alias", () => {
-  it("follows the generate model unless AI_MODEL_WRITE is set", async () => {
+  it("follows the generate model; a costlier AI_MODEL_WRITE is ignored (cost control)", async () => {
     const { resolveModel } = await import("./provider");
     const before = { w: process.env.AI_MODEL_WRITE, g: process.env.AI_MODEL_GENERATE };
     delete process.env.AI_MODEL_WRITE;
     delete process.env.AI_MODEL_GENERATE;
     expect(resolveModel("write")).toBe("gpt-6-luna");
     process.env.AI_MODEL_WRITE = "gpt-6.1-sol";
-    expect(resolveModel("write")).toBe("gpt-6.1-sol");
+    const warn = console.warn;
+    console.warn = () => {};
+    expect(resolveModel("write")).toBe("gpt-6-luna");
+    console.warn = warn;
     expect(resolveModel("generate")).toBe("gpt-6-luna");
     if (before.w === undefined) delete process.env.AI_MODEL_WRITE; else process.env.AI_MODEL_WRITE = before.w;
     if (before.g !== undefined) process.env.AI_MODEL_GENERATE = before.g;
