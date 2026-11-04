@@ -17,7 +17,7 @@ All of it must work **before LinkedIn is connected**, and keep AI spend tiny (Lu
 ## Cross-cutting rules (owner decisions)
 
 - **What counts as "posted"** until LinkedIn connects: a post counts once the user clicks **Mark as posted** on it. This stores `Document.postedAt`; the user can undo it. The challenge, streaks and the posts goal all count from `postedAt`. When LinkedIn sync arrives, published posts set it automatically.
-- **Cost.** Only Luna runs (code guard 7b4d4e2). New AI calls in this design:
+- **Provider and cost.** OpenAI only: no other model provider and no fallback. Only Luna runs (code guard 7b4d4e2). New AI calls in this design:
   - weekly ideas: one call per active profile per week
   - "save post as template": one call per click
 
@@ -175,10 +175,10 @@ All of it must work **before LinkedIn is connected**, and keep AI spend tiny (Lu
 ## 7. AI assistant connector (MCP)
 
 **What the user sees.**
-- Settings → Integrations → **AI assistants** has tabs for Claude, ChatGPT, Cursor and Codex. Each tab gives:
+- Settings → Integrations → **AI assistants** has tabs for **ChatGPT and Codex** only (OpenAI's apps; owner decision 2026-11-04: Orbit is OpenAI only). Each tab gives:
   - the server URL (`<origin>/api/mcp`, Streamable HTTP)
   - copy buttons
-  - the exact steps for that assistant: the Claude Code command, the Cursor deep link, ChatGPT/Claude connector instructions
+  - the exact steps for that assistant: ChatGPT connector instructions and the Codex CLI config
 - Sign-in happens in the assistant with Orbit's own login. There are no keys to copy.
 - **Which profile it acts as:** a select ("AI assistants act as: <profile>"), stored per user and changeable.
 - A list of connected assistants, each with **Disconnect**.

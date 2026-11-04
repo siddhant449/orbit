@@ -16,7 +16,7 @@
 
 ## Global Constraints
 
-- **AI.** Only allowed models run (`ALLOWED_TEXT_MODELS`, Luna). The only new AI calls are weekly ideas (one per active profile per week) and "save post as template" (one per click). Both go through `AiClient` with a `feature` set, so they land in the `AiUsage` ledger.
+- **AI.** OpenAI only (no other model provider, no fallback). Only allowed models run (`ALLOWED_TEXT_MODELS`, Luna). The only new AI calls are weekly ideas (one per active profile per week) and "save post as template" (one per click). Both go through `AiClient` with a `feature` set, so they land in the `AiUsage` ledger.
 - **Tests.** Never touch the real database: unit tests route to `TEST_DATABASE_URL`, and e2e uses `dev:e2e` (test DB, `AI_MOCK_MODEL=1`). No real AI calls in tests.
 - **Migrations.**
   - One per phase, hand-written SQL in `packages/db/prisma/migrations/<timestamp>_<name>/migration.sql`, following `20261028120000_ai_usage`.
@@ -440,9 +440,9 @@ Branch `orbit/mcp`. Migration `20261108090000_mcp`.
   - `revokeClient(userId, id)`, after which calls from that client get 401
 - Routes: `api/mcp-settings/route.ts` (GET binding and clients, PUT `{profileId}`) and `api/mcp-settings/clients/[id]/route.ts` (DELETE).
 - UI: `app/(app)/settings/integrations/page.tsx` "AI assistants":
-  - tabs: Claude, ChatGPT, Cursor, Codex
+  - tabs: ChatGPT and Codex only (owner decision: Orbit is OpenAI only)
   - the server URL `<origin>/api/mcp` with Copy
-  - per-tab steps: the Claude Code command `claude mcp add orbit --transport http <url>`, a Cursor deep link `cursor://anysphere.cursor-deeplink/mcp/install?name=orbit&config=<base64 {"url":"<url>"}>`, and ChatGPT/Claude web connector steps
+  - per-tab steps: ChatGPT connector steps (Settings → Connectors → add a custom connector with the URL) and the Codex CLI config (`codex mcp add orbit --url <url>`; check the current Codex CLI syntax at build time)
   - "AI assistants act as: <profile select>"
   - connected assistants, with Disconnect
 
