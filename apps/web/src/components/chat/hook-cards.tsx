@@ -3,6 +3,7 @@
 import { createContext, useContext } from "react";
 import { hookMeta, parseHookCards, type HookCard } from "@brandloop/agent/client";
 import { Button } from "@brandloop/ui";
+import { SaveMenu } from "@/components/saves/save-menu";
 
 /** What picking a hook does is the thread's business (swap the open post's opening, or start a draft from it). */
 export const HookActionsContext = createContext<{ useHook: (card: HookCard) => void; disabled: boolean } | null>(null);
@@ -30,10 +31,13 @@ export function HookCards({ cards }: { cards: HookCard[] }) {
             <p className="flex-1 text-[15px] leading-[1.45] text-text">{c.text}</p>
             <div className="flex items-center justify-between gap-3">
               <span className="text-xs text-text-3">{hookMeta(c)}</span>
-              <Button variant="secondary" size="sm" disabled={!actions || actions.disabled} onClick={() => actions?.useHook(c)}>
-                Use this hook
-                <span className="sr-only">{`, option ${c.index}`}</span>
-              </Button>
+              <span className="flex items-center gap-1">
+                <SaveMenu compact kind="HOOK" snapshot={{ text: c.text, purpose: c.purposeLabel }} label={`hook option ${c.index}`} />
+                <Button variant="secondary" size="sm" disabled={!actions || actions.disabled} onClick={() => actions?.useHook(c)}>
+                  Use this hook
+                  <span className="sr-only">{`, option ${c.index}`}</span>
+                </Button>
+              </span>
             </div>
           </li>
         ))}

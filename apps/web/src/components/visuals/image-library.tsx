@@ -6,6 +6,7 @@ import useSWRInfinite from "swr/infinite";
 import useSWR from "swr";
 import { Trash2 } from "lucide-react";
 import { Button, StatusPill } from "@brandloop/ui";
+import { SaveMenu } from "@/components/saves/save-menu";
 import { EmptyState } from "@/components/page";
 import { deleteVisual, getCredits, listVisuals, type LibraryItemDto } from "@/lib/visuals-api";
 
@@ -65,9 +66,14 @@ export function ImageLibrary() {
                   )}
                   {item.status !== "COMPLETED" && <StatusPill tone={item.status === "FAILED" ? "danger" : "neutral"}>{item.status === "FAILED" ? "Failed" : "Working"}</StatusPill>}
                 </div>
-                <Button type="button" variant="ghost" size="icon" aria-label="Delete image" onClick={() => void remove(item)}>
-                  <Trash2 aria-hidden="true" />
-                </Button>
+                <div className="flex shrink-0 items-center">
+                  {item.status === "COMPLETED" && (
+                    <SaveMenu compact kind="VISUAL" refId={item.id} snapshot={{ title: item.documentTitle ?? "Image", imageUrl: item.imageUrl }} label={`image ${item.documentTitle ?? ""}`.trim()} />
+                  )}
+                  <Button type="button" variant="ghost" size="icon" aria-label="Delete image" onClick={() => void remove(item)}>
+                    <Trash2 aria-hidden="true" />
+                  </Button>
+                </div>
               </div>
             </li>
           ))}

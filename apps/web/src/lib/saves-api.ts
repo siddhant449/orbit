@@ -89,16 +89,16 @@ async function ownsTarget(pid: string, kind: SavedKind, refId: string | undefine
   return true;
 }
 
-/** GET /api/saves?kind=&space=&cursor=&limit= */
+/** GET /api/saves?kind=A,B&space=&ref=&text=&cursor=&limit= (`ref` / `text` look up one thing's saved item). */
 export async function getSavesHandler(request: Request): Promise<Response> {
   const pid = await profileId();
   if (!pid) return NEED_PROFILE();
   const q = new URL(request.url).searchParams;
-  const kind = q.get("kind");
-  if (kind && !(KINDS as readonly string[]).includes(kind)) return fail(400, "Unknown type.");
+  const kinds = (q.get("kind") ?? "").split(",").filter(Boolean);
+  if (kinds.some((k) => !(KINDS as readonly string[]).includes(k))) return fail(400, "Unknown type.");
   try {
     const limit = Math.min(100, Math.max(1, Number.parseInt(q.get("limit") ?? "", 10) || 50));
-    return Response.json(await listSaved(pid, { kind: (kind as SavedKind) || undefined, spaceId: q.get("space") || undefined, cursor: q.get("cursor") || undefined, limit }));
+    return Response.json(await listSaved(pid, { kind: kinds.length ? (kinds as SavedKind[]) : undefined, spaceId: q.get("space") || undefined, refId: q.get("ref") || undefined, text: q.get("text")?.slice(0, 3000) || undefined, cursor: q.get("cursor") || undefined, limit }));
   } catch (err) {
     return fromError(err);
   }

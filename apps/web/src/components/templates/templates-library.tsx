@@ -6,9 +6,10 @@ import useSWRInfinite from "swr/infinite";
 import { Dialog } from "radix-ui";
 import { Button, Input, NativeSelect, Segmented } from "@brandloop/ui";
 import { CATEGORIES } from "@brandloop/agent/client";
-import { CheckIcon, CloseIcon, SearchIcon } from "@brandloop/ui/icons";
+import { CloseIcon, SearchIcon } from "@brandloop/ui/icons";
 import { EmptyState } from "@/components/page";
 import { dialogContentClass, dialogDescriptionClass, dialogOverlayClass, dialogTitleClass } from "@/components/dialog-classes";
+import { SaveMenu } from "@/components/saves/save-menu";
 import { promptHref } from "@/lib/prompt-param";
 import { categoryLabel, NEED_LABELS, templateHref, type TemplateDto } from "./labels";
 
@@ -22,18 +23,9 @@ async function fetchPage(url: string): Promise<Page> {
   return (await res.json()) as Page;
 }
 
-/** Save or unsave; resolves to whether the server kept the change. */
-async function putSaved(id: string, saved: boolean): Promise<boolean> {
-  const res = await fetch(`/api/templates/${encodeURIComponent(id)}/save`, { method: saved ? "PUT" : "DELETE" }).catch(() => null);
-  return Boolean(res?.ok);
-}
-
-function SaveButton({ t, saved, onToggle, busy }: { t: TemplateDto; saved: boolean; onToggle: () => void; busy: boolean }) {
+function SaveButton({ t, saved, onChange }: { t: TemplateDto; saved: boolean; onChange: (saved: boolean) => void }) {
   return (
-    <Button type="button" variant={saved ? "inverse" : "secondary"} size="sm" aria-pressed={saved} disabled={busy} onClick={onToggle} aria-label={`${saved ? "Unsave" : "Save"} ${t.title}`}>
-      {saved && <CheckIcon size={14} />}
-      {saved ? "Saved" : "Save"}
-    </Button>
+    <SaveMenu kind="TEMPLATE" refId={t.id} snapshot={{ title: t.title, slug: t.slug, category: t.category, type: t.type }} label={t.title} initialSaved={saved} onSavedChange={onChange} />
   );
 }
 
@@ -48,7 +40,7 @@ function UseLink({ t }: { t: TemplateDto }) {
   );
 }
 
-function Preview({ t, saved, busy, onToggle, onClose }: { t: TemplateDto | null; saved: boolean; busy: boolean; onToggle: () => void; onClose: () => void }) {
+function Preview({ t, saved, onChange, onClose }: { t: TemplateDto | null; saved: boolean; onChange: (saved: boolean) => void; onClose: () => void }) {
   return (
     <Dialog.Root open={t !== null} onOpenChange={(o) => !o && onClose()}>
       <Dialog.Portal>
@@ -82,7 +74,7 @@ function Preview({ t, saved, busy, onToggle, onClose }: { t: TemplateDto | null;
                 </p>
               )}
               <div className="flex flex-wrap justify-end gap-2">
-                <SaveButton t={t} saved={saved} busy={busy} onToggle={onToggle} />
+                <SaveButton t={t} saved={saved} onChange={onChange} />
                 <UseLink t={t} />
               </div>
             </div>
@@ -105,8 +97,6 @@ export function TemplatesLibrary() {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState<TemplateDto | null>(null);
   const [overrides, setOverrides] = useState<Record<string, boolean>>({});
-  const [busy, setBusy] = useState<string | null>(null);
-  const [failed, setFailed] = useState<string | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setSearch(query.trim()), 200);
@@ -129,17 +119,7 @@ export function TemplatesLibrary() {
   const total = data?.[0]?.total ?? 0;
   const isSaved = (t: TemplateDto) => overrides[t.id] ?? t.saved;
 
-  async function toggle(t: TemplateDto) {
-    const next = !isSaved(t);
-    setBusy(t.id);
-    setFailed(null);
-    setOverrides((o) => ({ ...o, [t.id]: next }));
-    if (!(await putSaved(t.id, next))) {
-      setOverrides((o) => ({ ...o, [t.id]: !next }));
-      setFailed("Couldn't update your saved templates. Try again.");
-    }
-    setBusy(null);
-  }
+  const setSaved = (t: TemplateDto, saved: boolean) => setOverrides((o) => ({ ...o, [t.id]: saved }));
 
   const shown = savedOnly ? items.filter((t) => isSaved(t)) : items;
   return (
@@ -174,11 +154,6 @@ export function TemplatesLibrary() {
         </div>
       </div>
 
-      {failed && (
-        <p role="alert" className="text-[13px] text-danger">
-          {failed}
-        </p>
-      )}
 
       {error ? (
         <EmptyState title="Couldn't load templates" body="Reload the page to try again." />
@@ -205,7 +180,7 @@ export function TemplatesLibrary() {
                   <span className="line-clamp-3 text-[14px] leading-[1.5] text-text-2">{t.why}</span>
                 </button>
                 <div className="flex items-center justify-end gap-2">
-                  <SaveButton t={t} saved={isSaved(t)} busy={busy === t.id} onToggle={() => void toggle(t)} />
+                  <SaveButton t={t} saved={isSaved(t)} onChange={(v) => setSaved(t, v)} />
                   <UseLink t={t} />
                 </div>
               </li>
@@ -219,7 +194,7 @@ export function TemplatesLibrary() {
         </>
       )}
 
-      <Preview t={open} saved={open ? isSaved(open) : false} busy={open ? busy === open.id : false} onToggle={() => open && void toggle(open)} onClose={() => setOpen(null)} />
+      <Preview t={open} saved={open ? isSaved(open) : false} onChange={(v) => open && setSaved(open, v)} onClose={() => setOpen(null)} />
     </div>
   );
 }

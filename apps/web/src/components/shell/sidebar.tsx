@@ -6,6 +6,7 @@ import { SearchIcon, SidebarIcon } from "@brandloop/ui/icons";
 import { ThemeSwitch } from "@/components/theme/theme-switch";
 import { cn } from "@brandloop/ui";
 import { isActive, primaryNav, type Section } from "@/lib/nav";
+import { SpacesNav } from "@/components/saves/spaces-nav";
 import { ChatHistory } from "@/components/chat/chat-history";
 import { Logo, LogoMark } from "./logo";
 import { MainNav, RailLink, SectionLink } from "./nav-link";
@@ -138,6 +139,7 @@ export function SectionPanel({ section, onNavigate, className }: { section: Sect
             {group.items.map((item) => (
               <SectionLink key={item.href} item={item} active={isActive(pathname, item.href)} onNavigate={onNavigate} />
             ))}
+            {group.label === "My library" && <SpacesNav onNavigate={onNavigate} />}
           </div>
         ))}
       </nav>

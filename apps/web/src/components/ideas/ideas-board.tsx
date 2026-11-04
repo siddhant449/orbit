@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { CONTENT_TYPES, FORMATS } from "@brandloop/ai/constants";
 import { Button, Segmented, StatusPill, cn } from "@brandloop/ui";
 import { CheckIcon, CopyIcon } from "@brandloop/ui/icons";
+import { SaveMenu } from "@/components/saves/save-menu";
 import { ideaDraftHref, parseCachedIdeas, previousFrom, type IdeasBasis, type IdeasResponse, type Idea } from "@/lib/ideas";
 
 type Count = "3" | "5" | "8";
@@ -110,6 +111,7 @@ function IdeaCard({ idea, index, fresh }: { idea: Idea & { id: string }; index: 
           {copied ? <CheckIcon size={14} aria-hidden="true" /> : <CopyIcon size={14} aria-hidden="true" />}
           {copied ? "Copied" : "Copy hook"}
         </button>
+        <SaveMenu compact kind="IDEA" snapshot={{ text: idea.hook, title: idea.title, angle: idea.angle }} label={`idea ${idea.title}`} className="size-9 shrink-0 self-center" />
         {/* Ruling A22: home opens with this prompt in the composer, ready to edit; nothing is sent until the user does. */}
         <Button asChild variant="paper" className="h-9 min-h-9 flex-1 text-[13px]">
           <Link href={ideaDraftHref(idea)} aria-describedby={titleId}>

@@ -91,7 +91,7 @@ async function assertOwnSpaces(profileId: string, spaceIds: string[]): Promise<s
   return ids;
 }
 
-const textKeyOf = (text: string) => createHash("sha256").update(text.trim()).digest("hex");
+export const savedTextKey = (text: string) => createHash("sha256").update(text.trim()).digest("hex");
 
 type ItemRecord = { id: string; kind: SavedKind; refId: string | null; snapshot: Prisma.JsonValue; createdAt: Date; spaces: { spaceId: string }[] };
 const ITEM_INCLUDE = { spaces: { select: { spaceId: true } } } as const;
@@ -149,7 +149,7 @@ export async function saveItem(
     const text = snapshot.text;
     if (typeof text !== "string" || !text.trim()) throw new SavesError("invalid", "There is nothing to save.");
     if (refId) throw new SavesError("invalid", "Hooks and ideas have no reference.");
-    textKey = textKeyOf(text);
+    textKey = savedTextKey(text);
   }
   const spaceIds = await assertOwnSpaces(profileId, input.spaceIds ?? []);
   const where = refId ? { profileId, kind, refId } : { profileId, kind, textKey };
@@ -173,10 +173,14 @@ export async function unsaveItem(profileId: string, itemId: string): Promise<voi
 
 export async function listSaved(
   profileId: string,
-  q: { kind?: SavedKind; spaceId?: string; cursor?: string; limit: number },
+  q: { kind?: SavedKind | SavedKind[]; spaceId?: string; refId?: string; text?: string; cursor?: string; limit: number },
 ): Promise<{ items: SavedItemRow[]; nextCursor: string | null }> {
   const limit = Math.min(100, Math.max(1, Math.floor(q.limit) || 1));
-  const kindWhere = q.kind ? { kind: q.kind } : {};
+  const kindWhere = {
+    ...(q.kind ? { kind: Array.isArray(q.kind) ? { in: q.kind } : q.kind } : {}),
+    ...(q.refId ? { refId: q.refId } : {}),
+    ...(q.text ? { textKey: savedTextKey(q.text) } : {}),
+  };
   if (q.spaceId) {
     await assertOwnSpaces(profileId, [q.spaceId]);
     const links = await prisma.savedItemSpace.findMany({
