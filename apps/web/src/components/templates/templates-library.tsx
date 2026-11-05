@@ -227,7 +227,7 @@ export function TemplatesLibrary() {
                   <button
                     type="button"
                     aria-pressed={likeOf(t).liked}
-                    aria-label={`${likeOf(t).liked ? "Unlike" : "Like"} ${t.title}`}
+                    aria-label={`${likeOf(t).liked ? "Unlike" : "Like"} ${t.title}, ${likeOf(t).count} ${likeOf(t).count === 1 ? "like" : "likes"}`}
                     data-template-like
                     onClick={() => void toggleLike(t)}
                     className="orbit-transition inline-flex h-9 items-center gap-1.5 rounded-pill px-2.5 text-text-2 hover:bg-line-soft hover:text-text focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent-text"
