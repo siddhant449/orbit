@@ -46,13 +46,15 @@ test("picking a format shows a chip, rides on the next message only, and shapes 
 
   // 2. The request carries selectedFormatId, the draft has a numbered list, and the chip clears.
   const request = page.waitForRequest((r) => r.method() === "POST" && new URL(r.url()).pathname === "/api/chat");
-  await box.fill("Draft a post about MVP myths");
+  await box.fill("Draft a post about why MVP myths cost founders months");
   await box.press("Enter");
   expect(((await request).postDataJSON() as { selectedFormatId?: string }).selectedFormatId).toBe("myth-truth");
   await expect(chip).toHaveCount(0);
   const panel = page.getByRole("dialog", { name: "MVP versus POC" });
   const post = panel.locator("[data-post-text]");
   await expect(post).toContainText("Three things an MVP actually is", { timeout: 30_000 });
+  // The post streams in; read it once the closing line has landed.
+  await expect(post).toContainText("Build the smallest thing that can prove you wrong.", { timeout: 30_000 });
   expect((await post.textContent()) ?? "").toMatch(/\n1\. A test of one risky assumption\n2\. A way to hear/);
 
   // 3. The next message carries no format.

@@ -87,8 +87,14 @@ test("the library screens show honest empty states", async ({ page }) => {
       await page.emulateMedia({ colorScheme });
       await page.goto(route);
       await expect(page.getByRole("heading", { level: 1, name: title })).toBeVisible();
-      await expect(page.getByText("Coming soon")).toBeVisible();
-      await expect(page.getByRole("article")).toHaveCount(0);
+      if (route === "/saves") {
+        // Saves is a real screen now (spaces and saved items), no longer a "coming soon" placeholder.
+        await expect(page.getByText("Coming soon")).toHaveCount(0);
+        await expect(page.getByText(/Nothing saved yet|Nothing saved here yet|Everything you've saved/).first()).toBeVisible();
+      } else {
+        await expect(page.getByText("Coming soon")).toBeVisible();
+        await expect(page.getByRole("article")).toHaveCount(0);
+      }
       await axeCheck(page);
       if (route === "/inspiration") await shot(page, `swipe-1440-${colorScheme}`);
     }
