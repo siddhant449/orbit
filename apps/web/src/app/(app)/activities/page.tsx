@@ -34,16 +34,16 @@ export default async function Page() {
   }
   const now = new Date();
   const p = await loadProgress(profile, now);
-  const best = bestWeekdayStreak(p.drafts, p.today);
+  const best = bestWeekdayStreak(p.posted, p.today);
   // No sprint is stored yet, so "today's post" is the format a sprint starting today would open with.
   const focus = buildSprint({ start: p.today, today: p.today, drafts: p.drafts }).focus;
   return (
     <ActivitiesView
       today={p.today}
       drafts={p.drafts}
-      streak={weekdayStreak(p.drafts, p.today)}
-      weekDrafts={draftsThisWeek(p.drafts, p.today)}
-      milestones={milestones({ total: p.draftTotal, best, fullWeek: hadFullWeek(p.drafts) })}
+      streak={weekdayStreak(p.posted, p.today)}
+      weekDrafts={draftsThisWeek(p.posted, p.today)}
+      milestones={milestones({ total: p.postedTotal, best, fullWeek: hadFullWeek(p.posted) })}
       checklist={gettingStarted({ strategy: p.strategy, identity: p.identity, knowledge: p.knowledge, voice: p.voice, drafts: p.draftTotal })}
       resets={resetsIn(now, p.timeZone)}
       todayPost={focus?.format ? { day: focus.day, format: focus.format } : null}

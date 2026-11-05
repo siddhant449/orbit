@@ -16,6 +16,8 @@ export type PostRow = {
   text: string;
   chatId: string | null;
   updatedAt: string;
+  /** When the writer marked it as posted (ISO), else null. */
+  postedAt?: string | null;
   /** A saved carousel rather than a written post: opens in the carousel studio. */
   kind?: "carousel";
 };

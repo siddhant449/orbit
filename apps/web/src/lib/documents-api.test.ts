@@ -14,7 +14,7 @@ vi.mock("@/lib/account", () => ({ getAccount: async () => env.account }));
 
 import { createDocumentForChat, deleteChat, ensureAccount, getOrCreateChat, prisma, saveAssistantMessage, saveDocumentVersion } from "@brandloop/db";
 import { randomUUID } from "node:crypto";
-import { applyProposalHandler, getDocumentHandler, linkChatHandler, listVersionsHandler, patchDocumentHandler, switchDocumentHandler } from "./documents-api";
+import { applyProposalHandler, getDocumentHandler, linkChatHandler, listVersionsHandler, patchDocumentHandler, postedHandler, switchDocumentHandler } from "./documents-api";
 
 const CLERK = "user_test_webdocs";
 let mine: { userId: string; profileId: string };
@@ -193,5 +193,21 @@ describe("POST /api/documents/:id/apply-proposal", () => {
     expect(await res.json()).toMatchObject({ code: "existing_post" });
     env.account = { user: { id: theirs.userId }, currentProfile: { id: theirs.profileId } };
     expect((await linkChatHandler(send("POST", { chatId: randomUUID() }), params(d.id))).status).toBe(404);
+  });
+
+  it("posted: two parallel marks keep one time, undo clears it, another profile gets 404 and nothing is published", async () => {
+    const d = await newDoc();
+    const req = new Request("http://test/api/documents/x/posted", { method: "POST" });
+    const [a, b] = await Promise.all([postedHandler(req, params(d.id), true), postedHandler(req, params(d.id), true)]);
+    const first = ((await a.json()) as { postedAt: string }).postedAt;
+    expect(first).toBeTruthy();
+    expect(((await b.json()) as { postedAt: string }).postedAt).toBe(first);
+
+    env.account = { user: { id: theirs.userId }, currentProfile: { id: theirs.profileId } };
+    expect((await postedHandler(req, params(d.id), true)).status).toBe(404);
+    expect((await postedHandler(req, params(d.id), false)).status).toBe(404);
+
+    env.account = { user: { id: mine.userId }, currentProfile: { id: mine.profileId } };
+    expect(await (await postedHandler(req, params(d.id), false)).json()).toEqual({ postedAt: null });
   });
 });

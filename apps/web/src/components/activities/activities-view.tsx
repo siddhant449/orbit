@@ -97,16 +97,16 @@ function StreakPanel({ streak, weekDrafts }: { streak: number; weekDrafts: numbe
           {streak}
         </span>
         <span className="text-[14px] text-text-2">
-          weekday streak · {weekDrafts} of {WEEK_GOAL} drafts this week
+          weekday streak · {weekDrafts} of {WEEK_GOAL} posts this week
         </span>
       </p>
-      <div role="img" aria-label={`${filled} of ${WEEK_GOAL} drafts this week`} className="relative flex gap-1.5">
+      <div role="img" aria-label={`${filled} of ${WEEK_GOAL} posts this week`} className="relative flex gap-1.5">
         {Array.from({ length: WEEK_GOAL }, (_, i) => (
           <span key={i} className={cn("h-2 flex-1 rounded-pill", i < filled ? "bg-accent-text" : "bg-line-2")} />
         ))}
       </div>
       <p className="relative text-[13px] text-text-soft">
-        {streak > 0 ? "Start a draft on the next weekday to keep it going." : "Start a draft today to begin a streak."}{" "}
+        {streak > 0 ? "Mark a post as posted on the next weekday to keep it going." : "Mark a post as posted today to begin a streak."}{" "}
         <span className="text-text-3">Weekends don&apos;t count either way.</span>
       </p>
     </Panel>
@@ -154,13 +154,13 @@ function GoalsPanel({ weekDrafts }: { weekDrafts: number }) {
         }
       />
       <ul aria-labelledby="goals-title" className="flex flex-col gap-3">
-        <GoalRow label={`Draft ${WEEK_GOAL} posts`} value={weekDrafts} max={WEEK_GOAL} />
+        <GoalRow label={`Post ${WEEK_GOAL} times`} value={weekDrafts} max={WEEK_GOAL} />
         <GoalRow label="50 comments" value={null} max={50} />
         <GoalRow label="10 DMs" value={null} max={10} />
         <GoalRow label="50 connection requests" value={null} max={50} />
       </ul>
       <p className="text-[11px] leading-[1.5] text-text-3">
-        Drafts are posts you start in Orbit. Comments, DMs and connection requests are counted once LinkedIn is connected.
+        Posts you mark as posted count toward the first goal. Comments, DMs and connection requests are counted once LinkedIn is connected.
       </p>
     </Panel>
   );
@@ -218,7 +218,7 @@ function AllBadges({ milestones }: { milestones: Milestone[] }) {
         <Dialog.Overlay className={dialogOverlayClass} />
         <Dialog.Content className={`${dialogContentClass} max-w-md`}>
           <Dialog.Title className={dialogTitleClass}>Badges</Dialog.Title>
-          <Dialog.Description className={dialogDescriptionClass}>Earned from the drafts you start in Orbit.</Dialog.Description>
+          <Dialog.Description className={dialogDescriptionClass}>Earned from the posts you mark as posted in Orbit.</Dialog.Description>
           <ul className="mt-5 flex flex-col gap-3">
             {milestones.map((m) => (
               <li key={m.id} className="flex items-center gap-3.5">

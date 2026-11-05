@@ -30,6 +30,7 @@ export default async function Page() {
       text: clipText(p.text),
       chatId: p.chatId,
       updatedAt: p.updatedAt.toISOString(),
+      postedAt: p.postedAt ? p.postedAt.toISOString() : null,
     })),
     ...carousels.map((c) => ({
       id: c.id,

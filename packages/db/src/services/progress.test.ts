@@ -4,7 +4,7 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "../client";
 import { ensureAccount } from "./account";
 import { getOrCreateChat } from "./chat";
-import { createDocumentForChat } from "./documents";
+import { createDocumentForChat, setDocumentPosted } from "./documents";
 import { getProgressSignals } from "./progress";
 
 // Scoped to this file's own users: the database is shared with other test runs.
@@ -42,6 +42,8 @@ describe("getProgressSignals", () => {
     expect(await getProgressSignals(profileId, new Date(0))).toEqual({
       draftDates: [],
       draftTotal: 0,
+      postedDates: [],
+      postedTotal: 0,
       hasStrategy: false,
       knowledgeReady: 0,
       hasOwnVoice: false,
@@ -73,5 +75,25 @@ describe("getProgressSignals", () => {
   it("counts only a voice learned from the writer's own posts", async () => {
     await prisma.voiceStyle.create({ data: { profileId, kind: "URL", name: "Link", samplePosts: [] } });
     expect((await getProgressSignals(profileId, new Date(0))).hasOwnVoice).toBe(false);
+  });
+
+  it("the posts count uses postedAt in the profile's week", async () => {
+    const a = await draft("Posted this week");
+    const b = await draft("Posted long ago");
+    const c = await draft("Still a draft");
+    const gone = await draft("Posted then deleted");
+    await setDocumentPosted(profileId, a.id, true);
+    await setDocumentPosted(profileId, b.id, true);
+    await setDocumentPosted(profileId, gone.id, true);
+    await prisma.document.update({ where: { id: gone.id }, data: { deletedAt: new Date() } });
+    await prisma.$executeRaw`UPDATE "Document" SET "postedAt" = '2020-01-01T00:00:00Z' WHERE "id" = ${b.id}`;
+    const s = await getProgressSignals(profileId, new Date("2025-01-01T00:00:00Z"));
+    expect(s.postedDates).toHaveLength(1);
+    expect(s.postedTotal).toBe(2);
+    // Drafts still count every live document, posted or not.
+    expect(s.draftTotal).toBe(3);
+    expect(c.postedAt).toBeNull();
+    await setDocumentPosted(profileId, a.id, false);
+    expect((await getProgressSignals(profileId, new Date(0))).postedDates).toHaveLength(1);
   });
 });

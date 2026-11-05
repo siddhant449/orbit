@@ -52,7 +52,7 @@ export function List({ posts, now, timeZone, filtered }: { posts: PostRow[]; now
                       {line && <span className="truncate text-[13px] text-text-2">{line}</span>}
                     </span>
                     <span className="flex items-center gap-3 text-[12px] text-text-3 md:contents">
-                      <span className="md:text-[12px] md:text-text-soft">Draft</span>
+                      <span className="md:text-[12px] md:text-text-soft">{p.postedAt ? "Posted" : "Draft"}</span>
                       <span className="font-mono text-[12px] tracking-[0.04em] md:text-text-2">
                         <span className="sr-only">Version </span>v{p.version}
                       </span>

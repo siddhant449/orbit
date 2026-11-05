@@ -6,6 +6,10 @@ export type ProgressSignals = {
   draftDates: Date[];
   /** All live drafts, ever. */
   draftTotal: number;
+  /** `postedAt` of the profile's live posts marked as posted since `since`. These drive the posts goal, streaks and badges. */
+  postedDates: Date[];
+  /** Live posts marked as posted, ever. */
+  postedTotal: number;
   hasStrategy: boolean;
   /** Knowledge items that finished processing. */
   knowledgeReady: number;
@@ -17,17 +21,20 @@ export type ProgressSignals = {
 
 /**
  * Read-only signals for Activities and the 30-day sprint, derived from data Orbit already stores. There is no
- * progress table yet: a "draft" here is a document created in chat, never a published post.
+ * separate progress table: a "draft" is a document created in chat, and a "posted" post is one the writer marked as posted
+ * (`Document.postedAt`). Neither means anything was published.
  */
 export async function getProgressSignals(profileId: string, since: Date): Promise<ProgressSignals> {
   const live = { profileId, deletedAt: null };
-  const [drafts, draftTotal, strategy, knowledgeReady, ownVoices, identity] = await Promise.all([
+  const [drafts, draftTotal, posted, postedTotal, strategy, knowledgeReady, ownVoices, identity] = await Promise.all([
     prisma.document.findMany({
       where: { ...live, createdAt: { gte: since } },
       select: { createdAt: true },
       orderBy: { createdAt: "asc" },
     }),
     prisma.document.count({ where: live }),
+    prisma.document.findMany({ where: { ...live, postedAt: { gte: since } }, select: { postedAt: true }, orderBy: { postedAt: "asc" } }),
+    prisma.document.count({ where: { ...live, postedAt: { not: null } } }),
     prisma.strategy.findUnique({ where: { profileId }, select: { id: true } }),
     prisma.knowledgeItem.count({ where: { profileId, status: "READY" } }),
     prisma.voiceStyle.count({ where: { profileId, kind: "OWN" } }),
@@ -36,6 +43,8 @@ export async function getProgressSignals(profileId: string, since: Date): Promis
   return {
     draftDates: drafts.map((d) => d.createdAt),
     draftTotal,
+    postedDates: posted.flatMap((d) => (d.postedAt ? [d.postedAt] : [])),
+    postedTotal,
     hasStrategy: !!strategy,
     knowledgeReady,
     hasOwnVoice: ownVoices > 0,

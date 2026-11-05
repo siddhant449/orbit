@@ -1,5 +1,6 @@
 "use client";
 
+import { MarkPosted } from "./mark-posted";
 import { SaveAsTemplate } from "@/components/templates/save-as-template";
 import { stripCitations } from "@brandloop/agent/client";
 import Link from "next/link";
@@ -122,8 +123,11 @@ export function PostEditorView({
   chat,
   voices,
   selectedVoiceId,
+  postedAt = null,
 }: {
   doc: EditorDoc;
+  /** When the writer marked the post as posted (ISO), or null. */
+  postedAt?: string | null;
   /** The post's live chat, or `id: null` when it has none (its chat was deleted). */
   chat: { id: string | null; messages: ChatUIMessage[] };
   voices: VoiceOption[];
@@ -523,6 +527,7 @@ export function PostEditorView({
                     <CopyIcon />
                   </Button>
                   <SaveAsTemplate documentId={doc.id} />
+                  <MarkPosted documentId={doc.id} initialPostedAt={postedAt} />
                   <LinkedInAction label="Schedule" variant="secondary" />
                   <LinkedInAction label="Publish" variant="primary" />
                 </div>

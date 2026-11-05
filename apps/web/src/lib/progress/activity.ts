@@ -1,6 +1,9 @@
 import { addDays, isWeekend, mondayOf, weekdayOf, type DayKey } from "./days";
 
-/** Drafts started per local day (documents created), the only activity Orbit can count today. */
+/**
+ * Items counted per local day. The same shape serves both counts: drafts (documents created) and posted posts
+ * (`postedAt`, marked by the writer). Streaks and the posts goal are fed the posted counts.
+ */
 export type DraftsByDay = Record<DayKey, number>;
 
 const has = (drafts: DraftsByDay, key: DayKey) => (drafts[key] ?? 0) > 0;
