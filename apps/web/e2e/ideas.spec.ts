@@ -81,6 +81,7 @@ test("the library screens show honest empty states", async ({ page }) => {
   for (const [route, title] of [
     ["/inspiration", "Swipe file"],
     ["/following", "Following"],
+    ["/saves", "All saves"],
   ] as const) {
     for (const colorScheme of ["dark", "light"] as const) {
       await page.setViewportSize({ width: 1440, height: 900 });
