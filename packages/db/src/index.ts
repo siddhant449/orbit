@@ -31,3 +31,6 @@ export * from "./services/notifications";
 export * from "./services/onboarding";
 export * from "./services/ai-usage";
 export * from "./services/challenge";
+export * from "./services/goals";
+export * from "./services/tasks";
+export * from "./services/badges";

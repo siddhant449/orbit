@@ -6,6 +6,7 @@ import { ACCOUNT_CACHE_TAG, getAccount } from "@/lib/account";
 import { isMockMode } from "@/lib/chat-deps";
 import { generateWeeklyIdeas, weeklyIdeasClient } from "@/lib/ideas/weekly";
 import { weekStartOn } from "@/lib/ideas/week";
+import { awardBadgesQuietly } from "@/lib/progress/award";
 import { revalidateTag } from "next/cache";
 
 const fail = (status: number, error: string, headers?: HeadersInit) => Response.json({ error }, { status, headers });
@@ -87,7 +88,10 @@ export async function draftIdeaHandler(id: string): Promise<Response> {
   const chatId = randomUUID();
   await getOrCreateChat(profile.id, account.user.id, chatId);
   const won = await markIdeaDrafted(profile.id, id, chatId);
-  if (won) return Response.json({ chatId, created: true });
+  if (won) {
+    await awardBadgesQuietly(profile.id);
+    return Response.json({ chatId, created: true });
+  }
   // A parallel click got there first: drop our empty chat and hand back theirs.
   await deleteChat(profile.id, chatId).catch(() => {});
   const winner = await getIdea(profile.id, id);

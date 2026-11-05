@@ -15,6 +15,7 @@ import {
   updateTemplate,
 } from "@brandloop/db";
 import { z } from "zod";
+import { awardBadgesQuietly } from "@/lib/progress/award";
 import { getAccount } from "@/lib/account";
 import { isMockMode } from "@/lib/chat-deps";
 import { createRateLimiter, type RateLimiter } from "@/lib/rate-limit";
@@ -139,7 +140,9 @@ export async function postTemplateHandler(request: Request): Promise<Response> {
   const body = TemplateBody.safeParse(await readJson(request));
   if (!body.success) return fail(400, body.error.issues[0]?.message ?? "Send a name, type, category and text.");
   try {
-    return Response.json({ template: dto(await createTemplate(profile.id, body.data)) }, { status: 201 });
+    const created = await createTemplate(profile.id, body.data);
+    await awardBadgesQuietly(profile.id);
+    return Response.json({ template: dto(created) }, { status: 201 });
   } catch (err) {
     return fromTemplateError(err);
   }

@@ -1,6 +1,7 @@
 import { ChallengeError, endChallenge, getActiveChallenge, openChallengeDay, startChallenge, type ActiveChallenge } from "@brandloop/db";
 import { z } from "zod";
 import { getAccount } from "@/lib/account";
+import { awardBadgesQuietly } from "@/lib/progress/award";
 import { dayKeyIn } from "@/lib/progress/days";
 import { findSprintFormat, pickFormats } from "@/lib/sprint/curriculum";
 import type { ChallengeView } from "@/lib/sprint/status";
@@ -41,6 +42,8 @@ export async function getChallengeHandler(deps: Deps = {}): Promise<Response> {
   const profile = (await getAccount())?.currentProfile;
   if (!profile) return NEED_PROFILE();
   const challenge = await getActiveChallenge(profile.id, deps.now?.());
+  // Reading a challenge past its 30th day is what completes it, so this is where the finished badge is earned.
+  if (challenge?.completedAt) await awardBadgesQuietly(profile.id);
   return Response.json({ challenge: challenge ? toChallengeView(challenge) : null });
 }
 
@@ -67,6 +70,7 @@ export async function deleteChallengeHandler(deps: Deps = {}): Promise<Response>
   const profile = (await getAccount())?.currentProfile;
   if (!profile) return NEED_PROFILE();
   if (!(await endChallenge(profile.id, deps.now?.()))) return fail(404, "No challenge is running.");
+  await awardBadgesQuietly(profile.id);
   return Response.json({ ok: true });
 }
 
