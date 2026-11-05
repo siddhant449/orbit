@@ -49,7 +49,7 @@ describe("mcp endpoint", () => {
     expect(res.status).toBe(401);
     const challenge = res.headers.get("www-authenticate") ?? "";
     expect(challenge).toMatch(/^Bearer /);
-    expect(challenge).toContain('resource_metadata="http://localhost:3500/.well-known/oauth-protected-resource"');
+    expect(challenge).toContain('resource_metadata="http://localhost:3500/.well-known/oauth-protected-resource/api/mcp"');
   });
 
   it("an invalid token is also a 401", async () => {
