@@ -38,6 +38,8 @@ export async function captureSet(page: Page, screen: string) {
 
 /** Fails the test on any serious or critical axe violation, listing the rules and the first nodes. */
 export async function axeCheck(page: Page, options: { exclude?: string[] } = {}) {
+  // Measure the settled page: axe reads the computed colour, which is blended while an entrance fade is running.
+  await page.waitForFunction(() => document.getAnimations().every((a) => a.effect?.getTiming().iterations === Infinity || a.playState !== "running"));
   let builder = new AxeBuilder({ page });
   for (const selector of options.exclude ?? []) builder = builder.exclude(selector);
   const { violations } = await builder.analyze();

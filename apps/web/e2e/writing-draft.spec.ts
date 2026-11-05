@@ -51,8 +51,13 @@ test("a framework post comes with an adjacent list, and the readout names it", a
 test("a post that needs facts asks for them and creates nothing", async ({ page }) => {
   await ask(page, "Draft a post about my first hire [e2e:needs-facts]");
   const reply = page.locator('[data-message="assistant"]').last();
-  await expect(reply).toContainText("Who was your first hire", { timeout: 30_000 });
-  await expect(reply).toContainText("What changed for the team after they joined?");
+  // The questions show in the dock above the composer, not as text in the reply.
+  const dock = page.locator("[data-question-dock]");
+  await expect(dock).toBeVisible({ timeout: 30_000 });
+  await expect(dock.locator("[data-question-count]")).toHaveText("Question 1 of 2");
+  await expect(dock.locator("[data-question-text]")).toContainText("Who was your first hire");
+  await expect(reply).toContainText("Needs a few details from you");
+  await expect(reply).not.toContainText("Who was your first hire");
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.locator("[data-draft-card]")).toHaveCount(0);
 });

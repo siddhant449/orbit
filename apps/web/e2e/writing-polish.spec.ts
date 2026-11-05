@@ -16,7 +16,8 @@ test.setTimeout(180_000);
 
 const CHAT_URL = /\/chat\/([0-9a-f-]{36})$/;
 const created = new Set<string>();
-const RULE = "No emojis";
+// A hard block-length limit: a lone over-long block is only a soft hit now, and the model repair runs for hard problems or two soft ones.
+const RULE = "No emojis or walls of text (>3 lines)";
 
 test.beforeEach(async ({ page }) => {
   page.on("request", (req) => {
