@@ -3,6 +3,7 @@ import { getChat, getIdea, getOrCreateChat, deleteChat, hasWeeklyBatch, isAiBloc
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { ACCOUNT_CACHE_TAG, getAccount } from "@/lib/account";
+import { isMockMode } from "@/lib/chat-deps";
 import { generateWeeklyIdeas, weeklyIdeasClient } from "@/lib/ideas/weekly";
 import { weekStartOn } from "@/lib/ideas/week";
 import { revalidateTag } from "next/cache";
@@ -49,7 +50,8 @@ export async function postWeeklyHandler(deps: Deps = {}): Promise<Response> {
   const week = weekStartOn(now, profile.timezone ?? "UTC");
   if (await hasWeeklyBatch(profile.id, week)) return fail(409, "This week's ideas are already made.");
 
-  const gate = await usage().takeDaily("ideas-weekly", profile.id, ON_DEMAND_PER_DAY);
+  // The offline mock costs nothing, and e2e runs share one in-memory counter for a whole server session: no daily limit there.
+  const gate = isMockMode() ? ({ ok: true } as const) : await usage().takeDaily("ideas-weekly", profile.id, ON_DEMAND_PER_DAY);
   if (!gate.ok) return fail(429, "You've made ideas twice today. Try again tomorrow.", { "retry-after": String(gate.retryAfterSec) });
 
   const out = await generateWeeklyIdeas(profile.id, { ai: deps.ai ?? weeklyIdeasClient, now: () => now });

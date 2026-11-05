@@ -106,6 +106,7 @@ export function Notifications({ variant = "pill" }: { variant?: "pill" | "circle
           align="end"
           sideOffset={8}
           collisionPadding={16}
+          aria-label="What's New"
           className="orbit-panel z-50 w-[min(360px,calc(100vw-32px))] !shadow-[var(--panel-highlight),var(--shadow-draft)] data-[state=open]:animate-[orbit-pop_200ms_var(--ease-out)_both]"
         >
           <div className="flex items-center justify-between gap-3">

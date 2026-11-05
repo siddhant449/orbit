@@ -5,8 +5,8 @@ import path from "node:path";
 import { axeCheck, expectNoHorizontalScroll } from "./helpers/shots";
 
 /**
- * Ideas (screens.md B11): "Generate this week's ideas" against the scripted mock (packages/agent/src/mock.ts
- * SCRIPTED_IDEAS); a regenerate avoids the ideas already shown; "Draft this" links home with `?prompt=` (ruling A22).
+ * Ideas (screens.md B11): "Make this week's ideas" against the scripted mock (packages/agent/src/mock.ts
+ * SCRIPTED_IDEAS); the batch is stored. The weekly flow is in ideas-weekly.spec.ts.
  * Nothing should start a chat here; any chat that does is deleted afterwards.
  * With SHOTS=1 and SHOTS_DIR, captures ideas-* at 1440 dark/light and 390 dark.
  */
@@ -41,35 +41,25 @@ test.afterEach(async ({ page }) => {
   created.clear();
 });
 
-test("generates this week's ideas, regenerates without repeats, and links Draft this home with ?prompt=", async ({ page }) => {
+test("For you makes this week's ideas from the stored batch and links nothing to a chat until Draft", async ({ page }) => {
+  await page.request.post("/api/dev/cron", { data: { reset: true, run: false } });
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.emulateMedia({ colorScheme: "dark" });
   await page.goto("/ideas");
   await expect(page.getByRole("heading", { level: 1, name: "For you" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Nothing generated this week yet" })).toBeVisible();
-  await expect(page.getByRole("list", { name: "Built from" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "No ideas for this week yet" })).toBeVisible();
   await axeCheck(page);
   await shot(page, "empty-1440-dark");
 
-  // Pick 3 with the keyboard, then generate.
-  await page.getByRole("radio", { name: "5" }).focus();
-  await page.keyboard.press("ArrowLeft");
-  await expect(page.getByRole("radio", { name: "3" })).toBeChecked();
-  await page.getByRole("button", { name: "Generate this week's ideas" }).click();
+  await page.getByRole("button", { name: "Make this week's ideas" }).click();
   const cards = page.getByRole("article");
-  await expect(cards).toHaveCount(3, { timeout: 30_000 });
+  await expect(cards).toHaveCount(5, { timeout: 30_000 });
   await expect(cards.first().getByRole("heading", { name: FIRST_TITLE })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Generate new ideas" })).toBeEnabled();
   await page.waitForTimeout(1200);
   await axeCheck(page);
   await shot(page, "1440-dark");
 
-  // Five, in light.
-  await page.getByRole("radio", { name: "5" }).click();
-  await page.getByRole("button", { name: "Generate new ideas" }).click();
-  await expect(cards).toHaveCount(5, { timeout: 30_000 });
   await page.emulateMedia({ colorScheme: "light" });
-  await page.waitForTimeout(1200);
   await axeCheck(page);
   await shot(page, "1440-light");
 
@@ -80,29 +70,17 @@ test("generates this week's ideas, regenerates without repeats, and links Draft 
   await shot(page, "390-dark");
   await page.setViewportSize({ width: 1440, height: 900 });
 
-  // Draft this (ruling A22): a link home with the idea in ?prompt=; the merge wires it to a prefilled composer that is
-  // never auto-sent. The regenerate avoided the three ideas already shown, so the first card is a new one.
-  await expect(cards.first().getByRole("heading", { name: FIRST_TITLE })).toHaveCount(0);
-  const draft = cards.first().getByRole("link", { name: "Draft this" });
-  const href = (await draft.getAttribute("href"))!;
-  expect(href.startsWith("/?prompt=")).toBe(true);
-  const prompt = decodeURIComponent(href.slice("/?prompt=".length));
-  expect(prompt).toMatch(/^Draft a LinkedIn post from this idea: /);
-  expect([...prompt].length).toBeLessThanOrEqual(2000);
-  await draft.click();
-  await expect(page).toHaveURL(/\/\?prompt=/);
+  // Nothing started a chat; the batch is stored, so a reload shows the same five.
   expect(created.size).toBe(0);
-
-  // Back on Ideas, this tab still has the last set (no regeneration needed).
-  await page.goto("/ideas");
+  await page.reload();
   await expect(cards).toHaveCount(5);
+  await page.request.post("/api/dev/cron", { data: { reset: true, run: false } });
 });
 
 test("the library screens show honest empty states", async ({ page }) => {
   for (const [route, title] of [
     ["/inspiration", "Swipe file"],
     ["/following", "Following"],
-    ["/saves", "All saves"],
   ] as const) {
     for (const colorScheme of ["dark", "light"] as const) {
       await page.setViewportSize({ width: 1440, height: 900 });
