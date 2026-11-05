@@ -1,7 +1,10 @@
 import type { ReactNode } from "react";
+import { headers } from "next/headers";
 import { StatusPill, cn } from "@brandloop/ui";
 import { PageBody, PageHeader, SectionHeading } from "@/components/page";
+import { AssistantsPanel } from "@/components/settings/assistants-panel";
 import { NotYetButton } from "@/components/settings/not-yet-button";
+import { loadMcpSettings } from "@/lib/mcp-settings-api";
 
 export const metadata = { title: "Integrations" };
 
@@ -39,7 +42,6 @@ const SOCIAL = [
 ];
 
 const ASSISTANTS = [
-  { name: "AI assistants", body: "Use Orbit drafts, hooks and your voice profile from Codex, Claude, ChatGPT and Cursor." },
   { name: "Orbit CLI", body: "The Orbit agent in your terminal: draft, refine and schedule without leaving it." },
   { name: "Telegram", body: "Tap once to connect, then message Orbit on Telegram: ideas, drafts, scheduling." },
 ];
@@ -72,7 +74,16 @@ function Card({ children, className }: { children: ReactNode; className?: string
   return <div className={cn("orbit-panel flex flex-col gap-4 p-5", className)}>{children}</div>;
 }
 
-export default function IntegrationsPage() {
+/** The public origin this request came in on, behind a proxy too. */
+async function serverUrl(): Promise<string> {
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
+  const proto = h.get("x-forwarded-proto") ?? (/^(localhost|127\.0\.0\.1)(:|$)/.test(host) ? "http" : "https");
+  return `${proto}://${host}/api/mcp`;
+}
+
+export default async function IntegrationsPage() {
+  const [url, mcp] = await Promise.all([serverUrl(), loadMcpSettings()]);
   return (
     <>
       <PageHeader title="Integrations" subtitle="Connect the profiles Orbit uses for publishing, analytics and personalization." />
@@ -112,8 +123,9 @@ export default function IntegrationsPage() {
         </section>
 
         <section aria-labelledby="int-assistants">
-          <SectionHeading id="int-assistants" title="AI assistants" note="use Orbit from your coding agent, Telegram and more" />
-          <ul className={grid(220)}>
+          <SectionHeading id="int-assistants" title="AI assistants" note="use Orbit from ChatGPT or Codex" />
+          <AssistantsPanel serverUrl={url} initial={mcp} />
+          <ul className={cn(grid(220), "mt-3")}>
             {ASSISTANTS.map((a) => (
               <li key={a.name} className="flex">
                 <Card className="w-full">
@@ -151,19 +163,6 @@ export default function IntegrationsPage() {
                 <div>
                   <NotYetButton service="API keys" variant="secondary" size="sm">
                     Create key
-                  </NotYetButton>
-                </div>
-              </Card>
-            </li>
-            <li className="flex">
-              <Card className="w-full">
-                <h3 className="text-[15px] font-medium leading-6 text-text">MCP server</h3>
-                <p className="flex-1 text-[13px] leading-[1.55] text-text-soft">
-                  Draft, schedule and read analytics from Claude, Cursor, Codex or ChatGPT.
-                </p>
-                <div>
-                  <NotYetButton service="The MCP server" variant="secondary" size="sm" aria-label="Set up MCP server">
-                    Set up
                   </NotYetButton>
                 </div>
               </Card>

@@ -146,6 +146,17 @@ export async function createDocumentForChat(
   });
 }
 
+/** A post written by an AI assistant through the MCP endpoint: no chat, version 1 with source ASSISTANT. */
+export async function createAssistantDocument(profileId: string, input: { title: string; text: string; changeSummary?: string }): Promise<DocumentSnapshot> {
+  const title = cleanTitle(input.title);
+  const text = checkText(input.text);
+  const doc = await prisma.document.create({
+    data: { profileId, title, version: 1, versions: { create: { version: 1, text, source: "ASSISTANT", changeSummary: cleanSummary(input.changeSummary) } } },
+    select: { id: true },
+  });
+  return (await snapshot(prisma, profileId, doc.id))!;
+}
+
 export function getDocument(profileId: string, id: string): Promise<DocumentSnapshot | null> {
   return snapshot(prisma, profileId, id);
 }

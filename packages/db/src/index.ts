@@ -34,3 +34,4 @@ export * from "./services/challenge";
 export * from "./services/goals";
 export * from "./services/tasks";
 export * from "./services/badges";
+export * from "./services/mcp";

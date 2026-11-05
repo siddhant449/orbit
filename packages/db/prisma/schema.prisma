@@ -27,6 +27,8 @@ model User {
   aiBlocked        Boolean      @default(false)
   memberships      Membership[]
   ownedProfiles    Profile[]    @relation("ProfileOwner")
+  mcpBinding       McpBinding?
+  mcpClients       McpClient[]
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 }
@@ -106,6 +108,7 @@ model Profile {
   goalTallies         GoalTally[]
   tasks               Task[]
   badges              Badge[]
+  mcpBindings         McpBinding[]
   storageObjects      StorageObject[]
   visuals             Visual[]
   brandTheme          BrandTheme?
@@ -400,6 +403,8 @@ enum VersionSource {
   USER_EDIT
   RESTORE
   PROPOSAL
+  /// Written by an AI assistant connected through the MCP endpoint.
+  ASSISTANT
 }
 
 /// A post. The current text lives in the DocumentVersion whose number equals `version`.
@@ -970,4 +975,29 @@ model Badge {
   awardedAt DateTime @default(now())
 
   @@id([profileId, badgeId])
+}
+
+/// The profile AI assistants act as for a user (one per user). Missing = the user's current profile.
+model McpBinding {
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String   @id
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  profileId String
+  updatedAt DateTime @updatedAt
+
+  @@index([profileId])
+}
+
+/// An AI assistant (an OAuth client) that has called the MCP endpoint for a user. Revoked clients get 401.
+model McpClient {
+  id         String    @id @default(cuid())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+  clientId   String
+  clientName String
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime  @default(now())
+  revokedAt  DateTime?
+
+  @@unique([userId, clientId])
 }
