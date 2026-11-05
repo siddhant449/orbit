@@ -1,19 +1,33 @@
+"use client";
+
+import useSWR from "swr";
 import { IntentLink as Link } from "@/components/shell/intent-link";
 import { Ring, cn } from "@brandloop/ui";
+import { dayLabel } from "@/lib/progress/days";
+import { findSprintFormat } from "@/lib/sprint/curriculum";
+import { summarizeChallenge, type ChallengeView } from "@/lib/sprint/status";
 
 export type SprintState =
   | { kind: "not-started" }
-  | { kind: "active"; day: number; title: string; posted: number; planned: number };
+  | { kind: "upcoming"; startsOn: string }
+  | { kind: "active"; day: number; title: string; posted: number; planned: number }
+  | { kind: "finished"; posted: number; planned: number };
 
 export const SPRINT_DAYS = 30;
 
-/** The card's copy for a sprint state. Not started is honest: no day, no sample title, an empty ring. */
+/** The card's copy for a challenge state. Not started is honest: no day, no sample title, an empty ring. */
 export function sprintCopy(state: SprintState) {
   if (state.kind === "not-started") {
-    return { label: "30-day sprint", title: "Not started", meta: "Start when you're ready", day: null, progress: 0 };
+    return { label: "30-day challenge", title: "Not started", meta: "Start when you're ready", day: null, progress: 0 };
+  }
+  if (state.kind === "upcoming") {
+    return { label: "30-day challenge", title: `Starts ${dayLabel(state.startsOn, { weekday: false })}`, meta: "Not started yet", day: null, progress: 0 };
+  }
+  if (state.kind === "finished") {
+    return { label: "30-day challenge", title: "Finished", meta: `${state.posted} of ${state.planned} posted`, day: null, progress: SPRINT_DAYS };
   }
   return {
-    label: "30-day sprint",
+    label: "30-day challenge",
     title: `Day ${state.day} · ${state.title}`,
     meta: `${state.posted} of ${state.planned} posted`,
     day: state.day,
@@ -22,8 +36,8 @@ export function sprintCopy(state: SprintState) {
 }
 
 /**
- * Sidebar sprint card (system §6.9): a `panel` link to `/challenge`, radius 16, padding 16, the 52 px progress ring
- * and three lines. O2 always passes `not-started` (the challenge feature is O11).
+ * Sidebar challenge card (system §6.9): a `panel` link to `/challenge`, radius 16, padding 16, the progress ring and
+ * three lines: "30-day challenge", "Day N · format" and "x of 22 posted" (or "Not started").
  */
 export function SprintCard({ state, active = false, onNavigate }: { state: SprintState; active?: boolean; onNavigate?: () => void }) {
   const copy = sprintCopy(state);
@@ -55,11 +69,32 @@ export function SprintPill({ state }: { state: SprintState }) {
   return (
     <Link
       href="/challenge"
-      aria-label={copy.day ? `30-day sprint, day ${copy.day}` : "30-day sprint, not started"}
+      aria-label={copy.day ? `30-day challenge, day ${copy.day}` : `30-day challenge, ${copy.title.toLowerCase()}`}
       className="orbit-transition flex h-11 items-center gap-2 rounded-pill bg-panel pl-3.5 pr-4 text-[13px] font-medium text-text shadow-highlight hover:bg-panel-hover"
     >
       <Ring value={copy.progress} max={SPRINT_DAYS} label="Sprint progress" size={16} strokeWidth={12} />
-      {copy.day ? `Day ${copy.day}` : "Sprint"}
+      {copy.day ? `Day ${copy.day}` : "Challenge"}
     </Link>
   );
+}
+
+const KEY = "/api/challenge";
+
+/** The stored challenge as a card state. SWR shares one request between the sidebar, the drawer and the mobile pill. */
+export function useSprintState(): SprintState {
+  const { data } = useSWR<{ challenge: ChallengeView | null }>(KEY, (url: string) => fetch(url).then((r) => (r.ok ? r.json() : { challenge: null })), {
+    revalidateOnFocus: true,
+    keepPreviousData: true,
+  });
+  return sprintStateOf(data?.challenge ?? null);
+}
+
+export function sprintStateOf(view: ChallengeView | null): SprintState {
+  if (!view) return { kind: "not-started" };
+  const s = summarizeChallenge(view);
+  if (s.phase === "upcoming") return { kind: "upcoming", startsOn: view.startDate };
+  if (s.phase === "finished") return { kind: "finished", posted: s.posted, planned: s.postDays };
+  const today = s.days.find((d) => d.isToday);
+  const title = findSprintFormat(today?.formatId)?.title ?? "Rest day";
+  return { kind: "active", day: s.dayNumber ?? 1, title, posted: s.posted, planned: s.postDays };
 }

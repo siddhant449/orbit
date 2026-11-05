@@ -7,7 +7,7 @@ vi.mock("next/link", () => ({
 }));
 
 const { MainNav } = await import("./nav-link");
-const { SprintCard, sprintCopy } = await import("./sprint-card");
+const { SprintCard, sprintCopy, sprintStateOf } = await import("./sprint-card");
 
 describe("MainNav", () => {
   it("renders the six links inside nav Main, the current one marked", () => {
@@ -29,7 +29,7 @@ describe("MainNav", () => {
 describe("SprintCard", () => {
   it("not started: honest copy, empty ring, links to the sprint", () => {
     expect(sprintCopy({ kind: "not-started" })).toEqual({
-      label: "30-day sprint",
+      label: "30-day challenge",
       title: "Not started",
       meta: "Start when you're ready",
       day: null,
@@ -43,11 +43,24 @@ describe("SprintCard", () => {
 
   it("active: day and title, posted of planned", () => {
     expect(sprintCopy({ kind: "active", day: 4, title: "A list post", posted: 3, planned: 22 })).toEqual({
-      label: "30-day sprint",
+      label: "30-day challenge",
       title: "Day 4 · A list post",
       meta: "3 of 22 posted",
       day: 4,
       progress: 4,
     });
+  });
+
+  it("is built from the stored challenge: day, today's format and posted of planned", () => {
+    expect(sprintStateOf(null)).toEqual({ kind: "not-started" });
+    const days = Array.from({ length: 30 }, (_, i) => {
+      const date = new Date(Date.parse("2026-11-04T00:00:00Z") + i * 86_400_000).toISOString().slice(0, 10);
+      const wd = new Date(`${date}T00:00:00Z`).getUTCDay();
+      return { dayNumber: i + 1, date, formatId: wd === 0 || wd === 6 ? null : "origin-story", chatId: null, doc: null };
+    });
+    const view = { id: "e", startDate: "2026-11-04", finishDate: "2026-12-03", completedAt: null, endedAt: null, days };
+    expect(sprintStateOf({ ...view, today: "2026-11-04" })).toEqual({ kind: "active", day: 1, title: "The origin story", posted: 0, planned: 22 });
+    expect(sprintStateOf({ ...view, today: "2026-11-01" })).toEqual({ kind: "upcoming", startsOn: "2026-11-04" });
+    expect(sprintStateOf({ ...view, today: "2026-12-10" })).toEqual({ kind: "finished", posted: 0, planned: 22 });
   });
 });

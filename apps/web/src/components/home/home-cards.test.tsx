@@ -19,7 +19,7 @@ describe("HomeCards", () => {
   it("with no strategy: sprint, activities and strategy empty states, honest copy only", () => {
     const html = renderToStaticMarkup(<HomeCards strategy={null} latestChat={null} />);
     expect(html).toContain("Today&#x27;s post");
-    expect(html).toContain("Start the 30-day sprint");
+    expect(html).toContain("Start the 30-day challenge");
     expect(html).toContain("One proven format every weekday");
     expect(html).toContain('href="/challenge"');
     expect(html).toContain("Daily goals arrive with Activities");

@@ -4,7 +4,7 @@ import { IntentLink as Link } from "@/components/shell/intent-link";
 import { MenuIcon, SearchIcon } from "@brandloop/ui/icons";
 import { Logo } from "./logo";
 import { Notifications } from "./notifications";
-import { SprintPill, type SprintState } from "./sprint-card";
+import { SprintPill, useSprintState } from "./sprint-card";
 
 const circle =
   "orbit-transition grid size-11 place-items-center rounded-full border border-line-control text-text hover:border-inverse hover:bg-inverse hover:text-on-inverse";
@@ -14,14 +14,13 @@ const circle =
  * the full nav, chat history and settings reachable.
  */
 export function MobileHeader({
-  sprint,
   onSearch,
   onMenu,
 }: {
-  sprint: SprintState;
   onSearch: () => void;
   onMenu: () => void;
 }) {
+  const sprint = useSprintState();
   return (
     <header className="relative flex shrink-0 items-center justify-between gap-3 px-(--gutter) pb-2 pt-[calc(env(safe-area-inset-top)+8px)] md:hidden">
       <Link href="/" aria-label="Orbit home" className="rounded-pill">

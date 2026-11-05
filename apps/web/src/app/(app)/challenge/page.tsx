@@ -1,29 +1,29 @@
+import { getActiveChallenge } from "@brandloop/db";
 import { EmptyState, PageBody, PageHeader } from "@/components/page";
 import { SprintView } from "@/components/sprint/sprint-view";
 import { getAccount } from "@/lib/account";
-import { loadProgress } from "@/lib/progress/load";
-import { buildSprint, parseStart } from "@/lib/sprint/plan";
+import { toChallengeView } from "@/lib/challenge-api";
+import { dayKeyIn } from "@/lib/progress/days";
 
-export const metadata = { title: "30-day sprint" };
+export const metadata = { title: "30-day challenge" };
 
 /**
- * 30-day sprint (screens.md B9, p11/p24). No sprint is stored yet: the calendar runs from `?start=` when the page
- * carries one, otherwise it previews a sprint starting today. Day ticks come from the drafts started each day.
+ * 30-day challenge (screens.md B9, p11/p24): the stored enrollment, or the Start screen when there is none. The newest
+ * challenge shows even after it ended, as a summary with Start again.
  */
-export default async function Page({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+export default async function Page() {
   const profile = (await getAccount()).currentProfile;
   if (!profile) {
     return (
       <>
-        <PageHeader title="30-day sprint" />
+        <PageHeader title="30-day challenge" />
         <PageBody>
-          <EmptyState title="No profile yet" body="Add a profile to run a sprint for it." />
+          <EmptyState title="No profile yet" body="Add a profile to run a challenge for it." />
         </PageBody>
       </>
     );
   }
-  const progress = await loadProgress(profile);
-  const pinned = parseStart((await searchParams).start, progress.today);
-  const sprint = buildSprint({ start: pinned ?? progress.today, today: progress.today, drafts: progress.drafts });
-  return <SprintView sprint={sprint} pinned={pinned !== null} />;
+  const now = new Date();
+  const challenge = await getActiveChallenge(profile.id, now, { includeEnded: true });
+  return <SprintView challenge={challenge ? toChallengeView(challenge) : null} today={dayKeyIn(now, profile.timezone || "UTC")} />;
 }

@@ -11,7 +11,7 @@ const env = vi.hoisted(() => {
 });
 vi.mock("@/lib/account", () => ({ getAccount: async () => env.account }));
 
-import { createNotification, ensureAccount, prisma, saveIdeaBatch } from "@brandloop/db";
+import { createNotification, ensureAccount, prisma, saveIdeaBatch, startChallenge } from "@brandloop/db";
 import { getNotificationsHandler, postNotificationsReadHandler } from "./notifications-api";
 
 vi.setConfig({ testTimeout: 30_000, hookTimeout: 30_000 });
@@ -77,5 +77,15 @@ describe("notifications API", () => {
     await prisma.idea.update({ where: { id: ideas[1]!.id }, data: { drafted: true } });
     const rows = (await (await getNotificationsHandler({ now: () => NOW })).json()) as { derived: { id: string; title: string }[] };
     expect(rows.derived.find((r) => r.id === "ideas")!.title).toBe("1 idea is waiting for you");
+  });
+
+  it("adds today's challenge day as a derived row, only for the profile that has one", async () => {
+    await startChallenge(a.profileId, "2026-11-02", Array.from({ length: 22 }, (_, i) => `f${i}`), NOW);
+    as(a);
+    const mine = (await (await getNotificationsHandler({ now: () => NOW })).json()) as { derived: { id: string; title: string; detail?: string }[] };
+    expect(mine.derived.find((r) => r.id === "challenge")).toMatchObject({ title: "Challenge day 3", detail: "0 of 22 posted" });
+    as(b);
+    const other = (await (await getNotificationsHandler({ now: () => NOW })).json()) as { derived: { id: string }[] };
+    expect(other.derived.some((r) => r.id === "challenge")).toBe(false);
   });
 });

@@ -1,6 +1,7 @@
 import type { AiClient } from "@brandloop/ai";
 import { createHash, timingSafeEqual } from "node:crypto";
 import { prisma, pruneNotifications } from "@brandloop/db";
+import { challengeEndingHook } from "../challenge-cron";
 import { dueForGeneration, weekStartOn } from "./week";
 import { generateWeeklyIdeas, weeklyIdeasClient } from "./weekly";
 
@@ -35,7 +36,7 @@ export async function selectDueProfiles(now: Date, limit = CRON_MAX_PROFILES): P
 }
 
 /** Work other features add to the daily run (challenge reminders). Each gets the run's clock; a failure is logged, never fatal. */
-export const dailyCronHooks: Array<(ctx: { now: Date }) => Promise<void>> = [];
+export const dailyCronHooks: Array<(ctx: { now: Date }) => Promise<void>> = [challengeEndingHook];
 
 export type CronSummary = { generated: number; skipped: number; failed: number };
 

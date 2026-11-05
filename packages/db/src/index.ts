@@ -30,3 +30,4 @@ export * from "./services/ideas";
 export * from "./services/notifications";
 export * from "./services/onboarding";
 export * from "./services/ai-usage";
+export * from "./services/challenge";

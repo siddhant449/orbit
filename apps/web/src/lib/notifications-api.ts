@@ -1,7 +1,9 @@
-import { getChecklist, listNotifications, markNotificationsRead, prisma } from "@brandloop/db";
+import { getActiveChallenge, getChecklist, listNotifications, markNotificationsRead, prisma } from "@brandloop/db";
 import { z } from "zod";
 import { getAccount } from "@/lib/account";
 import { weekStartOn } from "@/lib/ideas/week";
+import { summarizeChallenge } from "@/lib/sprint/status";
+import { toChallengeView } from "@/lib/challenge-api";
 import { buildDerivedRows } from "@/lib/whats-new";
 
 const fail = (status: number, error: string) => Response.json({ error }, { status });
@@ -10,16 +12,19 @@ const fail = (status: number, error: string) => Response.json({ error }, { statu
 export async function getNotificationsHandler(deps: { now?: () => Date } = {}): Promise<Response> {
   const profile = (await getAccount())?.currentProfile;
   if (!profile) return fail(400, "Create a profile first.");
-  const week = weekStartOn(deps.now?.() ?? new Date(), profile.timezone ?? "UTC");
-  const [stored, waiting, checklist] = await Promise.all([
+  const now = deps.now?.() ?? new Date();
+  const week = weekStartOn(now, profile.timezone ?? "UTC");
+  const [stored, waiting, checklist, challenge] = await Promise.all([
     listNotifications(profile.id, 20),
     // Ideas for this week that are still untouched: not hidden, not drafted.
     prisma.idea.count({ where: { profileId: profile.id, origin: "weekly", weekStartOn: new Date(`${week}T00:00:00Z`), hidden: false, drafted: false } }),
     getChecklist(profile.id),
+    getActiveChallenge(profile.id, now),
   ]);
+  const running = challenge ? summarizeChallenge(toChallengeView(challenge)) : null;
   const next = checklist?.find((i) => !i.done && !i.comingSoon) ?? null;
   const derived = buildDerivedRows({
-    challenge: null, // Filled in with the stored challenge (phase C).
+    challenge: running?.dayNumber ? { day: running.dayNumber, posted: running.posted, total: running.postDays, href: "/challenge" } : null,
     ideasWaiting: waiting,
     nextStep: next ? { title: next.label, href: next.href } : null,
   });

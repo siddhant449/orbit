@@ -1,9 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { SPRINT_FORMATS, findSprintFormat, sprintDraftPrompt } from "./curriculum";
+import { PROMPT_PARAM_MAX } from "@/lib/prompt-param";
+import { SPRINT_FORMATS, findSprintFormat, pickFormats, sprintDraftPrompt } from "./curriculum";
 
 describe("sprint curriculum", () => {
-  it("has one format for each of the up to 22 weekdays in 30 days", () => {
-    expect(SPRINT_FORMATS).toHaveLength(22);
+  it("has 23 formats, of which 22 are used for the up to 22 weekdays in 30 days", () => {
+    expect(SPRINT_FORMATS).toHaveLength(23);
+    expect(SPRINT_FORMATS.filter((f) => f.optional)).toHaveLength(1);
+    const picked = pickFormats(SPRINT_FORMATS);
+    expect(picked).toHaveLength(22);
+    expect(picked.some((f) => f.optional)).toBe(false);
+    expect(pickFormats().map((f) => f.id)).toEqual(picked.map((f) => f.id));
   });
 
   it("gives every format a unique slug id and title", () => {
@@ -44,5 +50,9 @@ describe("sprint curriculum", () => {
     expect(prompt).toContain("Day 4");
     for (const s of f.steps) expect(prompt).toContain(s);
     expect(sprintDraftPrompt(f)).not.toContain("Day ");
+  });
+
+  it("keeps every prompt within the home handoff cap", () => {
+    for (const f of SPRINT_FORMATS) expect([...sprintDraftPrompt(f, 30)].length).toBeLessThanOrEqual(PROMPT_PARAM_MAX);
   });
 });

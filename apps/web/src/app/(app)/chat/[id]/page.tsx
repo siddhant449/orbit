@@ -1,8 +1,9 @@
 import { notFound } from "next/navigation";
-import { getChat, getChatDocument, getIdea, getSelectedVoice, listMessages, listVoices } from "@brandloop/db";
+import { getChallengeDayByChat, getChat, getChatDocument, getIdea, getSelectedVoice, listMessages, listVoices } from "@brandloop/db";
 import type { ChatUIMessage } from "@brandloop/agent/client";
 import { ChatViewLazy as ChatView } from "@/components/chat/chat-view-lazy";
 import { getAccount } from "@/lib/account";
+import { findSprintFormat, sprintDraftPrompt } from "@/lib/sprint/curriculum";
 
 export default async function ChatPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ idea?: string | string[] }> }) {
   const { id } = await params;
@@ -20,7 +21,13 @@ export default async function ChatPage({ params, searchParams }: { params: Promi
   // "Draft" on a For you card opens the chat it made with the idea's prompt; a chat that already has messages never re-sends it.
   const ideaId = typeof ideaParam === "string" ? ideaParam : undefined;
   const idea = ideaId && messages.length === 0 ? await getIdea(profile.id, ideaId) : null;
-  const initialText = idea && idea.chatId === id ? idea.prompt : undefined;
+  let initialText = idea && idea.chatId === id ? idea.prompt : undefined;
+  // A challenge day's empty chat opens with that day's prompt and writes straight away, like an idea does.
+  if (!initialText && messages.length === 0) {
+    const day = await getChallengeDayByChat(profile.id, id);
+    const format = findSprintFormat(day?.formatId);
+    if (day && format) initialText = sprintDraftPrompt(format, day.dayNumber);
+  }
   const initialMessages = messages.map((m) => ({
     id: m.id,
     role: m.role,

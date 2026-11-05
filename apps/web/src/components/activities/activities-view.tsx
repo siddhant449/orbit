@@ -9,8 +9,6 @@ import { CheckIcon, ChevronLeftIcon, ChevronRightIcon } from "@brandloop/ui/icon
 import { dialogContentClass, dialogDescriptionClass, dialogOverlayClass, dialogTitleClass } from "@/components/dialog-classes";
 import { nextMilestone, weekStrip, type ChecklistItem, type DraftsByDay, type Milestone, type MilestoneId } from "@/lib/progress/activity";
 import { dayLabel, type DayKey } from "@/lib/progress/days";
-import type { SprintFormat } from "@/lib/sprint/curriculum";
-import { sprintDraftHref } from "@/lib/sprint/links";
 
 const rise = (i: number) => ({ "--rise-delay": `${i * 80}ms` }) as CSSProperties;
 const WEEK_GOAL = 5;
@@ -34,8 +32,6 @@ export type ActivitiesProps = {
   milestones: Milestone[];
   checklist: { items: ChecklistItem[]; done: number };
   resets: string;
-  /** Today's sprint day as a sprint starting today would have it: its number and format travel together. */
-  todayPost: { day: number; format: SprintFormat } | null;
 };
 
 /** Activities (screens.md B8): three summary panels, the week strip, getting started and today's routine. */
@@ -368,7 +364,7 @@ function ChecklistPanel({ checklist }: { checklist: { items: ChecklistItem[]; do
   );
 }
 
-function TodayPanel({ today, drafts, resets, todayPost }: ActivitiesProps) {
+function TodayPanel({ today, drafts, resets }: ActivitiesProps) {
   const draftedToday = (drafts[today] ?? 0) > 0;
   const routines = [
     { title: "Comment on 8 posts", detail: "Thoughtful comments on posts in your field put your name in front of new readers." },
@@ -394,13 +390,11 @@ function TodayPanel({ today, drafts, resets, todayPost }: ActivitiesProps) {
               {draftedToday && <span className="sr-only"> (done)</span>}
             </span>
             <span className="text-[12px] text-text-2">
-              {todayPost
-                ? `Try the sprint's opening format, ${todayPost.format.title.replace(/^The /, "the ")}. Orbit drafts it with you.`
-                : "Drafting on the days you plan keeps the streak alive. Orbit drafts it with you."}
+              Drafting on the days you plan keeps the streak alive. Orbit drafts it with you.
             </span>
           </span>
           <Button asChild size="sm" variant={draftedToday ? "secondary" : "primary"} className="shrink-0 text-[12px]">
-            <Link href={todayPost ? sprintDraftHref(todayPost) : "/"}>{draftedToday ? "Draft another" : "Draft"}</Link>
+            <Link href="/">{draftedToday ? "Draft another" : "Draft"}</Link>
           </Button>
         </li>
         {routines.map((r) => (

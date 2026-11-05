@@ -61,7 +61,7 @@ export function HomeCards({
       <Link href="/challenge" className={cn(card, "orbit-panel--interactive")} style={rise(0)}>
         <span className="flex min-w-0 flex-col gap-1 md:flex-1 md:gap-3">
           <Label>Today&apos;s post</Label>
-          <span className="type-card-title text-text max-md:text-[19px]">Start the 30-day sprint</span>
+          <span className="type-card-title text-text max-md:text-[19px]">Start the 30-day challenge</span>
           <span className="text-[12px] text-text-2 md:mt-auto">One proven format every weekday</span>
         </span>
         <OpenPill className="h-8 md:hidden" />

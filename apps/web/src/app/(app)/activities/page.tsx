@@ -11,7 +11,6 @@ import {
 } from "@/lib/progress/activity";
 import { resetsIn } from "@/lib/progress/days";
 import { loadProgress } from "@/lib/progress/load";
-import { buildSprint } from "@/lib/sprint/plan";
 
 export const metadata = { title: "Activities" };
 
@@ -35,8 +34,6 @@ export default async function Page() {
   const now = new Date();
   const p = await loadProgress(profile, now);
   const best = bestWeekdayStreak(p.posted, p.today);
-  // No sprint is stored yet, so "today's post" is the format a sprint starting today would open with.
-  const focus = buildSprint({ start: p.today, today: p.today, drafts: p.drafts }).focus;
   return (
     <ActivitiesView
       today={p.today}
@@ -46,7 +43,6 @@ export default async function Page() {
       milestones={milestones({ total: p.postedTotal, best, fullWeek: hadFullWeek(p.posted) })}
       checklist={gettingStarted({ strategy: p.strategy, identity: p.identity, knowledge: p.knowledge, voice: p.voice, drafts: p.draftTotal })}
       resets={resetsIn(now, p.timeZone)}
-      todayPost={focus?.format ? { day: focus.day, format: focus.format } : null}
     />
   );
 }

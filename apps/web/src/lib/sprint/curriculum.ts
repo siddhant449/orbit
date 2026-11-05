@@ -1,6 +1,7 @@
 /**
- * Orbit's 30-day sprint curriculum: one post format per weekday, in order. Thirty calendar days hold 20 to 22
- * weekdays depending on the start day, so there are 22 formats and a short sprint simply ends before the last ones.
+ * Orbit's 30-day challenge curriculum: one post format per weekday, in order. Thirty calendar days hold 20 to 22
+ * weekdays depending on the start day, so 22 formats are used (`pickFormats` drops the optional one) and a shorter
+ * challenge simply ends before the last ones.
  * Weekends are rest days and take no format. All wording here is Orbit's own.
  */
 export type SprintFormat = {
@@ -13,6 +14,8 @@ export type SprintFormat = {
   steps: readonly [string, string, string];
   /** One possible opening line, to show the tone. Generic on purpose: the writer brings the specifics. */
   example: string;
+  /** The weakest-fit format: left out of a challenge, which has 22 posting days at most. */
+  optional?: true;
 };
 
 export const SPRINT_FORMATS: readonly SprintFormat[] = [
@@ -74,6 +77,7 @@ export const SPRINT_FORMATS: readonly SprintFormat[] = [
   },
   {
     id: "dropped-tool",
+    optional: true,
     title: "The tool you dropped",
     brief: "A tool, app or habit you stopped using, and what replaced it. Be fair to the old one and specific about why you switched.",
     steps: ["Say what you used and for how long", "Name the moment it stopped working for you", "Share what you use now and the trade-off"],
@@ -164,6 +168,13 @@ export const SPRINT_FORMATS: readonly SprintFormat[] = [
     example: "I was told never to work with friends. I did it anyway. Here's how that went.",
   },
   {
+    id: "red-flag",
+    title: "The red flag you learned",
+    brief: "An early warning sign you now spot at once, and what you do when you see it. Keep it about the pattern, never a person.",
+    steps: ["Describe the sign in plain words", "Tell the story of the first time it cost you", "Say what you do the moment you see it now"],
+    example: "When a client says \"just a quick favour\" in week one, I now stop and write the scope down.",
+  },
+  {
     id: "sprint-recap",
     title: "What the sprint taught you",
     brief: "Look back on the sprint: what you posted, what landed, what surprised you, and what you'll keep doing.",
@@ -190,4 +201,9 @@ export function sprintDraftPrompt(format: SprintFormat, day?: number): string {
     `Shape:\n${format.steps.map((s, i) => `${i + 1}. ${s}`).join("\n")}`,
     "If you need details only I would know, ask me one or two short questions first, then draft it.",
   ].join("\n\n");
+}
+
+/** The 22 formats a challenge uses: the curriculum without its optional (weakest-fit) format, in order. */
+export function pickFormats(curriculum: readonly SprintFormat[] = SPRINT_FORMATS): SprintFormat[] {
+  return curriculum.filter((f) => !f.optional).slice(0, 22);
 }
