@@ -5,7 +5,8 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 // returns notFound() and the probe 404s (it also needs AI_MOCK_MODEL=1).
 // /admin is "public" to the middleware on purpose: signed-out visitors must get the same 404 as everyone else (not a sign-in
 // redirect that reveals the page exists); the admin layout and every admin action check the allow-list themselves.
-const publicRoutes = ["/sign-in(.*)", "/sign-up(.*)", "/welcome(.*)", "/privacy(.*)", "/terms(.*)", "/admin(.*)"];
+// /api/cron is called by Vercel Cron with no session; the route itself requires `Authorization: Bearer $CRON_SECRET`.
+const publicRoutes = ["/sign-in(.*)", "/sign-up(.*)", "/welcome(.*)", "/privacy(.*)", "/terms(.*)", "/admin(.*)", "/api/cron(.*)"];
 if (process.env.NODE_ENV !== "production") publicRoutes.push("/design(.*)", "/api/dev/db-name");
 
 const isPublicRoute = createRouteMatcher(publicRoutes);
