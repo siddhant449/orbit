@@ -68,6 +68,28 @@ describe("handleVisualJob: generate", () => {
     expect(await balance()).toBe(29);
   });
 
+  it("an image job success adds one IMAGE_READY", async () => {
+    cleanup = await installVisualsEnv();
+    await prisma.notification.deleteMany({ where: { profileId: a.profileId } });
+    const v = await create();
+    expect(await handleVisualJob(getVisualDeps(), { visualId: v.id, op: "generate" }, ctx())).toBe("ok");
+    // A repeat of the same job (a retry delivered twice) adds nothing new.
+    await prisma.visual.update({ where: { id: v.id }, data: { status: "PENDING", activeOp: null } });
+    await handleVisualJob(getVisualDeps(), { visualId: v.id, op: "generate" }, ctx()).catch(() => {});
+    const rows = await prisma.notification.findMany({ where: { profileId: a.profileId } });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ kind: "IMAGE_READY", title: "Your image is ready", href: "/images", dedupeKey: `visual:${v.id}` });
+  });
+
+  it("a failed image job adds no event", async () => {
+    cleanup = await installVisualsEnv();
+    await prisma.notification.deleteMany({ where: { profileId: a.profileId } });
+    const v = await create({ documentId: undefined });
+    const failing = { ...getVisualDeps(), provider: { ...getVisualDeps().provider, generate: async () => { throw new ProviderError("refused", false); } } as ImageProvider };
+    expect(await handleVisualJob(failing, { visualId: v.id, op: "generate" }, ctx())).toBe("failed");
+    expect(await prisma.notification.count({ where: { profileId: a.profileId } })).toBe(0);
+  });
+
   it("uses the profile's brand colours in the prompt only when asked", async () => {
     cleanup = await installVisualsEnv();
     await saveTheme(a.profileId, { background: "#010203", accent: "#A1B2C3", headline: "#111111", bodyText: "#222222", caption: "#333333", line: "#444444", bar: "#555555", highlightBar: "#666666" }, "manual");

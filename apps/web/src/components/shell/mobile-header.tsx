@@ -3,6 +3,7 @@
 import { IntentLink as Link } from "@/components/shell/intent-link";
 import { MenuIcon, SearchIcon } from "@brandloop/ui/icons";
 import { Logo } from "./logo";
+import { Notifications } from "./notifications";
 import { SprintPill, type SprintState } from "./sprint-card";
 
 const circle =
@@ -28,6 +29,7 @@ export function MobileHeader({
       </Link>
       <div className="flex items-center gap-2">
         <SprintPill state={sprint} />
+        <Notifications variant="circle" />
         <button type="button" onClick={onSearch} aria-label="Search" className={circle}>
           <SearchIcon size={18} />
         </button>

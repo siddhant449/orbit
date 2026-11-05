@@ -1,5 +1,5 @@
 import {
-  completeEdit, completeGenerate, failEdit, failVisual, getDocument, getTheme, getVisual, requeueOp, startOp, type Visual,
+  completeEdit, completeGenerate, createNotification, failEdit, failVisual, getDocument, getTheme, getVisual, requeueOp, startOp, type Visual,
 } from "@brandloop/db";
 import { TransientJobError, type JobContext } from "@brandloop/jobs";
 import {
@@ -152,8 +152,13 @@ export async function handleVisualJob(
   if (!visual) return "ignored";
 
   try {
-    if (job.op === "generate") await generate(deps, visual);
-    else if (job.op === "edit") await edit(deps, visual);
+    if (job.op === "generate") {
+      await generate(deps, visual);
+      // Never fails the job: the image is made either way. One event per image (the key), so a redelivered job adds nothing.
+      await createNotification(visual.profileId, { kind: "IMAGE_READY", title: "Your image is ready", href: "/images", dedupeKey: `visual:${visual.id}` }).catch((err) =>
+        deps.log(`[visuals] image event not stored: ${err instanceof Error ? err.name : "unknown error"}`),
+      );
+    } else if (job.op === "edit") await edit(deps, visual);
     else await logo(visual);
     return "ok";
   } catch (raw) {
