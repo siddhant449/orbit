@@ -2,7 +2,7 @@ import { cache } from "react";
 import { unstable_cache } from "next/cache";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { isAdminEmail } from "@/lib/admin-email";
-import { ensureAccount, findAccountByClerkId, type AccountState } from "@brandloop/db";
+import { ensureAccount, findAccountByClerkId, touchProfileActive, type AccountState } from "@brandloop/db";
 
 /** Tag on every cached account read. Writers that change a profile, user, team or membership expire it (see `expireAccountCache`). */
 export const ACCOUNT_CACHE_TAG = "account";
@@ -18,6 +18,9 @@ const loadCachedAccount = unstable_cache(
   async (clerkId: string): Promise<AccountState> => {
     const account = await findAccountByClerkId(clerkId);
     if (!account) throw new NoAccountYet();
+    // The weekly cron only serves profiles used in the last 14 days. This runs on a cache miss, and the write is throttled to once an hour.
+    const current = account.currentProfile;
+    if (current) await touchProfileActive(current.id, current.lastActiveAt).catch(() => {});
     return account;
   },
   ["account-by-clerk-id"],
@@ -31,6 +34,7 @@ function reviveProfile<T extends AccountState["profiles"][number]>(p: T): T {
     createdAt: new Date(p.createdAt),
     updatedAt: new Date(p.updatedAt),
     deletedAt: p.deletedAt ? new Date(p.deletedAt) : null,
+    lastActiveAt: p.lastActiveAt ? new Date(p.lastActiveAt) : null,
   };
 }
 

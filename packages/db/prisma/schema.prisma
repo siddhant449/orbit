@@ -76,6 +76,8 @@ model Profile {
   language            String           @default("en-US")
   timezone            String           @default("UTC")
   generationDayOfWeek Int              @default(1)
+  /// Last time someone used this profile; written at most hourly. The weekly cron skips profiles idle for 14 days.
+  lastActiveAt        DateTime?
   onboardingCompleted Boolean          @default(false)
   onboardingStep      Int              @default(1)
   onboardingAnswers   Json?
@@ -97,6 +99,8 @@ model Profile {
   saveSpaces          SaveSpace[]
   savedItems          SavedItem[]
   templateUses        TemplateUse[]
+  ideas               Idea[]
+  notifications       Notification[]
   storageObjects      StorageObject[]
   visuals             Visual[]
   brandTheme          BrandTheme?
@@ -831,4 +835,46 @@ model AiUsage {
   @@index([createdAt])
   @@index([userId, createdAt])
   @@index([feature, createdAt])
+}
+
+/// A post idea kept for the profile: the weekly batch (origin "weekly") or the ones the chat picker showed (origin "chat").
+model Idea {
+  id          String   @id @default(cuid())
+  profile     Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  profileId   String
+  /// Monday of the profile's local week.
+  weekStartOn DateTime @db.Date
+  /// "weekly" | "chat"
+  origin      String
+  position    Int
+  category    String
+  title       String
+  detail      String
+  /// The chat prompt "Draft" opens a new chat with.
+  prompt      String
+  sourceKind  String
+  sourceRef   String?
+  drafted     Boolean  @default(false)
+  chatId      String?
+  hidden      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@unique([profileId, weekStartOn, origin, position])
+  @@index([profileId, weekStartOn])
+}
+
+/// A stored "what's new" event. A repeated dedupeKey for the same profile is ignored.
+model Notification {
+  id        String    @id @default(cuid())
+  profile   Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  profileId String
+  kind      String
+  title     String
+  href      String
+  dedupeKey String?
+  createdAt DateTime  @default(now())
+  readAt    DateTime?
+
+  @@unique([profileId, dedupeKey])
+  @@index([profileId, createdAt])
 }

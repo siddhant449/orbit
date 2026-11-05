@@ -192,3 +192,18 @@ export async function updateProfileSettings(userId: string, profileId: string, i
     },
   });
 }
+
+const ACTIVE_WRITE_EVERY_MS = 3_600_000;
+
+/**
+ * Records that someone is using the profile, at most once an hour (the weekly cron only serves recently active
+ * profiles). `known` is the value the caller already loaded, so a fresh one costs no query at all.
+ */
+export async function touchProfileActive(profileId: string, known: Date | string | null | undefined, now = new Date()): Promise<boolean> {
+  if (known && now.getTime() - new Date(known).getTime() < ACTIVE_WRITE_EVERY_MS) return false;
+  const { count } = await prisma.profile.updateMany({
+    where: { id: profileId, OR: [{ lastActiveAt: null }, { lastActiveAt: { lt: new Date(now.getTime() - ACTIVE_WRITE_EVERY_MS) } }] },
+    data: { lastActiveAt: now },
+  });
+  return count > 0;
+}
