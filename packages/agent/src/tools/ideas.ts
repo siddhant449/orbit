@@ -2,7 +2,7 @@ import { CONTENT_TYPES, StrategySchema } from "@brandloop/ai";
 import { getStrategy, listMemory, memoryLines, prisma } from "@brandloop/db";
 import { tool } from "ai";
 import { z } from "zod";
-import type { TurnContext } from "../context";
+import type { SavedIdeaCard, TurnContext } from "../context";
 import { defuseTags, oneLine } from "../data";
 import { gatePurposes, HOOK_PURPOSES, HOOK_PURPOSE_IDS, pickPurposes, type HookPurpose } from "../library";
 import { assignSources, sourceBadge, type AssignInput, type IdeaSource } from "../writing/ideas";
@@ -155,6 +155,11 @@ function briefFor(card: IdeaCard, material: IdeaMaterial): string {
   return lines.join("\n").slice(0, 2_000);
 }
 
+/** The idea as it is kept: the opening line is its title, the badge its category. */
+function savedCard(c: IdeaCard): SavedIdeaCard {
+  return { hook: c.hook, angle: c.angle, why: c.why, badge: sourceBadge(c.source), sourceKind: c.source.kind, sourceRef: c.source.ref };
+}
+
 export type IdeasPickerOutput = PresentOptionsOutput & { briefs: Record<string, { brief: string; category: string | null }> };
 
 /** The picker for a set of ideas: up to 6 rows (the hook, and which source it comes from and why), with the hidden briefs beside them. */
@@ -190,6 +195,8 @@ export async function generateIdeasRun(ctx: TurnContext, input: { count: number 
     }
     const cards = await writeIdeas(ctx.ai, material, count, `${ctx.chatId}:${ctx.requestMessageId}`, abortSignal);
     if (cards.length < 2) return "Failed: no usable ideas came back. Ask the user to try again.";
+    // Kept for the For you page so the ideas stop vanishing with the tab; never blocks or fails the reply.
+    if (ctx.saveIdeas) void ctx.saveIdeas(ctx.profileId, cards.map(savedCard)).catch((err) => console.error(`[agent] keeping ideas failed: ${err instanceof Error ? err.message : String(err)}`));
     return ideasPicker(cards, material);
   } catch (err) {
     if (isAbort(err)) throw err;

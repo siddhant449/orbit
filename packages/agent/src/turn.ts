@@ -60,6 +60,8 @@ export type ChatDeps = {
   research?: ResearchProvider | null;
   /** Image tools (suggest, propose, edit). Null or absent: the tools are not offered. */
   visuals?: VisualsToolDeps | null;
+  /** Stores the ideas the chat picker showed, as origin "chat" ideas of the current week. */
+  saveIdeas?: TurnContext["saveIdeas"];
   /** Moderation, per-profile rate limit and daily cost cap. Absent: no checks. */
   safety?: ChatSafety | null;
   now?: () => Date;
@@ -589,6 +591,7 @@ export async function runChatTurn(
       documentRef: { current: await getChatDocument(profileId, chatId) },
       documentContext: body.documentContext ?? null,
       visuals: deps.visuals ?? null,
+      saveIdeas: deps.saveIdeas ?? null,
       screenText: deps.safety
         ? async (text) => {
             const out = await screenOutput(text, metered.moderate!);

@@ -2,9 +2,10 @@ import { after } from "next/server";
 import { createAiClient, createEmbedder, getModel, getModelById, webSearchTool } from "@brandloop/ai";
 import { createChatSafety } from "@/lib/chat-safety";
 import { fakeEmbedder } from "@brandloop/ai/testing";
+import { saveChatIdeas } from "@/lib/ideas/chat-save";
 import { visualsEnabled } from "@/lib/visuals/deps";
 import { visualsToolDeps } from "@/lib/visuals/chat-tools";
-import { createScriptedChatModel, fakeResearchProvider, getRunRegistry, scriptedAi, selectResearchProvider, type ChatDeps } from "@brandloop/agent";
+import { createScriptedChatModel, fakeResearchProvider, getRunRegistry, scriptedAi, selectResearchProvider, type ChatDeps, type SavedIdeaCard } from "@brandloop/agent";
 
 /**
  * Offline mode for dev and e2e: `AI_MOCK_MODEL=1` swaps in the keyword-scripted chat model, the scripted
@@ -33,6 +34,7 @@ export function getChatDeps(modelId?: string | null): ChatDeps {
     after: afterResponse,
     visuals: visualsEnabled() ? visualsToolDeps : null,
     safety: createChatSafety({ mock: isMockMode() }),
+    saveIdeas: (profileId: string, cards: SavedIdeaCard[]) => saveChatIdeas(profileId, cards),
   };
   if (isMockMode()) {
     const pace = Number(process.env.AI_MOCK_CHUNK_MS);

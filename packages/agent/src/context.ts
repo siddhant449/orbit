@@ -15,6 +15,9 @@ export type VisualsToolDeps = {
 export type OpenDocument = { id: string; title: string; version: number; text: string };
 
 /** Everything a tool needs for one chat turn. Built once per turn by the turn runner. */
+/** One picker idea as the app keeps it (the hook is the title, the source badge the category). */
+export type SavedIdeaCard = { hook: string; angle: string; why: string; badge: string; sourceKind: string; sourceRef: string };
+
 export type TurnContext = {
   profileId: string;
   userId: string;
@@ -50,6 +53,8 @@ export type TurnContext = {
   documentRef: { current: OpenDocument | null };
   /** Image tools are offered only when the app wires this in (VISUALS_ENABLED). */
   visuals?: VisualsToolDeps | null;
+  /** Keeps the ideas the picker showed (fire and forget; a failure never reaches the chat). Absent: not kept. */
+  saveIdeas?: ((profileId: string, cards: SavedIdeaCard[]) => Promise<void>) | null;
   /** Moderation for text a tool is about to save as the post. Returns the refusal message when it is flagged, else null. */
   screenText?: ((text: string) => Promise<string | null>) | undefined;
   now: () => Date;

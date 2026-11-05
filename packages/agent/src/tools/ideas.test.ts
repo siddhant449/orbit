@@ -36,6 +36,20 @@ describe("generateIdeas", () => {
     expect(JSON.stringify(out.options)).not.toContain("Invent no personal facts");
   });
 
+  it("hands the picker's ideas to saveIdeas, and a failing save never breaks the reply", async () => {
+    await seed();
+    const saved: { profileId: string; hooks: string[] }[] = [];
+    ctx.saveIdeas = async (profileId, cards) => {
+      saved.push({ profileId, hooks: cards.map((c) => c.hook) });
+    };
+    const out = (await generateIdeasRun(ctx, { count: null })) as IdeasPickerOutput;
+    expect(saved).toHaveLength(1);
+    expect(saved[0]!.profileId).toBe(ctx.profileId);
+    expect(saved[0]!.hooks).toHaveLength(out.options.length);
+    ctx.saveIdeas = () => Promise.reject(new Error("db down"));
+    expect(((await generateIdeasRun(ctx, { count: null })) as IdeasPickerOutput).options).toHaveLength(5);
+  });
+
   it("uses the extract model alias, and one call", async () => {
     await seed();
     const ai = fakeAi((call: { prompt: string }) => ({ ideas: [...call.prompt.matchAll(/^Slot (\d+) \|/gm)].map((m) => ({ slot: Number(m[1]), hook: `${["Zero", "Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot"][Number(m[1])]} opening line`, angle: "An angle.", why: "Why." })) }));

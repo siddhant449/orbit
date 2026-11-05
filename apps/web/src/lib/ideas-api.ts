@@ -1,5 +1,5 @@
 import { AI_PAUSED_MESSAGE, aiErrorUserMessage, AiUnavailableError, bindUsage, createAiClient, StrategySchema, type AiClient } from "@brandloop/ai";
-import { assignSources, loadIdeaMaterial, scriptedAi, sourceBadge } from "@brandloop/agent";
+import { assignSources, loadIdeaMaterial, scriptedAi, sourceBadge, type IdeaSource } from "@brandloop/agent";
 import { getStrategy, isAiBlocked, listMemory, prisma, renderCoreSections, renderMemoryIndex } from "@brandloop/db";
 import { z } from "zod";
 import { getAccount } from "@/lib/account";
@@ -42,6 +42,21 @@ export async function loadIdeasContext(
     },
     basis: { strategy: Boolean(parsed?.success), memoryFiles: memory.length, recentDrafts: recentDrafts.length },
   };
+}
+
+/**
+ * The same step as the chat's ideas: each idea gets its own piece of the user's material before anything is written.
+ * Sets `ctx.assigned` and returns the sources in slot order.
+ */
+export async function assignIdeaSources(ctx: IdeasContext, profileId: string, count: number): Promise<IdeaSource[]> {
+  const material = await loadIdeaMaterial(profileId);
+  const slots = assignSources({ ...material, count, recentTitles: [...material.recentTitles, ...ctx.previous.map((p) => p.title)] });
+  ctx.assigned = slots.map((a) => ({
+    slot: a.slot,
+    badge: sourceBadge(a.source),
+    text: material.text.get(`${a.source.kind}:${a.source.ref}`) ?? a.source.ref,
+  }));
+  return slots.map((a) => a.source);
 }
 
 const fail = (status: number, error: string, headers?: HeadersInit) => Response.json({ error }, { status, headers });
@@ -95,13 +110,7 @@ export async function postIdeasHandler(request: Request, deps: IdeasDeps = {}): 
   const count = clampIdeaCount(body.data.count);
   const now = deps.now?.() ?? new Date();
   const { ctx, basis } = await loadIdeasContext(profile.id, profile.timezone ?? "UTC", now, body.data.previous ?? []);
-  // The same step as the chat's ideas: each idea gets its own piece of the user's material before anything is written.
-  const material = await loadIdeaMaterial(profile.id);
-  ctx.assigned = assignSources({ ...material, count, recentTitles: [...material.recentTitles, ...ctx.previous.map((p) => p.title)] }).map((a) => ({
-    slot: a.slot,
-    badge: sourceBadge(a.source),
-    text: material.text.get(`${a.source.kind}:${a.source.ref}`) ?? a.source.ref,
-  }));
+  await assignIdeaSources(ctx, profile.id, count);
 
   try {
     // The real client throws AiUnavailableError on first use when no key is set; mock mode never needs one.
