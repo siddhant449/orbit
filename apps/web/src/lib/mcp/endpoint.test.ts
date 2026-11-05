@@ -14,11 +14,12 @@ vi.mock("@clerk/nextjs/server", () => ({ auth: vi.fn(async () => ({ isAuthentica
 import { ensureAccount, listClients, prisma, revokeClient } from "@brandloop/db";
 import { E2E_MCP_USER_HEADER, verifyMcpRequest } from "./auth";
 import { createMcpEndpoint } from "./handler";
+import { createUsageLimiter, memoryStore } from "@brandloop/ai";
 import { authorizationServerMetadata, protectedResourceMetadata } from "./metadata";
 
 vi.setConfig({ testTimeout: 30_000, hookTimeout: 30_000 });
 
-const CLERK = "user_webtest_mcpauth";
+const CLERK = "user_webtest_authep";
 const MOCK = { AI_MOCK_MODEL: "1", NODE_ENV: "test" };
 // "clerk.example.accounts.dev$" encoded the way Clerk encodes a Frontend API host in a publishable key.
 const KEY = `pk_test_${Buffer.from("clerk.example.accounts.dev$").toString("base64")}`;
@@ -84,6 +85,27 @@ describe("mcp endpoint", () => {
     expect(await verifyMcpRequest(req(), "t", { env: {}, verifyToken: token(`${CLERK}_2`, "c1") })).toBeUndefined();
     // A different assistant of the same user is unaffected.
     expect(await verifyMcpRequest(req(), "t", { env: {}, verifyToken: token(`${CLERK}_2`, "c2") })).toBeDefined();
+  });
+
+  it("a user over the request limit (300 per 10 minutes) gets 429", async () => {
+    await ensureAccount({ clerkId: `${CLERK}_3`, email: "mcpauth3@example.test", firstName: "M", teamNameSuffix: " (webtest)" });
+    const limiter = createUsageLimiter({ store: memoryStore() });
+    const endpoint = createMcpEndpoint({
+      auth: { env: {}, limiter, requestLimit: 3, verifyToken: async () => ({ token: "t", clientId: "c1", scopes: [], extra: { userId: `${CLERK}_3` } }) },
+    });
+    for (let i = 0; i < 3; i++) expect((await endpoint(initialize({ authorization: "Bearer t" }))).status).toBe(200);
+    const res = await endpoint(initialize({ authorization: "Bearer t" }));
+    expect(res.status).toBe(429);
+    expect(Number(res.headers.get("retry-after"))).toBeGreaterThan(0);
+  });
+
+  it("APP_URL, when set, decides the resource URLs instead of forwarded headers", async () => {
+    const env = { NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: KEY, APP_URL: "https://orbit.example" };
+    const body = await protectedResourceMetadata(new Request("http://evil.test/x", { headers: { "x-forwarded-host": "evil.test" } }), env).json();
+    expect(body.resource).toBe("https://orbit.example/api/mcp");
+    const endpoint = createMcpEndpoint({ auth: { env: { APP_URL: "https://orbit.example" }, verifyToken: async () => undefined } });
+    const res = await endpoint(initialize({ "x-forwarded-host": "evil.test" }));
+    expect(res.headers.get("www-authenticate")).toContain('resource_metadata="https://orbit.example/.well-known/oauth-protected-resource/api/mcp"');
   });
 
   it("metadata routes return the Clerk issuer", async () => {

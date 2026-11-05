@@ -31,18 +31,18 @@ import {
 } from "@brandloop/agent";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import { createRateLimiter, type RateLimiter } from "@/lib/rate-limit";
+import { createUsageLimiter, defaultCounterStore, type UsageLimiter } from "@brandloop/ai";
 
 export const MCP_LIMIT = 60;
-export const MCP_WINDOW_MS = 10 * 60_000;
+export const MCP_WINDOW_SEC = 10 * 60;
 export const RATE_LIMITED_MESSAGE = "Orbit is getting a lot of requests from your assistant. Wait a minute and try again.";
-export const NO_PROFILE_MESSAGE = "This Orbit account has no profile yet. Open Orbit and create one first.";
+export const NO_PROFILE_MESSAGE = "Choose which profile AI assistants act as in Orbit → Settings → Integrations.";
 
-// 60 calls per profile per 10 minutes, shared by every tool; survives dev hot reloads.
-const globalLimiter = globalThis as unknown as { __mcpLimiter?: RateLimiter };
-const defaultLimiter = () => (globalLimiter.__mcpLimiter ??= createRateLimiter({ limit: MCP_LIMIT, windowMs: MCP_WINDOW_MS }));
+// 60 calls per profile per 10 minutes, shared by every tool, counted in the shared counter store (Upstash in production, so it holds across instances).
+const globalLimiter = globalThis as unknown as { __mcpToolLimiter?: UsageLimiter };
+const defaultLimiter = () => (globalLimiter.__mcpToolLimiter ??= createUsageLimiter({ store: defaultCounterStore() }));
 
-export type McpToolDeps = { limiter?: RateLimiter };
+export type McpToolDeps = { limiter?: UsageLimiter };
 export type McpToolResult = { text: string; isError?: boolean };
 
 type Run<S extends z.ZodType> = (profileId: string, input: z.infer<S>) => Promise<McpToolResult | unknown>;
@@ -291,7 +291,7 @@ export async function callMcpTool(userId: string, name: string, args: unknown, d
   if (!tool) return fail(`Unknown tool: ${name}`);
   const binding = await getBinding(userId);
   if (!binding) return fail(NO_PROFILE_MESSAGE);
-  const gate = (deps.limiter ?? defaultLimiter()).take(binding.profileId);
+  const gate = await (deps.limiter ?? defaultLimiter()).take("mcp", binding.profileId, { limit: MCP_LIMIT, windowSec: MCP_WINDOW_SEC });
   if (!gate.ok) return fail(RATE_LIMITED_MESSAGE);
   const parsed = tool.schema.safeParse(args ?? {});
   if (!parsed.success) return fail(`Invalid input: ${parsed.error.issues.map((i) => `${i.path.join(".") || "input"} ${i.message}`).join("; ")}`);

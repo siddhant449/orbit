@@ -8,7 +8,7 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 // /api/cron is called by Vercel Cron with no session; the route itself requires `Authorization: Bearer $CRON_SECRET`.
 // /api/mcp is called by AI assistants with no session; the route verifies the bearer token (a Clerk OAuth access token) itself and answers 401 with the
 // resource-metadata challenge. /.well-known/* is the OAuth metadata assistants read before they have a token.
-const publicRoutes = ["/sign-in(.*)", "/sign-up(.*)", "/welcome(.*)", "/privacy(.*)", "/terms(.*)", "/admin(.*)", "/api/cron(.*)", "/api/mcp(.*)", "/.well-known/(.*)"];
+const publicRoutes = ["/sign-in(.*)", "/sign-up(.*)", "/welcome(.*)", "/privacy(.*)", "/terms(.*)", "/admin(.*)", "/api/cron(.*)", "/api/mcp", "/api/mcp/(.*)", "/.well-known/(.*)"];
 if (process.env.NODE_ENV !== "production") publicRoutes.push("/design(.*)", "/api/dev/db-name");
 
 const isPublicRoute = createRouteMatcher(publicRoutes);

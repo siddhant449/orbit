@@ -1,3 +1,4 @@
+import { createUsageLimiter, defaultCounterStore, type UsageLimiter } from "@brandloop/ai";
 import { prisma, touchClient } from "@brandloop/db";
 import { auth } from "@clerk/nextjs/server";
 import { verifyClerkToken } from "@clerk/mcp-tools/next";
@@ -12,8 +13,19 @@ export const E2E_MCP_USER_HEADER = "x-orbit-e2e-mcp-user";
 /** Optional, mock only: which assistant (OAuth client) the call comes from. Defaults to one test client. */
 export const E2E_MCP_CLIENT_HEADER = "x-orbit-e2e-mcp-client";
 
+/** 300 HTTP requests per user per 10 minutes, whichever tool or assistant sends them; counted in the shared store. */
+export const MCP_REQUEST_LIMIT = 300;
+export const MCP_REQUEST_WINDOW_SEC = 600;
+const globalLimiter = globalThis as unknown as { __mcpAuthLimiter?: UsageLimiter };
+const defaultLimiter = () => (globalLimiter.__mcpAuthLimiter ??= createUsageLimiter({ store: defaultCounterStore() }));
+/** Requests the per-user limit refused: the endpoint turns their 401 into a 429 with this retry delay. */
+export const throttled = new WeakMap<Request, number>();
+
 export type McpAuthDeps = {
   env?: Record<string, string | undefined>;
+  limiter?: UsageLimiter;
+  /** Test hook; defaults to MCP_REQUEST_LIMIT. */
+  requestLimit?: number;
   /** Verifies a Clerk-issued OAuth access token. Returns undefined for a missing or invalid one. */
   verifyToken?: (bearer: string | undefined) => Promise<AuthInfo | undefined>;
 };
@@ -57,6 +69,11 @@ export async function verifyMcpRequest(req: Request, bearer: string | undefined,
 
   const user = await prisma.user.findUnique({ where: { clerkId }, select: { id: true } });
   if (!user) return undefined;
+  const gate = await (deps.limiter ?? defaultLimiter()).take("mcp-req", user.id, { limit: deps.requestLimit ?? MCP_REQUEST_LIMIT, windowSec: MCP_REQUEST_WINDOW_SEC });
+  if (!gate.ok) {
+    throttled.set(req, gate.retryAfterSec);
+    return undefined;
+  }
   const { revoked } = await touchClient(user.id, clientId, assistantName(req.headers.get("user-agent")));
   if (revoked) return undefined;
   return { token: bearer ?? "e2e", clientId, scopes, extra: { userId: user.id, clerkId } };

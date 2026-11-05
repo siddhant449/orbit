@@ -177,22 +177,38 @@ export function AssistantsPanel({ serverUrl, initial }: { serverUrl: string; ini
               <li key={c.id} className="flex items-center gap-3 py-2.5">
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[14px] font-medium text-text">{c.clientName}</p>
-                  <p className="text-[12px] text-text-2">Last used {c.lastUsedAt.slice(0, 10)}</p>
+                  <p className="text-[12px] text-text-2">{c.disconnected ? "Disconnected" : `Last used ${c.lastUsedAt.slice(0, 10)}`}</p>
                 </div>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  disabled={busy}
-                  aria-label={`Disconnect ${c.clientName}`}
-                  onClick={() => void run(() => call(`/api/mcp-settings/clients/${c.id}`, "DELETE"), `Disconnected ${c.clientName}`)}
-                >
-                  Disconnect
-                </Button>
+                {c.disconnected ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    disabled={busy}
+                    aria-label={`Reconnect ${c.clientName}`}
+                    onClick={() => void run(() => call(`/api/mcp-settings/clients/${c.id}`, "POST"), `Reconnected ${c.clientName}`)}
+                  >
+                    Reconnect
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    disabled={busy}
+                    aria-label={`Disconnect ${c.clientName}`}
+                    onClick={() => void run(() => call(`/api/mcp-settings/clients/${c.id}`, "DELETE"), `Disconnected ${c.clientName}`)}
+                  >
+                    Disconnect
+                  </Button>
+                )}
               </li>
             ))}
           </ul>
         )}
+        <p className="mt-3 text-[12px] leading-[1.55] text-text-2">
+          Disconnect makes Orbit refuse this assistant from now on. To remove it completely, also remove the connector in the assistant.
+        </p>
       </div>
     </div>
   );

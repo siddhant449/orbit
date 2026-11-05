@@ -94,8 +94,16 @@ test("settings: URL, tabs, binding and connected assistants", async ({ page, con
   await page.reload();
   await expect(page.getByRole("heading", { name: "Connected assistants" })).toBeVisible();
   await page.getByRole("button", { name: /^Disconnect/ }).first().click();
-  await expect(page.getByText(/^Disconnected/)).toBeVisible();
+  await expect(page.getByText("Disconnected AI assistant")).toBeVisible();
   expect((await rpc(page, "tools/list", {}, 2)).status()).toBe(401);
+
+  // Disconnected assistants stay listed; Reconnect lets them call again.
+  await page.reload();
+  await expect(page.getByText("Disconnected", { exact: true }).first()).toBeVisible();
+  await page.getByRole("button", { name: /^Reconnect/ }).first().click();
+  await expect(page.getByText("Reconnected AI assistant")).toBeVisible();
+  expect((await rpc(page, "tools/list", {}, 3)).status()).toBe(200);
+  await axeCheck(page);
 });
 
 test("the endpoint lists the tools, creates a draft, and refuses without a token", async ({ page }) => {

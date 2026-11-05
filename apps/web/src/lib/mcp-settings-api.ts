@@ -1,4 +1,4 @@
-import { AccountError, getBinding, listClients, revokeClient, setBinding } from "@brandloop/db";
+import { AccountError, getBinding, listClients, reconnectClient, revokeClient, setBinding } from "@brandloop/db";
 import { z } from "zod";
 import { getAccount } from "@/lib/account";
 
@@ -8,7 +8,7 @@ const Body = z.object({ profileId: z.string().min(1).max(100) });
 export type McpSettingsDto = {
   profileId: string | null;
   profiles: { id: string; name: string }[];
-  clients: { id: string; clientName: string; lastUsedAt: string }[];
+  clients: { id: string; clientName: string; lastUsedAt: string; disconnected: boolean }[];
 };
 
 /** The settings for the signed-in user: the profile assistants act as (their owned profiles only) and the connected assistants. */
@@ -19,7 +19,7 @@ export async function loadMcpSettings(): Promise<McpSettingsDto> {
   return {
     profileId: binding?.profileId ?? null,
     profiles: account.profiles.filter((p) => p.ownerUserId === userId).map((p) => ({ id: p.id, name: p.name })),
-    clients: clients.map((c) => ({ id: c.id, clientName: c.clientName, lastUsedAt: c.lastUsedAt.toISOString() })),
+    clients: clients.map((c) => ({ id: c.id, clientName: c.clientName, lastUsedAt: c.lastUsedAt.toISOString(), disconnected: Boolean(c.revokedAt) })),
   };
 }
 
@@ -44,6 +44,17 @@ export async function deleteMcpClientHandler(id: string): Promise<Response> {
   const account = await getAccount();
   try {
     await revokeClient(account.user.id, id);
+  } catch (err) {
+    if (err instanceof AccountError) return fail(404, "That assistant wasn't found.");
+    throw err;
+  }
+  return Response.json(await loadMcpSettings());
+}
+
+export async function reconnectMcpClientHandler(id: string): Promise<Response> {
+  const account = await getAccount();
+  try {
+    await reconnectClient(account.user.id, id);
   } catch (err) {
     if (err instanceof AccountError) return fail(404, "That assistant wasn't found.");
     throw err;

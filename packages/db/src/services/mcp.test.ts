@@ -2,7 +2,7 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "../client";
 import { AccountError } from "./account";
 import { createAssistantDocument, getDocument, listDocumentVersions, saveDocumentVersion } from "./documents";
-import { getBinding, listClients, revokeClient, setBinding, touchClient } from "./mcp";
+import { getBinding, listClients, reconnectClient, revokeClient, setBinding, touchClient } from "./mcp";
 import { account, cleanupVisualTests, secondProfile } from "./visual-test-helpers";
 
 beforeEach(cleanupVisualTests);
@@ -30,7 +30,24 @@ describe("mcp binding", () => {
     expect((await getBinding(a.userId))?.profileId).toBe(a.profileId);
   });
 
-  it("a deleted bound profile falls back to the current profile", async () => {
+  it("an admin whose current profile is a teammate's still gets their own profile", async () => {
+    const a = await account("m11");
+    const b = await account("m12");
+    const theirs = await prisma.profile.create({ data: { teamId: a.teamId, ownerUserId: b.userId, name: "Teammate" } });
+    await prisma.user.update({ where: { id: a.userId }, data: { currentProfileId: theirs.id } });
+    expect(await getBinding(a.userId)).toEqual({ profileId: a.profileId });
+    // A stale binding to a profile they no longer own is ignored too.
+    await prisma.mcpBinding.create({ data: { userId: a.userId, profileId: theirs.id } });
+    expect(await getBinding(a.userId)).toEqual({ profileId: a.profileId });
+  });
+
+  it("a user with no profile of their own gets no binding", async () => {
+    const a = await account("m13");
+    await prisma.profile.update({ where: { id: a.profileId }, data: { deletedAt: new Date() } });
+    expect(await getBinding(a.userId)).toBeNull();
+  });
+
+  it("a deleted bound profile falls back to their first own profile", async () => {
     const a = await account("m3");
     const second = await secondProfile(a);
     await setBinding(a.userId, second.profileId);
@@ -51,7 +68,34 @@ describe("mcp clients", () => {
 
     await revokeClient(a.userId, rows[0]!.id);
     expect(await touchClient(a.userId, "client-1", "ChatGPT")).toEqual({ revoked: true });
-    expect(await listClients(a.userId)).toHaveLength(0);
+    // It stays listed, as disconnected, until reconnected.
+    const after = await listClients(a.userId);
+    expect(after).toHaveLength(1);
+    expect(after[0]!.revokedAt).not.toBeNull();
+    await reconnectClient(a.userId, rows[0]!.id);
+    expect(await touchClient(a.userId, "client-1", "ChatGPT")).toEqual({ revoked: false });
+    expect((await listClients(a.userId))[0]!.revokedAt).toBeNull();
+    await expect(reconnectClient(a.userId, rows[0]!.id)).rejects.toBeInstanceOf(AccountError);
+  });
+
+  it("writes lastUsedAt at most once a minute", async () => {
+    const a = await account("m8");
+    await touchClient(a.userId, "c", "Codex");
+    const first = (await listClients(a.userId))[0]!.lastUsedAt;
+    await touchClient(a.userId, "c", "Codex");
+    expect((await listClients(a.userId))[0]!.lastUsedAt).toEqual(first);
+    await prisma.mcpClient.updateMany({ where: { userId: a.userId }, data: { lastUsedAt: new Date(Date.now() - 120_000) } });
+    await touchClient(a.userId, "c", "Codex");
+    expect(Date.now() - (await listClients(a.userId))[0]!.lastUsedAt.getTime()).toBeLessThan(60_000);
+  });
+
+  it("a user cannot reconnect another user's client", async () => {
+    const a = await account("m9");
+    const b = await account("m10");
+    await touchClient(a.userId, "c", "Codex");
+    const [row] = await listClients(a.userId);
+    await revokeClient(a.userId, row!.id);
+    await expect(reconnectClient(b.userId, row!.id)).rejects.toBeInstanceOf(AccountError);
   });
 
   it("a user cannot revoke another user's client", async () => {

@@ -11,7 +11,7 @@ vi.hoisted(() => {
 });
 
 import { createKnowledge, createTemplate, ensureAccount, listDocumentVersions, prisma, setBinding } from "@brandloop/db";
-import { createRateLimiter } from "@/lib/rate-limit";
+import { createUsageLimiter, memoryStore } from "@brandloop/ai";
 import { callMcpTool, MCP_TOOLS } from "./tools";
 
 vi.setConfig({ testTimeout: 30_000, hookTimeout: 30_000 });
@@ -41,7 +41,7 @@ async function make(tag: string): Promise<Acc> {
   return { userId: acc.user.id, profileId: acc.currentProfile!.id, teamId: acc.team.id };
 }
 
-const limiter = () => createRateLimiter({ limit: 1000, windowMs: 60_000 });
+const limiter = () => createUsageLimiter({ store: memoryStore() });
 const call = (who: Acc, name: string, args: Record<string, unknown> = {}, deps: { limiter?: ReturnType<typeof limiter> } = {}) =>
   callMcpTool(who.userId, name, args, { limiter: deps.limiter ?? limiter() });
 const json = (r: { text: string }) => JSON.parse(r.text);
@@ -163,6 +163,13 @@ describe("mcp tools", () => {
     expect((await call(a, "update_memory", { id: "strategy/themes#0", text: "Something about themes here" })).isError).toBe(true);
   });
 
+  it("a user with no profile of their own is told to choose one", async () => {
+    await prisma.profile.update({ where: { id: a.profileId }, data: { deletedAt: new Date() } });
+    const r = await call(a, "list_memories");
+    expect(r.isError).toBe(true);
+    expect(r.text).toContain("Settings → Integrations");
+  });
+
   it("save_idea saves once and list_ideas reads the weekly ideas", async () => {
     const one = json(await call(a, "save_idea", { title: "Hiring lessons", detail: "What I learned hiring my first engineer" }));
     const two = json(await call(a, "save_idea", { title: "Hiring lessons", detail: "What I learned hiring my first engineer" }));
@@ -173,12 +180,12 @@ describe("mcp tools", () => {
   });
 
   it("the rate limit answers with the friendly message", async () => {
-    const tight = createRateLimiter({ limit: 2, windowMs: 60_000 });
-    await call(a, "list_memories", {}, { limiter: tight });
-    await call(a, "list_memories", {}, { limiter: tight });
+    const tight = createUsageLimiter({ store: memoryStore() });
+    for (let i = 0; i < 60; i++) expect((await call(a, "list_memories", {}, { limiter: tight })).isError).toBeFalsy();
     const third = await call(a, "list_memories", {}, { limiter: tight });
     expect(third.isError).toBe(true);
     expect(third.text).toMatch(/a lot of requests/i);
+    // Unknown tools and invalid input are refused before the count, but a bad call still used its slot above.
     // Another profile has its own allowance.
     expect((await call(b, "list_memories", {}, { limiter: tight })).isError).toBeFalsy();
   });
