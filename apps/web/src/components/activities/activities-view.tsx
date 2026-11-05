@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Dialog } from "radix-ui";
 import { CalendarCheck, Flame, FolderPlus, Layers, LayoutTemplate, Lightbulb, Medal, PenLine, Trophy, type LucideIcon } from "lucide-react";
 import { Button, cn } from "@brandloop/ui";
@@ -57,12 +57,15 @@ export function ActivitiesView(props: ActivitiesProps) {
   const [tally, setTally] = useState(props.tally);
   const todos = useTodos(props.tasks, props.dones, props.today);
   const [dialog, setDialog] = useState<{ open: boolean; task?: TaskLike }>({ open: false });
+  const addRef = useRef<HTMLButtonElement>(null);
 
   return (
     <div className="flex w-full flex-col gap-4 px-5 pb-16 pt-8 md:px-8 md:pt-[28px]">
       <header className="orbit-rise flex flex-wrap items-end justify-between gap-4">
         <h1 className="type-page-title text-text focus-visible:outline-none">Activities</h1>
-        <Button onClick={() => setDialog({ open: true })}>+ Add activity</Button>
+        <Button ref={addRef} onClick={() => setDialog({ open: true })}>
+          + Add activity
+        </Button>
       </header>
 
       <div className="orbit-rise grid grid-cols-[repeat(auto-fit,minmax(min(300px,100%),1fr))] gap-3" style={rise(1)}>
@@ -78,7 +81,9 @@ export function ActivitiesView(props: ActivitiesProps) {
         <TodoPanel today={props.today} resets={props.resets} todos={todos} postedToday={props.postedToday} postHref={props.postHref} onEdit={(task) => setDialog({ open: true, task })} />
       </div>
 
-      <TaskDialog key={dialog.task?.id ?? "new"} open={dialog.open} onOpenChange={(open) => setDialog((d) => ({ ...d, open }))} task={dialog.task} onSaved={todos.saved} />
+      <TaskDialog key={dialog.task?.id ?? "new"} open={dialog.open} onOpenChange={(open) => setDialog((d) => ({ ...d, open }))} task={dialog.task} onSaved={todos.saved}
+        returnFocusTo={() => (dialog.task ? document.querySelector<HTMLElement>(`[data-task="${dialog.task.id}"] [aria-label^="Options"]`) : addRef.current)}
+      />
     </div>
   );
 }
@@ -129,7 +134,7 @@ function StreakPanel({ streak, weekPosted, goal, today }: { streak: number; week
       ) : (
         <p className="relative text-[13px] text-text-soft">
           {weekPosted >= goal ? "Goal met this week." : "Mark a post as posted to move toward this week's goal."}{" "}
-          <span className="text-text-3">The week runs Monday to Sunday.</span>
+          <span className="text-text-2">The week runs Monday to Sunday.</span>
         </p>
       )}
     </Panel>

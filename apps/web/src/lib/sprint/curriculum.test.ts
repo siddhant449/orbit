@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { isTimely } from "../../../../../packages/agent/src/research/timely";
 import { PROMPT_PARAM_MAX } from "@/lib/prompt-param";
 import { SPRINT_FORMATS, findSprintFormat, pickFormats, sprintDraftPrompt } from "./curriculum";
 
@@ -54,5 +55,9 @@ describe("sprint curriculum", () => {
 
   it("keeps every prompt within the home handoff cap", () => {
     for (const f of SPRINT_FORMATS) expect([...sprintDraftPrompt(f, 30)].length).toBeLessThanOrEqual(PROMPT_PARAM_MAX);
+  });
+
+  it("never reads as a news request: a timely word would force a web search before the day's questions", () => {
+    for (const f of SPRINT_FORMATS) expect(isTimely(sprintDraftPrompt(f, 3)), f.id).toEqual({ timely: false, reason: null });
   });
 });

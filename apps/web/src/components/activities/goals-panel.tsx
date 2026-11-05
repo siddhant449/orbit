@@ -87,7 +87,7 @@ export function GoalsPanel({ goal, tally, weekPosted, onGoal, onTally }: { goal:
           </li>
         ))}
       </ul>
-      <p className="text-[11px] leading-[1.5] text-text-3">Posts count when you mark them as posted. Counted by you until LinkedIn is connected.</p>
+      <p className="text-[11px] leading-[1.5] text-text-2">Posts count when you mark them as posted. Counted by you until LinkedIn is connected.</p>
     </section>
   );
 }

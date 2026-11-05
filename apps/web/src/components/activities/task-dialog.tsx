@@ -10,12 +10,34 @@ import type { TaskLike, TaskRepeat } from "@/lib/progress/tasks";
 const WEEKDAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 /** Add an activity, or edit one (`task` given): a title, an optional note and how often it repeats. */
-export function TaskDialog({ open, onOpenChange, task, onSaved }: { open: boolean; onOpenChange: (open: boolean) => void; task?: TaskLike; onSaved: (task: TaskLike) => void }) {
+export function TaskDialog({
+  open,
+  onOpenChange,
+  task,
+  onSaved,
+  returnFocusTo,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  task?: TaskLike;
+  onSaved: (task: TaskLike) => void;
+  /** Where focus goes on close when there is no trigger to return to (the dialog is opened from state, not a Radix trigger). */
+  returnFocusTo?: () => HTMLElement | null;
+}) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className={dialogOverlayClass} />
-        <Dialog.Content className={`${dialogContentClass} max-w-md`}>
+        <Dialog.Content
+          className={`${dialogContentClass} max-w-md`}
+          onCloseAutoFocus={(e) => {
+            const el = returnFocusTo?.();
+            if (el) {
+              e.preventDefault();
+              el.focus();
+            }
+          }}
+        >
           <Dialog.Title className={dialogTitleClass}>{task ? "Edit activity" : "Add activity"}</Dialog.Title>
           <Dialog.Description className={dialogDescriptionClass}>Something you want to do again and again, or just once. Tick it off on the day.</Dialog.Description>
           {/* Mounted only while open, so each opening starts from the task's current values. */}

@@ -140,7 +140,7 @@ export function TodoPanel({
         <li className="flex items-center gap-3 rounded-[12px] px-3 py-2.5">
           <CheckCircle done={postedToday} />
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span className={cn("text-[14px] font-medium", postedToday ? "text-text-3 line-through" : "text-text")}>
+            <span className={cn("text-[14px] font-medium", postedToday ? "text-text-2 line-through" : "text-text")}>
               Post today
               {postedToday && <span className="sr-only"> (done)</span>}
             </span>
@@ -183,9 +183,9 @@ export function TodoPanel({
                 <CheckCircle done={isDone} />
               </button>
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className={cn("text-[14px] font-medium", isDone ? "text-text-3 line-through" : "text-text")}>{r.task.title}</span>
+                <span className={cn("text-[14px] font-medium", isDone ? "text-text-2 line-through" : "text-text")}>{r.task.title}</span>
                 {r.task.note && <span className="text-[12px] text-text-2">{r.task.note}</span>}
-                <span className="text-[11px] text-text-3">
+                <span className="text-[11px] text-text-2">
                   {repeatText(r.task)}
                   {r.carriedOver && ` · ${carriedLabel(r.task.createdOn, today, (k) => dayLabel(k))}`}
                 </span>
@@ -198,7 +198,7 @@ export function TodoPanel({
       {shown.length === 0 && <p className="px-3 py-2 text-[12px] text-text-2">No activities yet. Add one for something you want to do every day or week, and it shows up here.</p>}
       {skipped.length > 0 && (
         <div className="px-3 pt-2">
-          <p className="text-[11px] text-text-3">Skipped today</p>
+          <p className="text-[11px] text-text-2">Skipped today</p>
           <ul>
             {skipped.map((r) => (
               <li key={r.task.id} className="flex items-center justify-between gap-3 py-1 text-[12px] text-text-2">
@@ -213,12 +213,12 @@ export function TodoPanel({
       )}
       {paused.length > 0 && (
         <div className="px-3 pt-2">
-          <p className="text-[11px] text-text-3">Paused</p>
+          <p className="text-[11px] text-text-2">Paused</p>
           <ul>
             {paused.map((t) => (
               <li key={t.id} className="flex items-center justify-between gap-3 py-1 text-[12px] text-text-2">
                 <span className="truncate">
-                  {t.title} <span className="text-text-3">· until {dayLabel(addDays(t.pausedUntil!, 1), { weekday: false })}</span>
+                  {t.title} <span className="text-text-2">· until {dayLabel(addDays(t.pausedUntil!, 1), { weekday: false })}</span>
                 </span>
                 <Button variant="micro" size="sm" disabled={todos.busy} onClick={() => void todos.resume(t)}>
                   Resume

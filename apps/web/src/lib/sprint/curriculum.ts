@@ -23,7 +23,7 @@ export const SPRINT_FORMATS: readonly SprintFormat[] = [
     id: "origin-story",
     title: "The origin story",
     brief: "Why you do this work at all. One moment that set you on this path, told plainly, ending on what it means for the people you help now.",
-    steps: ["Open on the moment, not the backstory", "Say what you believed before and what changed", "Close on how it shapes the way you work today"],
+    steps: ["Open on the moment, not the backstory", "Say what you believed before and what changed", "Close on how it shapes the way you work"],
     example: "I didn't choose this job. A spreadsheet with one wrong number chose it for me.",
   },
   {
@@ -101,7 +101,7 @@ export const SPRINT_FORMATS: readonly SprintFormat[] = [
     id: "lesson-from-someone",
     title: "The lesson someone gave you",
     brief: "Something a manager, client or peer taught you that stuck. Keep them anonymous and keep the focus on the lesson.",
-    steps: ["Set the scene in one or two lines", "Quote or paraphrase what they said", "Show how you use it today"],
+    steps: ["Set the scene in one or two lines", "Quote or paraphrase what they said", "Show how you use it in your work"],
     example: "My first manager handed back my report with one note: \"Who is this for?\" I still ask it daily.",
   },
   {
