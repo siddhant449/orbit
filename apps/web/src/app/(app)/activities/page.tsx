@@ -1,24 +1,22 @@
+import { getActiveChallenge, getTallies, getWeeklyGoal, listBadges, listTaskDones, listTasks } from "@brandloop/db";
 import { EmptyState, PageBody, PageHeader } from "@/components/page";
 import { ActivitiesView } from "@/components/activities/activities-view";
 import { getAccount } from "@/lib/account";
-import {
-  bestWeekdayStreak,
-  draftsThisWeek,
-  gettingStarted,
-  hadFullWeek,
-  milestones,
-  weekdayStreak,
-} from "@/lib/progress/activity";
-import { resetsIn } from "@/lib/progress/days";
+import { weekStartOn } from "@/lib/ideas/week";
+import { gettingStarted } from "@/lib/progress/activity";
+import { awardBadgesQuietly } from "@/lib/progress/award";
+import { addDays, resetsIn } from "@/lib/progress/days";
+import { goalWeeks, weekStreak } from "@/lib/progress/goals";
 import { loadProgress } from "@/lib/progress/load";
-import { buildSprint } from "@/lib/sprint/plan";
+import { summarizeChallenge } from "@/lib/sprint/status";
+import { toChallengeView } from "@/lib/challenge-api";
+import { TASK_HISTORY_DAYS } from "@/lib/tasks-api";
 
 export const metadata = { title: "Activities" };
 
 /**
- * Activities (screens.md B8, p10/p23). Streak, the drafts goal, milestones, the day strip and getting started are
- * derived from existing data (drafts = documents started in chat; onboarding = strategy, memories, knowledge, voice).
- * LinkedIn goals and routines show what they will track, without numbers, until LinkedIn is connected.
+ * Activities (screens.md B8): the weekly goals (posts counted from "Mark as posted", the rest by hand), the week streak,
+ * badges, the day strip and today's to-dos are all stored; getting started stays derived from onboarding data.
  */
 export default async function Page() {
   const profile = (await getAccount()).currentProfile;
@@ -34,19 +32,33 @@ export default async function Page() {
   }
   const now = new Date();
   const p = await loadProgress(profile, now);
-  const best = bestWeekdayStreak(p.drafts, p.today);
-  // No sprint is stored yet, so "today's post" is the format a sprint starting today would open with.
-  const focus = buildSprint({ start: p.today, today: p.today, drafts: p.drafts }).focus;
+  const week = weekStartOn(now, p.timeZone);
+  // Badges first, so a streak or a first-time event that happened without a click is held before the list is read.
+  await awardBadgesQuietly(profile.id);
+  const [goal, tally, tasks, dones, badges, challenge] = await Promise.all([
+    getWeeklyGoal(profile.id),
+    getTallies(profile.id, week),
+    listTasks(profile.id),
+    listTaskDones(profile.id, addDays(p.today, -TASK_HISTORY_DAYS)),
+    listBadges(profile.id, now),
+    getActiveChallenge(profile.id, now),
+  ]);
+  const weeks = goalWeeks(p.posted, p.today, goal.posts);
+  const running = challenge ? summarizeChallenge(toChallengeView(challenge)) : null;
   return (
     <ActivitiesView
       today={p.today}
-      drafts={p.drafts}
-      streak={weekdayStreak(p.drafts, p.today)}
-      weekDrafts={draftsThisWeek(p.drafts, p.today)}
-      milestones={milestones({ total: p.draftTotal, best, fullWeek: hadFullWeek(p.drafts) })}
+      weekPosted={weeks[weeks.length - 1]!.posted}
+      streak={weekStreak(weeks)}
+      goal={goal}
+      tally={tally}
+      tasks={tasks}
+      dones={dones}
+      badges={badges.map(({ awardedAt: _awardedAt, ...b }) => b)}
       checklist={gettingStarted({ strategy: p.strategy, identity: p.identity, knowledge: p.knowledge, voice: p.voice, drafts: p.draftTotal })}
       resets={resetsIn(now, p.timeZone)}
-      todayPost={focus?.format ? { day: focus.day, format: focus.format } : null}
+      postedToday={(p.posted[p.today] ?? 0) > 0}
+      postHref={running && running.phase === "active" ? "/challenge" : "/"}
     />
   );
 }

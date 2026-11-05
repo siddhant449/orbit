@@ -101,6 +101,11 @@ model Profile {
   templateUses        TemplateUse[]
   ideas               Idea[]
   notifications       Notification[]
+  challenges          ChallengeEnrollment[]
+  weeklyGoal          WeeklyGoal?
+  goalTallies         GoalTally[]
+  tasks               Task[]
+  badges              Badge[]
   storageObjects      StorageObject[]
   visuals             Visual[]
   brandTheme          BrandTheme?
@@ -418,8 +423,11 @@ model Document {
   media        PostMedia[]
   carousels    Carousel[]
   templateUses TemplateUse[]
+  /// When the writer marked the post as posted (nothing is published). Null until then; undo clears it.
+  postedAt     DateTime?
 
   @@index([profileId, deletedAt, updatedAt])
+  @@index([profileId, postedAt])
 }
 
 model DocumentVersion {
@@ -877,4 +885,89 @@ model Notification {
 
   @@unique([profileId, dedupeKey])
   @@index([profileId, createdAt])
+}
+
+/// A 30-day challenge run. At most one is active per profile (partial unique index in the migration SQL).
+model ChallengeEnrollment {
+  id          String         @id @default(cuid())
+  profile     Profile        @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  profileId   String
+  startDate   DateTime       @db.Date
+  endedAt     DateTime?
+  completedAt DateTime?
+  createdAt   DateTime       @default(now())
+  days        ChallengeDay[]
+
+  @@index([profileId, createdAt])
+}
+
+/// One of the 30 days. Rest days have no formatId. chatId is the day's chat (its post is Chat.documentId).
+model ChallengeDay {
+  id           String              @id @default(cuid())
+  enrollment   ChallengeEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  enrollmentId String
+  dayNumber    Int
+  date         DateTime            @db.Date
+  formatId     String?
+  chatId       String?
+
+  @@unique([enrollmentId, dayNumber])
+}
+
+model WeeklyGoal {
+  profile     Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  profileId   String  @id
+  preset      String
+  posts       Int
+  comments    Int
+  dms         Int
+  connections Int
+}
+
+/// What the writer counted by hand in a week (comments, dms, connections) until LinkedIn is connected.
+model GoalTally {
+  profile     Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  profileId   String
+  weekStartOn DateTime @db.Date
+  kind        String
+  count       Int      @default(0)
+
+  @@id([profileId, weekStartOn, kind])
+}
+
+model Task {
+  id          String     @id @default(cuid())
+  profile     Profile    @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  profileId   String
+  title       String
+  note        String?
+  /// once | weekdays | weekly
+  repeat      String
+  /// 1 = Monday ... 7 = Sunday, for weekly
+  weekday     Int?
+  position    Int        @default(0)
+  pausedUntil DateTime?
+  createdAt   DateTime   @default(now())
+  dones       TaskDone[]
+
+  @@index([profileId, position])
+}
+
+model TaskDone {
+  task   Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId String
+  date   DateTime @db.Date
+  /// DONE | SKIPPED
+  status String
+
+  @@id([taskId, date])
+}
+
+model Badge {
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  profileId String
+  badgeId   String
+  awardedAt DateTime @default(now())
+
+  @@id([profileId, badgeId])
 }

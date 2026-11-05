@@ -11,12 +11,9 @@ import { ChatHistory } from "@/components/chat/chat-history";
 import { Logo, LogoMark } from "./logo";
 import { MainNav, RailLink, SectionLink } from "./nav-link";
 import { ProfileMenu } from "./profile-menu";
-import { SprintCard, type SprintState } from "./sprint-card";
+import { SprintCard, useSprintState } from "./sprint-card";
 
 type Handlers = { onSearch: () => void; onNavigate?: () => void };
-
-/** O2 has no challenge data, so the sprint is always "not started" (O11 brings the real state). */
-export const SPRINT: SprintState = { kind: "not-started" };
 
 const iconButton =
   "orbit-transition grid size-8 shrink-0 place-items-center rounded-full border border-line-control text-text-2 hover:border-inverse hover:bg-inverse hover:text-on-inverse";
@@ -32,6 +29,7 @@ export function MainSidebar({
   indicatorId = "nav-main",
 }: Handlers & { onCollapse?: () => void; indicatorId?: string }) {
   const pathname = usePathname();
+  const sprint = useSprintState();
   return (
     <div className="relative flex h-full w-[240px] shrink-0 flex-col px-3 py-[18px]">
       <div className="flex h-8 items-center justify-between gap-2 pl-2">
@@ -64,7 +62,7 @@ export function MainSidebar({
       </div>
 
       <div className="mb-4 mt-4">
-        <SprintCard state={SPRINT} active={pathname === "/challenge"} onNavigate={onNavigate} />
+        <SprintCard state={sprint} active={pathname === "/challenge"} onNavigate={onNavigate} />
       </div>
 
       <MainNav pathname={pathname} onNavigate={onNavigate} indicatorId={indicatorId} />

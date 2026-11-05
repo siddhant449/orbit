@@ -129,7 +129,11 @@ export function PostCard({ post, now, showStatus = false }: { post: PostRow; now
         </span>
         {line && <span className="line-clamp-2 text-[13px] leading-[1.45] text-text-2">{line}</span>}
         <span className="flex items-center justify-between text-[11px] text-text-3">
-          {showStatus ? (
+          {post.postedAt ? (
+            <StatusPill tone="accent" className="min-h-5 px-2 text-[10px]">
+              Posted
+            </StatusPill>
+          ) : showStatus ? (
             <StatusPill className="min-h-5 px-2 text-[10px]">
               <span aria-hidden="true" className="size-1.5 rounded-full bg-faint" />
               Draft

@@ -6,6 +6,7 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
+    "./habits": "./src/habits.ts",
     "./test-db": "./src/test-db.ts",
     "./use-test-db": "./src/use-test-db.ts",
     "./vitest-setup": "./src/vitest-setup.ts"

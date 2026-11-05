@@ -8,11 +8,13 @@ import {
   listDocumentVersions,
   switchDocumentVersion,
   saveDocumentVersion,
+  setDocumentPosted,
 } from "@brandloop/db";
 import { applyProposal, ProposalError } from "@brandloop/agent";
 import { z } from "zod";
 import { getAccount } from "@/lib/account";
 import { afterUserEdit } from "@/lib/jobs";
+import { awardBadgesQuietly } from "@/lib/progress/award";
 
 /**
  * Handlers behind the document routes (design §5). Every read and write is scoped to the signed-in user's
@@ -152,4 +154,17 @@ export async function linkChatHandler(request: Request, { params }: Ctx): Promis
     }
     return fromError(err);
   }
+}
+
+/**
+ * POST /api/documents/:id/posted marks the post as posted (the first time sticks); DELETE undoes it. This only stores
+ * `postedAt`: nothing is published or scheduled anywhere. 200 `{postedAt}`; 404 for another profile's post.
+ */
+export async function postedHandler(_request: Request, { params }: Ctx, posted: boolean): Promise<Response> {
+  const profileId = await currentProfileId();
+  if (!profileId) return fail(400, "Create a profile first.");
+  const out = await setDocumentPosted(profileId, (await params).id, posted);
+  if (!out) return notFound();
+  if (posted) await awardBadgesQuietly(profileId);
+  return Response.json({ postedAt: out.postedAt ? out.postedAt.toISOString() : null });
 }

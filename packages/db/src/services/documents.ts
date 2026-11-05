@@ -47,6 +47,8 @@ export type DocumentSnapshot = {
   hook: string | null;
   chatId: string | null;
   updatedAt: Date;
+  /** When the writer marked the post as posted; null until then. Nothing is published by it. */
+  postedAt: Date | null;
 };
 
 export type DocumentVersionRow = {
@@ -105,6 +107,7 @@ async function snapshot(db: Tx | typeof prisma, profileId: string, id: string): 
     hook: current.hook,
     chatId: doc.chat && !doc.chat.deletedAt ? doc.chat.id : null,
     updatedAt: doc.updatedAt,
+    postedAt: doc.postedAt,
   };
 }
 
@@ -165,6 +168,7 @@ export type PostSummary = {
   chatId: string | null;
   createdAt: Date;
   updatedAt: Date;
+  postedAt: Date | null;
 };
 
 export const POSTS_PAGE_SIZE = 200;
@@ -191,12 +195,13 @@ export async function listPosts(
         revision: number;
         createdAt: Date;
         updatedAt: Date;
+        postedAt: Date | null;
         chatId: string | null;
         chatDeletedAt: Date | null;
         text: string | null;
       }[]
     >(Prisma.sql`
-      SELECT d."id", d."title", d."status"::text AS "status", d."version", d."revision", d."createdAt", d."updatedAt",
+      SELECT d."id", d."title", d."status"::text AS "status", d."version", d."revision", d."createdAt", d."updatedAt", d."postedAt",
              c."id" AS "chatId", c."deletedAt" AS "chatDeletedAt", left(v."text", ${textMax}) AS "text"
       FROM "Document" d
       LEFT JOIN "Chat" c ON c."documentId" = d."id"
@@ -217,6 +222,7 @@ export async function listPosts(
     chatId: r.chatId && !r.chatDeletedAt ? r.chatId : null,
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
+    postedAt: r.postedAt,
   }));
   return { posts, total };
 }
@@ -333,7 +339,7 @@ export async function switchDocumentVersion(
   });
 }
 
-export type DocumentListRow = Omit<DocumentSnapshot, "hook" | "kind">;
+export type DocumentListRow = Omit<DocumentSnapshot, "hook" | "kind" | "postedAt">;
 
 /** The profile's posts, most recently changed first, each with its current text. */
 export async function listDocuments(profileId: string, opts: { limit?: number } = {}): Promise<DocumentListRow[]> {
@@ -392,6 +398,19 @@ export async function linkChatToDocument(
 }
 
 export type { VersionSource };
+
+/**
+ * Marks a post as posted (or undoes it). Marking twice keeps the first time; undoing clears it. This only stores the
+ * time: nothing is published anywhere. Returns the new `postedAt`, or `undefined` for a post that isn't this profile's.
+ */
+export async function setDocumentPosted(profileId: string, documentId: string, posted: boolean): Promise<{ postedAt: Date | null } | undefined> {
+  const where = { id: documentId, profileId, deletedAt: null };
+  // Raw so the post's "last edited" time doesn't move: marking it posted isn't an edit.
+  if (posted) await prisma.$executeRaw`UPDATE "Document" SET "postedAt" = now() WHERE "id" = ${documentId} AND "profileId" = ${profileId} AND "deletedAt" IS NULL AND "postedAt" IS NULL`;
+  else await prisma.$executeRaw`UPDATE "Document" SET "postedAt" = NULL WHERE "id" = ${documentId} AND "profileId" = ${profileId} AND "deletedAt" IS NULL AND "postedAt" IS NOT NULL`;
+  const doc = await prisma.document.findFirst({ where, select: { postedAt: true } });
+  return doc ?? undefined;
+}
 
 /**
  * What style learning compares: a base text and the current text. The base is the newest AI-written version, or, with

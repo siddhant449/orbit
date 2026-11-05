@@ -14,7 +14,7 @@ import { AccountProvider } from "./account-context";
 import { MobileHeader } from "./mobile-header";
 import { MobileTabbar } from "./mobile-tabbar";
 import { RouteFocus } from "./route-focus";
-import { MainSidebar, Rail, SPRINT, SectionPanel } from "./sidebar";
+import { MainSidebar, Rail, SectionPanel } from "./sidebar";
 
 // cmdk and the palette's actions load the first time it is opened (Cmd+K or a search button), not with every page.
 const CommandPalette = dynamic(() => import("./command-palette").then((m) => m.CommandPalette), { ssr: false });
@@ -153,7 +153,7 @@ export function AppShell({ account, children }: { account: ShellAccount; childre
         </aside>
 
         <main className="relative flex min-w-0 flex-1 flex-col">
-          <MobileHeader sprint={SPRINT} onSearch={openSearch} onMenu={() => setDrawerOpen(true)} />
+          <MobileHeader onSearch={openSearch} onMenu={() => setDrawerOpen(true)} />
           <div data-sheet="" className="relative flex min-h-0 flex-1 flex-col">
             <DeferredSmoothScroll className="min-h-0 flex-1 overflow-y-auto">{children}</DeferredSmoothScroll>
           </div>

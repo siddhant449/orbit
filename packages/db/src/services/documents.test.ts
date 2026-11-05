@@ -16,6 +16,7 @@ import {
   listPosts,
   switchDocumentVersion,
   saveDocumentVersion,
+  setDocumentPosted,
 } from "./documents";
 
 const clerk = (n: number) => ({
@@ -226,5 +227,32 @@ describe("documents", () => {
     const s = await ensureAccount(clerk(2));
     expect((await listPosts(s.currentProfile!.id)).posts).toEqual([]);
     expect((await listPosts(p, { limit: 1 })).posts).toHaveLength(1);
+  });
+
+  it("posting twice keeps the first postedAt; undo clears it", async () => {
+    const doc = await createDocumentForChat(p, chat, { title: "Mark me", text: "Body" });
+    expect(doc.postedAt).toBeNull();
+    const first = await setDocumentPosted(p, doc.id, true);
+    expect(first?.postedAt).toBeInstanceOf(Date);
+    await new Promise((r) => setTimeout(r, 15));
+    const again = await setDocumentPosted(p, doc.id, true);
+    expect(again?.postedAt?.getTime()).toBe(first!.postedAt!.getTime());
+    expect((await getDocument(p, doc.id))?.postedAt?.getTime()).toBe(first!.postedAt!.getTime());
+    expect((await listPosts(p)).posts[0]?.postedAt?.getTime()).toBe(first!.postedAt!.getTime());
+    // Marking it posted is not an edit: the last-edited time stays.
+    expect((await getDocument(p, doc.id))?.updatedAt.getTime()).toBe(doc.updatedAt.getTime());
+    expect((await setDocumentPosted(p, doc.id, false))?.postedAt).toBeNull();
+    expect((await getDocument(p, doc.id))?.postedAt).toBeNull();
+    expect((await setDocumentPosted(p, doc.id, false))?.postedAt).toBeNull();
+  });
+
+  it("two concurrent marks leave one postedAt, and another profile's post is not found", async () => {
+    const doc = await createDocumentForChat(p, chat, { title: "Race", text: "Body" });
+    const [a, b] = await Promise.all([setDocumentPosted(p, doc.id, true), setDocumentPosted(p, doc.id, true)]);
+    expect(a?.postedAt?.getTime()).toBe(b?.postedAt?.getTime());
+    const other = await ensureAccount(clerk(2));
+    expect(await setDocumentPosted(other.currentProfile!.id, doc.id, true)).toBeUndefined();
+    await prisma.document.update({ where: { id: doc.id }, data: { deletedAt: new Date() } });
+    expect(await setDocumentPosted(p, doc.id, false)).toBeUndefined();
   });
 });

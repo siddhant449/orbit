@@ -14,6 +14,7 @@ import {
 } from "@brandloop/db";
 import { z } from "zod";
 import { getAccount } from "@/lib/account";
+import { awardBadgesQuietly } from "@/lib/progress/award";
 import { createRateLimiter, type RateLimiter } from "@/lib/rate-limit";
 
 export const SAVES_BODY_MAX_BYTES = 8 * 1024;
@@ -145,9 +146,11 @@ const SpaceFields = { name: z.string().max(200), description: z.string().max(200
 
 /** POST /api/spaces `{name, description?}` -> 201 `{space}`. */
 export async function postSpaceHandler(request: Request, deps: SavesDeps = {}): Promise<Response> {
-  return write(request, deps, z.object({ ...SpaceFields, description: z.string().max(2000).optional() }), "Send a name.", async (pid, body) =>
-    Response.json({ space: await createSpace(pid, body) }, { status: 201 }),
-  );
+  return write(request, deps, z.object({ ...SpaceFields, description: z.string().max(2000).optional() }), "Send a name.", async (pid, body) => {
+    const space = await createSpace(pid, body);
+    await awardBadgesQuietly(pid); // "First space"; a badge problem never fails the request
+    return Response.json({ space }, { status: 201 });
+  });
 }
 
 /** PATCH /api/spaces/:id `{name?, description?, pinned?}`. */

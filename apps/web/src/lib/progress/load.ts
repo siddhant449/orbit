@@ -10,6 +10,9 @@ export type ProgressData = {
   today: DayKey;
   drafts: DraftsByDay;
   draftTotal: number;
+  /** Posts marked as posted per local day (`Document.postedAt`): what the posts goal, streaks and badges count. */
+  posted: DraftsByDay;
+  postedTotal: number;
   strategy: boolean;
   identity: boolean;
   knowledge: boolean;
@@ -28,6 +31,8 @@ export async function loadProgress(profile: { id: string; timezone: string }, no
     today,
     drafts: countByDay(signals.draftDates, timeZone),
     draftTotal: signals.draftTotal,
+    posted: countByDay(signals.postedDates, timeZone),
+    postedTotal: signals.postedTotal,
     strategy: signals.hasStrategy,
     identity: signals.hasIdentity,
     knowledge: signals.knowledgeReady > 0,
